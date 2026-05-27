@@ -1,4 +1,4 @@
-# ONE-DATABASE — Full-Stack Multi-Tenant Template
+#Full-Stack Multi-Tenant Template
 
 A multi-tenant admin platform with two portals: **SuperAdmin** (manages brands/organizations across
 the whole platform) and **Admin** (manages users, roles, and resources scoped to a single brand +
@@ -7,10 +7,10 @@ branch). Tenancy is enforced by scoping every Admin query to the authenticated u
 
 ## Repository layout
 
-| Path     | What it is        | Conventions live in        |
-| -------- | ----------------- | -------------------------- |
+| Path     | What it is                                                             | Conventions live in                                |
+| -------- | ---------------------------------------------------------------------- | -------------------------------------------------- |
 | `front/` | React 19 + Vite client (Ant Design, Tailwind v4, Zustand, React Query) | [front/CLAUDE.md](front/CLAUDE.md) → `front/docs/` |
-| `back/`  | Node + Express API (MySQL via `mysql2`, Passport JWT, Zod) | [back/CLAUDE.md](back/CLAUDE.md) → `back/docs/` |
+| `back/`  | Node + Express API (MySQL via `mysql2`, Passport JWT, Zod)             | [back/CLAUDE.md](back/CLAUDE.md) → `back/docs/`    |
 
 When working inside `front/` or `back/`, the directory's own `CLAUDE.md` and its imported `docs/`
 apply — read them before writing code. They are the source of truth for the project's patterns

@@ -1,4 +1,4 @@
-# Backend — ONE-DATABASE (Node + Express + MySQL)
+# Backend — (Node + Express + MySQL)
 
 Conventions for the multi-tenant API server. These are **non-negotiable** patterns — follow them
 when creating or editing any controller, route, validator, migration, or upload handler. Each

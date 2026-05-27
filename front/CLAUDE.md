@@ -1,4 +1,4 @@
-# Frontend — ONE-DATABASE (React 19 + Vite)
+# Frontend — (React 19 + Vite)
 
 Conventions for the admin/superadmin frontend. These are **non-negotiable** patterns — follow
 them when creating or editing any page, hook, component, API service, or form. Each section below
