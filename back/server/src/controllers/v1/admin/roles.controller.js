@@ -1,0 +1,280 @@
+import express from "express";
+import { catchAsync } from "../../../utils/catchAsync.js";
+import { getCurrentTimestampLocal } from "../../../utils/dateUtils.js";
+import { checkPermission } from "../../../middlewares/checkPermission.middleware.js";
+
+const router = express.Router();
+
+/**
+ * GET /
+ * List all roles (scoped by brandId/branchId from authenticated user)
+ */
+router.get(
+  "/",
+  checkPermission("users", "roles", "read"),
+  catchAsync(async (req, res) => {
+    const {
+      page = 1,
+      pageSize = 10,
+      search = "",
+      status,
+      sortBy = "dateCreated",
+      sortOrder = "DESC",
+    } = req.query;
+    const { brandId, branchId } = req.user;
+    const offset = (page - 1) * pageSize;
+    const params = [brandId, branchId];
+    let whereClause =
+      "WHERE r.brandId = ? AND r.branchId = ? AND r.status != 'Deleted' AND r.roleName != 'Owner'";
+
+    if (search) {
+      whereClause += ` AND (r.roleName LIKE ? OR r.description LIKE ?)`;
+      params.push(`%${search}%`, `%${search}%`);
+    }
+
+    if (status) {
+      whereClause += ` AND r.status = ?`;
+      params.push(status);
+    }
+
+    const allowedSortColumns = ["dateCreated", "dateUpdated", "roleName"];
+    const safeSortBy = allowedSortColumns.includes(sortBy) ? sortBy : "dateCreated";
+    const safeSortOrder = sortOrder.toUpperCase() === "ASC" ? "ASC" : "DESC";
+
+    const [countRows, roles] = await Promise.all([
+      req.db.query(
+        `SELECT COUNT(*) as total FROM roles r ${whereClause}`,
+        params
+      ),
+      req.db.query(
+        `SELECT
+        r.roleId,
+        r.brandId,
+        r.branchId,
+        r.roleName,
+        r.description,
+        r.status,
+        r.dateCreated,
+        r.dateUpdated
+      FROM roles r
+      ${whereClause}
+      ORDER BY r.${safeSortBy} ${safeSortOrder}
+      LIMIT ? OFFSET ?`,
+        [...params, Number(pageSize), Number(offset)]
+      ),
+    ]);
+    const total = countRows[0]?.total || 0;
+
+    return res.sendSuccess("Roles retrieved successfully", {
+      roles,
+      pagination: {
+        page: Number(page),
+        pageSize: Number(pageSize),
+        total,
+        totalPages: Math.ceil(total / pageSize),
+      },
+    });
+  })
+);
+
+/**
+ * GET /:roleId
+ * Get single role
+ */
+router.get(
+  "/:roleId",
+  checkPermission("users", "roles", "read"),
+  catchAsync(async (req, res) => {
+    const { roleId } = req.params;
+    const roles = await req.db.query(
+      `SELECT roleId, brandId, branchId, roleName, description, status, dateCreated, dateUpdated
+       FROM roles WHERE roleId = ? AND status != 'Deleted' LIMIT 1`,
+      [roleId]
+    );
+
+    if (roles.length === 0) {
+      return res.sendError("Role not found", 404);
+    }
+
+    return res.sendSuccess("Role retrieved successfully", { role: roles[0] });
+  })
+);
+
+/**
+ * POST /
+ * Create new role
+ */
+router.post(
+  "/",
+  checkPermission("users", "roles", "write"),
+  catchAsync(async (req, res) => {
+    const { roleName, description } = req.body;
+    const { brandId, branchId } = req.user;
+    const now = getCurrentTimestampLocal();
+
+    let conn;
+    try {
+      conn = await req.db.beginTransaction();
+
+      // Generate UUID from MySQL
+      const [uuidRow] = await conn.execute(`SELECT UUID() as id`);
+      const roleId = uuidRow[0].id;
+
+      // Check duplicate roleName within same brand/branch
+      const [existing] = await conn.execute(
+        `SELECT roleId FROM roles 
+         WHERE roleName = ? AND brandId = ? AND branchId = ? AND status != 'Deleted'
+         LIMIT 1 FOR UPDATE`,
+        [roleName, brandId, branchId]
+      );
+
+      if (existing.length > 0) {
+        await req.db.rollback(conn);
+        return res.sendError("A role with this name already exists", 409);
+      }
+
+      await conn.execute(
+        `INSERT INTO roles (roleId, brandId, branchId, roleName, description, status, dateCreated, dateUpdated)
+         VALUES (?, ?, ?, ?, ?, 'Active', ?, ?)`,
+        [roleId, brandId, branchId, roleName, description || null, now, now]
+      );
+
+      await req.db.commit(conn);
+
+      return res.sendSuccess("Role created successfully", { roleId }, 201);
+    } catch (err) {
+      await req.db.rollback(conn);
+      throw err;
+    }
+  })
+);
+
+/**
+ * PUT /:roleId
+ * Update role
+ */
+router.put(
+  "/:roleId",
+  checkPermission("users", "roles", "write"),
+  catchAsync(async (req, res) => {
+    const { roleId } = req.params;
+    const { roleName, description, status } = req.body;
+    const now = getCurrentTimestampLocal();
+
+    const result = await req.db.query(
+      `UPDATE roles 
+       SET roleName = ?, description = ?, status = ?, dateUpdated = ?
+       WHERE roleId = ? AND status != 'Deleted'`,
+      [roleName, description || null, status || "Active", now, roleId]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.sendError("Role not found", 404);
+    }
+
+    return res.sendSuccess("Role updated successfully");
+  })
+);
+
+/**
+ * DELETE /:roleId
+ * Soft delete role (status → Inactive since roles only have Active/Inactive)
+ */
+router.delete(
+  "/:roleId",
+  checkPermission("users", "roles", "write"),
+  catchAsync(async (req, res) => {
+    const { roleId } = req.params;
+    const now = getCurrentTimestampLocal();
+
+    const result = await req.db.query(
+      `UPDATE roles SET status = 'Inactive', dateUpdated = ? WHERE roleId = ? AND status = 'Active'`,
+      [now, roleId]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.sendError("Role not found", 404);
+    }
+
+    return res.sendSuccess("Role deleted successfully");
+  })
+);
+
+/**
+ * GET /:roleId/permissions
+ * Get permissions assigned to a role
+ */
+router.get(
+  "/:roleId/permissions",
+  checkPermission("users", "roles", "read"),
+  catchAsync(async (req, res) => {
+    const { roleId } = req.params;
+
+    const permissions = await req.db.query(
+      `SELECT 
+        rp.id,
+        rp.roleId,
+        rp.permissionId,
+        rp.accessLevel,
+        rp.dateCreated,
+        p.module,
+        p.submodule,
+        p.description
+      FROM role_permissions rp
+      INNER JOIN permissions p ON p.permissionId = rp.permissionId
+      WHERE rp.roleId = ?`,
+      [roleId]
+    );
+
+    return res.sendSuccess("Role permissions retrieved", { permissions });
+  })
+);
+
+/**
+ * POST /:roleId/permissions
+ * Assign permissions to a role (replaces existing)
+ * Body: { permissions: ["permissionId1", "permissionId2", ...] }
+ */
+router.post(
+  "/:roleId/permissions",
+  checkPermission("users", "roles", "write"),
+  catchAsync(async (req, res) => {
+    const { roleId } = req.params;
+    const { permissions } = req.body;
+    const now = getCurrentTimestampLocal();
+
+    let conn;
+    try {
+      conn = await req.db.beginTransaction();
+
+      // Remove existing permissions for this role
+      await conn.execute(`DELETE FROM role_permissions WHERE roleId = ?`, [roleId]);
+
+      // Insert new permissions in a single bulk statement.
+      // Each perm must be { permissionId, accessLevel }.
+      if (permissions && permissions.length > 0) {
+        const placeholders = permissions.map(() => "(?, ?, ?, ?)").join(", ");
+        const values = permissions.flatMap((perm) => [
+          roleId,
+          perm.permissionId,
+          perm.accessLevel,
+          now,
+        ]);
+        await conn.execute(
+          `INSERT INTO role_permissions (roleId, permissionId, accessLevel, dateCreated)
+           VALUES ${placeholders}`,
+          values
+        );
+      }
+
+      await req.db.commit(conn);
+
+      return res.sendSuccess("Permissions assigned successfully");
+    } catch (err) {
+      await req.db.rollback(conn);
+      throw err;
+    }
+  })
+);
+
+export default router;
