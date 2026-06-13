@@ -1,4 +1,4 @@
-#Full-Stack Multi-Tenant Template
+# Full-Stack Multi-Tenant Template
 
 A production-style starter for multi-tenant admin platforms. It ships two portals out of the box —
 a **SuperAdmin** portal that manages organizations across the whole platform, and an **Admin**

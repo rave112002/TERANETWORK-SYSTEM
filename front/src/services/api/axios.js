@@ -88,8 +88,11 @@ axiosInstance.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        // Fetch new CSRF token
-        const response = await axiosInstance.get("/api/v1/auth/csrf-token");
+        // Fetch new CSRF token. The token is portal-agnostic, and there is no
+        // /api/v1/auth route — the admin endpoint is the canonical source.
+        const response = await axiosInstance.get(
+          "/api/v1/admin/auth/csrf-token",
+        );
         const newCsrfToken = response.data.csrfToken;
 
         // Update the store with the new token
@@ -182,10 +185,12 @@ export const createAxiosInstanceWithInterceptor = (
         originalRequest._retry = true;
 
         try {
-          // Fetch new CSRF token using the appropriate user type endpoint
+          // Fetch new CSRF token using the appropriate user type endpoint.
+          // Default to the admin endpoint — the token is portal-agnostic and
+          // there is no portal-less /api/v1/auth route.
           const csrfEndpoint = user
             ? `/api/v1/${user}/auth/csrf-token`
-            : "/api/v1/auth/csrf-token";
+            : "/api/v1/admin/auth/csrf-token";
           const response = await axiosInstance.get(csrfEndpoint);
           const newCsrfToken = response.data.csrfToken;
 
