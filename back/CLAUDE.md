@@ -7,11 +7,11 @@ section below is imported from `docs/`; read the relevant one before writing cod
 ## Stack
 
 Node + Express · MySQL via a custom `Database` class wrapping `mysql2/promise` (`server/config/database.js`,
-injected as `req.db`) · Passport JWT auth · Zod validators · multi-tenant scoping by `brandId`/`branchId`.
+injected as `req.db`) · Passport JWT auth · Zod validators · multi-tenant scoping by `companyId`/`branchId`.
 
 ## Convention docs
 
-- **Authenticated user context** — `req.user` fields and the rules for multi-tenant scoping (never trust client-sent brand/branch/account IDs).
+- **Authenticated user context** — `req.user` fields and the rules for multi-tenant scoping (never trust client-sent company/branch/account IDs).
   @docs/auth-context.md
 - **Database query & transaction patterns** — `req.db.query` vs `conn.execute` return shapes, the transaction template, race-safe check-then-insert, soft-delete filtering.
   @docs/db-patterns.md

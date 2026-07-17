@@ -9,31 +9,31 @@ const router = express.Router();
 
 // ─── Upload configurations ──────────────────────────────────────────────────
 
-// SuperAdmin — brand logo: uploads/superadmin/logos/{brandId}/
+// SuperAdmin — company logo: uploads/superadmin/logos/{companyId}/
 const superadminLogoUpload = upload({
   filePath: (req) => {
-    const brandId = req.body.brandId || req.params.brandId || "unknown";
-    return `uploads/superadmin/logos/${brandId}`;
+    const companyId = req.body.companyId || req.params.companyId || "unknown";
+    return `uploads/superadmin/logos/${companyId}`;
   },
   fileTypes: ["images"],
   maxFileSize: 1024 * 1024 * 2, // 2MB
 });
 
-// Admin — user avatar: uploads/admin/avatars/{brandId}/{branchId}/{accountId}/
+// Admin — user avatar: uploads/admin/avatars/{companyId}/{branchId}/{accountId}/
 const adminAvatarUpload = upload({
   filePath: (req) => {
-    const { brandId, branchId, accountId } = req.user;
-    return `uploads/admin/avatars/${brandId}/${branchId}/${accountId}`;
+    const { companyId, branchId, accountId } = req.user;
+    return `uploads/admin/avatars/${companyId}/${branchId}/${accountId}`;
   },
   fileTypes: ["images"],
   maxFileSize: 1024 * 1024 * 2, // 2MB
 });
 
-// Admin — general image: uploads/admin/images/{brandId}/{branchId}/
+// Admin — general image: uploads/admin/images/{companyId}/{branchId}/
 const adminImageUpload = upload({
   filePath: (req) => {
-    const { brandId, branchId } = req.user;
-    return `uploads/admin/images/${brandId}/${branchId}`;
+    const { companyId, branchId } = req.user;
+    return `uploads/admin/images/${companyId}/${branchId}`;
   },
   fileTypes: ["images"],
   maxFileSize: 1024 * 1024 * 5, // 5MB
@@ -43,8 +43,8 @@ const adminImageUpload = upload({
 
 /**
  * POST /logo
- * Upload brand logo (SuperAdmin context)
- * Requires brandId in request body or params
+ * Upload company logo (SuperAdmin context)
+ * Requires companyId in request body or params
  */
 router.post(
   "/logo",
@@ -69,7 +69,7 @@ router.post(
 /**
  * POST /avatar
  * Upload user avatar (Admin context)
- * Path: uploads/admin/avatars/{brandId}/{branchId}/{accountId}/
+ * Path: uploads/admin/avatars/{companyId}/{branchId}/{accountId}/
  */
 router.post(
   "/avatar",
@@ -94,7 +94,7 @@ router.post(
 /**
  * POST /image
  * Upload general image (Admin context)
- * Path: uploads/admin/images/{brandId}/{branchId}/
+ * Path: uploads/admin/images/{companyId}/{branchId}/
  */
 router.post(
   "/image",

@@ -1,39 +1,57 @@
 import { useState, useEffect, useMemo } from "react";
-import {
-  Button,
-  Collapse,
-  Checkbox,
-  Select,
-  Space,
-  message,
-  Spin,
-  Alert,
-} from "antd";
+import { Button, Drawer, Select, message, Spin } from "antd";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Check, ChevronDown, ChevronRight, Info, Key, X } from "lucide-react";
 import { getPermissions } from "../../../../../services/api/admin/permissions";
 import {
   getRolePermissions,
   assignPermissions,
 } from "../../../../../services/api/admin/roles";
+import { decodeHTML } from "../../../../../utils/decode-html";
 
-const { Panel } = Collapse;
+const ACCESS_OPTIONS = [
+  { value: "read", label: "Read Only" },
+  { value: "write", label: "Full Access" },
+];
 
-const PermissionsDrawer = ({ role, onClose }) => {
+/** Circular check — green filled tick when on, hairline ring when off. */
+const CircleCheck = ({ checked, onChange, label }) => (
+  <button
+    type="button"
+    role="checkbox"
+    aria-checked={checked}
+    aria-label={label}
+    onClick={() => onChange(!checked)}
+    className="inline-flex items-center justify-center shrink-0 transition-colors"
+    style={{
+      width: 18,
+      height: 18,
+      borderRadius: "50%",
+      cursor: "pointer",
+      background: checked ? "var(--color-success)" : "transparent",
+      border: checked ? "none" : "1.5px solid var(--color-line)",
+    }}
+  >
+    {checked && <Check className="w-3 h-3" style={{ color: "#fff" }} strokeWidth={3} />}
+  </button>
+);
+
+const PermissionsDrawer = ({ open, role, onClose }) => {
   const queryClient = useQueryClient();
   const [selectedPermissions, setSelectedPermissions] = useState({});
+  const [collapsed, setCollapsed] = useState(() => new Set());
 
-  // Fetch all permissions
   const { data: permissionsData, isLoading: permissionsLoading } = useQuery({
     queryKey: ["permissions"],
     queryFn: () => getPermissions(),
+    enabled: open,
   });
 
-  // Fetch role permissions
   const { data: rolePermissionsData, isLoading: rolePermissionsLoading } =
     useQuery({
       queryKey: ["rolePermissions", role?.roleId],
       queryFn: () => getRolePermissions(role.roleId),
-      enabled: !!role?.roleId,
+      enabled: open && !!role?.roleId,
     });
 
   useEffect(() => {
@@ -65,200 +83,325 @@ const PermissionsDrawer = ({ role, onClose }) => {
 
   const handlePermissionChange = (permissionId, checked) => {
     setSelectedPermissions((prev) => {
-      const newPermissions = { ...prev };
-      if (checked) {
-        newPermissions[permissionId] = "read";
-      } else {
-        delete newPermissions[permissionId];
-      }
-      return newPermissions;
+      const next = { ...prev };
+      if (checked) next[permissionId] = "read";
+      else delete next[permissionId];
+      return next;
     });
   };
 
   const handleAccessLevelChange = (permissionId, accessLevel) => {
-    setSelectedPermissions((prev) => ({
-      ...prev,
-      [permissionId]: accessLevel,
-    }));
+    setSelectedPermissions((prev) => ({ ...prev, [permissionId]: accessLevel }));
   };
 
   const handleSave = () => {
     const permissions = Object.entries(selectedPermissions).map(
-      ([permissionId, accessLevel]) => ({
-        permissionId,
-        accessLevel,
-      }),
+      ([permissionId, accessLevel]) => ({ permissionId, accessLevel }),
     );
     saveMutation.mutate(permissions);
   };
 
   const handleSelectAll = (modulePermissions) => {
-    const newPermissions = { ...selectedPermissions };
-    modulePermissions.forEach((perm) => {
-      newPermissions[perm.permissionId] = "read";
+    setSelectedPermissions((prev) => {
+      const next = { ...prev };
+      modulePermissions.forEach((p) => {
+        if (!next[p.permissionId]) next[p.permissionId] = "read";
+      });
+      return next;
     });
-    setSelectedPermissions(newPermissions);
   };
 
   const handleDeselectAll = (modulePermissions) => {
-    const newPermissions = { ...selectedPermissions };
-    modulePermissions.forEach((perm) => {
-      delete newPermissions[perm.permissionId];
+    setSelectedPermissions((prev) => {
+      const next = { ...prev };
+      modulePermissions.forEach((p) => delete next[p.permissionId]);
+      return next;
     });
-    setSelectedPermissions(newPermissions);
   };
 
-  // Group permissions by module (must be before any early returns — Rules of Hooks)
+  const toggleModule = (moduleName) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(moduleName)) next.delete(moduleName);
+      else next.add(moduleName);
+      return next;
+    });
+
+  // Group permissions by module
   const modules = useMemo(() => {
     const perms = permissionsData?.data?.permissions || [];
     const grouped = {};
     perms.forEach((p) => {
-      const key = p.module;
-      if (!grouped[key]) {
-        grouped[key] = { module: key, permissions: [] };
-      }
-      grouped[key].permissions.push(p);
+      if (!grouped[p.module]) grouped[p.module] = { module: p.module, permissions: [] };
+      grouped[p.module].permissions.push(p);
     });
     return Object.values(grouped);
   }, [permissionsData]);
 
-  if (permissionsLoading || rolePermissionsLoading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <Spin size="large" tip="Loading permissions..." />
-      </div>
-    );
-  }
+  const isLoading = permissionsLoading || rolePermissionsLoading;
 
   return (
-    <div>
-      <Alert
-        message={`Managing permissions for: ${role?.roleName}`}
-        description={role?.description}
-        type="info"
-        showIcon
-        className="mb-4"
-      />
-
-      <Collapse defaultActiveKey={modules.map((m) => m.module)}>
-        {modules.map((moduleData) => {
-          const modulePermissions = moduleData.permissions;
-          const selectedCount = modulePermissions.filter(
-            (p) => selectedPermissions[p.permissionId],
-          ).length;
-
-          return (
-            <Panel
-              header={
-                <div className="flex justify-between items-center">
-                  <span className="font-semibold capitalize">
-                    {moduleData.module}
-                  </span>
-                  <span className="text-sm text-gray-500">
-                    {selectedCount} / {modulePermissions.length} selected
-                  </span>
-                </div>
-              }
-              key={moduleData.module}
-              extra={
-                <Space size="small" onClick={(e) => e.stopPropagation()}>
-                  <Button
-                    size="small"
-                    type="link"
-                    onClick={() => handleSelectAll(modulePermissions)}
-                  >
-                    Select All
-                  </Button>
-                  <Button
-                    size="small"
-                    type="link"
-                    onClick={() => handleDeselectAll(modulePermissions)}
-                  >
-                    Deselect All
-                  </Button>
-                </Space>
-              }
+    <Drawer
+      open={open}
+      onClose={onClose}
+      width={800}
+      closable={false}
+      styles={{ body: { padding: 0 } }}
+    >
+      <div className="flex flex-col h-full">
+        {/* Header — X on the left, then accent chip + title */}
+        <div
+          className="shrink-0 flex items-center gap-3 px-5 py-3.5"
+          style={{ borderBottom: "1px solid var(--color-line)" }}
+        >
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="icon-btn w-8 h-8 shrink-0"
+          >
+            <X className="w-[18px] h-[18px]" />
+          </button>
+          <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl shrink-0 bg-(image:--gradient-primary)">
+            <Key className="w-5 h-5 text-white" />
+          </span>
+          <div className="min-w-0">
+            <h2
+              className="m-0 font-semibold leading-tight"
+              style={{ fontSize: 19, color: "var(--color-text-dark)" }}
             >
-              <div className="space-y-3">
-                {modulePermissions.map((permission) => {
-                  const isChecked =
-                    !!selectedPermissions[permission.permissionId];
-                  const accessLevel =
-                    selectedPermissions[permission.permissionId] || "read";
+              Manage Permissions
+            </h2>
+            <p
+              className="m-0 mt-0.5"
+              style={{ fontSize: 13, color: "var(--color-text-secondary)" }}
+            >
+              Configure access levels for this role
+            </p>
+          </div>
+        </div>
 
-                  return (
+        {/* Scrollable body */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {isLoading ? (
+            <div className="flex justify-center items-center h-64">
+              <Spin size="large" />
+            </div>
+          ) : (
+            <>
+              {/* Info banner — which role is being edited */}
+              <div
+                className="flex items-start gap-3 p-4"
+                style={{
+                  background:
+                    "color-mix(in srgb, var(--color-success) 8%, var(--color-surface))",
+                  border:
+                    "1px solid color-mix(in srgb, var(--color-success) 28%, transparent)",
+                  borderRadius: 12,
+                }}
+              >
+                <span
+                  className="inline-flex items-center justify-center shrink-0"
+                  style={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: "50%",
+                    background: "var(--color-success)",
+                  }}
+                >
+                  <Info className="w-3.5 h-3.5" style={{ color: "#fff" }} />
+                </span>
+                <div className="min-w-0">
+                  <div
+                    style={{
+                      fontSize: 13.5,
+                      fontWeight: 600,
+                      color: "var(--color-text-dark)",
+                    }}
+                  >
+                    Managing permissions for: {decodeHTML(role?.roleName)}
+                  </div>
+                  {role?.description && (
                     <div
-                      key={permission.permissionId}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded"
+                      className="mt-0.5"
+                      style={{ fontSize: 13, color: "var(--color-text-secondary)" }}
                     >
-                      <div className="flex items-center flex-1">
-                        <Checkbox
-                          checked={isChecked}
-                          onChange={(e) =>
-                            handlePermissionChange(
-                              permission.permissionId,
-                              e.target.checked,
-                            )
-                          }
+                      {decodeHTML(role.description)}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Module groups */}
+              {modules.map(({ module: moduleName, permissions }) => {
+                const isOpen = !collapsed.has(moduleName);
+                const selectedCount = permissions.filter(
+                  (p) => selectedPermissions[p.permissionId],
+                ).length;
+
+                return (
+                  <div
+                    key={moduleName}
+                    style={{
+                      background: "var(--color-surface)",
+                      border: "1px solid var(--color-line)",
+                      borderRadius: "var(--radius-card)",
+                    }}
+                  >
+                    {/* Module header */}
+                    <div className="flex items-center justify-between gap-3 px-4 py-3">
+                      <button
+                        type="button"
+                        onClick={() => toggleModule(moduleName)}
+                        aria-expanded={isOpen}
+                        className="flex items-center gap-2 min-w-0 cursor-pointer"
+                        style={{ background: "none", border: "none", padding: 0 }}
+                      >
+                        <span style={{ color: "var(--color-text-muted)" }}>
+                          {isOpen ? (
+                            <ChevronDown className="w-4 h-4" />
+                          ) : (
+                            <ChevronRight className="w-4 h-4" />
+                          )}
+                        </span>
+                        <span
+                          className="capitalize truncate"
+                          style={{
+                            fontSize: 14.5,
+                            fontWeight: 600,
+                            color: "var(--color-text-dark)",
+                          }}
                         >
-                          <div>
-                            <div className="font-medium">
-                              {permission.submodule ? (
-                                <>
-                                  {permission.module} → {permission.submodule}
-                                </>
-                              ) : (
-                                permission.module
+                          {moduleName}
+                        </span>
+                      </button>
+
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span
+                          style={{ fontSize: 12.5, color: "var(--color-text-muted)" }}
+                        >
+                          {selectedCount} / {permissions.length} selected
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleSelectAll(permissions)}
+                          className="cursor-pointer hover:underline"
+                          style={{ fontSize: 12.5, color: "var(--color-link)" }}
+                        >
+                          Select All
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeselectAll(permissions)}
+                          className="cursor-pointer hover:underline"
+                          style={{ fontSize: 12.5, color: "var(--color-link)" }}
+                        >
+                          Deselect All
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Permission rows */}
+                    {isOpen && (
+                      <div className="px-4 pb-4 space-y-2">
+                        {permissions.map((permission) => {
+                          const isChecked = !!selectedPermissions[permission.permissionId];
+                          const accessLevel =
+                            selectedPermissions[permission.permissionId] || "read";
+                          const label = permission.submodule
+                            ? `${permission.module} → ${permission.submodule}`
+                            : permission.module;
+
+                          return (
+                            <div
+                              key={permission.permissionId}
+                              className="flex items-center justify-between gap-3 px-3.5 py-3"
+                              style={{
+                                border: "1px solid var(--color-line)",
+                                borderRadius: 10,
+                              }}
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <CircleCheck
+                                  checked={isChecked}
+                                  onChange={(next) =>
+                                    handlePermissionChange(
+                                      permission.permissionId,
+                                      next,
+                                    )
+                                  }
+                                  label={label}
+                                />
+                                <div className="min-w-0">
+                                  <div
+                                    style={{
+                                      fontSize: 13.5,
+                                      fontWeight: 600,
+                                      color: "var(--color-text-dark)",
+                                    }}
+                                  >
+                                    {label}
+                                  </div>
+                                  {permission.description && (
+                                    <div
+                                      style={{
+                                        fontSize: 12.5,
+                                        color: "var(--color-text-muted)",
+                                      }}
+                                    >
+                                      {decodeHTML(permission.description)}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {isChecked && (
+                                <Select
+                                  value={accessLevel}
+                                  onChange={(value) =>
+                                    handleAccessLevelChange(
+                                      permission.permissionId,
+                                      value,
+                                    )
+                                  }
+                                  style={{ width: 140 }}
+                                  size="small"
+                                  options={ACCESS_OPTIONS}
+                                />
                               )}
                             </div>
-                            <div className="text-xs text-gray-500">
-                              {permission.description}
-                            </div>
-                          </div>
-                        </Checkbox>
+                          );
+                        })}
                       </div>
+                    )}
+                  </div>
+                );
+              })}
+            </>
+          )}
+        </div>
 
-                      {isChecked && (
-                        <Select
-                          value={accessLevel}
-                          onChange={(value) =>
-                            handleAccessLevelChange(
-                              permission.permissionId,
-                              value,
-                            )
-                          }
-                          style={{ width: 120 }}
-                          size="small"
-                        >
-                          <Select.Option value="read">Read Only</Select.Option>
-                          <Select.Option value="write">
-                            Full Access
-                          </Select.Option>
-                        </Select>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </Panel>
-          );
-        })}
-      </Collapse>
-
-      <div className="mt-6 flex justify-end">
-        <Space>
-          <Button onClick={onClose}>Cancel</Button>
+        {/* Footer */}
+        <div
+          className="shrink-0 flex justify-end gap-3 px-5 pt-4"
+          style={{
+            borderTop: "1px solid var(--color-line)",
+            paddingBottom: "calc(1rem + env(safe-area-inset-bottom))",
+          }}
+        >
+          <Button onClick={onClose} size="large">
+            Cancel
+          </Button>
           <Button
             type="primary"
             onClick={handleSave}
-            loading={saveMutation.isLoading}
-            className="bg-gradient-to-r from-blue-500 to-indigo-600 border-0"
+            loading={saveMutation.isPending}
+            size="large"
           >
-            Save Permissions
+            Save permissions
           </Button>
-        </Space>
+        </div>
       </div>
-    </div>
+    </Drawer>
   );
 };
 

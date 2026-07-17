@@ -1,9 +1,9 @@
-#Full-Stack Multi-Tenant Template
+# Full-Stack Multi-Tenant Template
 
-A multi-tenant admin platform with two portals: **SuperAdmin** (manages brands/organizations across
-the whole platform) and **Admin** (manages users, roles, and resources scoped to a single brand +
-branch). Tenancy is enforced by scoping every Admin query to the authenticated user's `brandId` /
-`branchId`; SuperAdmin operates across all brands.
+A multi-tenant admin platform with two portals: **SuperAdmin** (manages companies across the whole
+platform) and **Admin** (manages users, roles, and resources scoped to a single company + branch).
+Tenancy is enforced by scoping every Admin query to the authenticated user's `companyId` /
+`branchId`; SuperAdmin operates across all companies.
 
 ## Repository layout
 
@@ -26,4 +26,4 @@ apply — read them before writing code. They are the source of truth for the pr
 - **Soft deletes everywhere:** rows are never physically deleted — set `status = 'Deleted'` and
   filter with `status != 'Deleted'`.
 - **Business IDs, not numeric IDs:** APIs, URLs, and FKs use the `varchar` business ID
-  (`accountId`, `brandId`, `roleId`, …), never the internal auto-increment `id`.
+  (`accountId`, `companyId`, `roleId`, …), never the internal auto-increment `id`.

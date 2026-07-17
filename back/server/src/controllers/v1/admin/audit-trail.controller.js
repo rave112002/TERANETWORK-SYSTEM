@@ -6,13 +6,13 @@ const router = express.Router();
 
 /**
  * GET /
- * List audit trail logs (scoped by brand/branch from req.user)
+ * List audit trail logs (scoped by company/branch from req.user)
  */
 router.get(
   "/",
   checkPermission("audit_trail", null, "read"),
   catchAsync(async (req, res) => {
-    const { brandId, branchId } = req.user;
+    const { companyId, branchId } = req.user;
     const {
       page = 1,
       pageSize = 20,
@@ -25,8 +25,8 @@ router.get(
     } = req.query;
 
     const offset = (page - 1) * pageSize;
-    const params = [brandId, branchId];
-    let whereClause = "WHERE a.brandId = ? AND a.branchId = ?";
+    const params = [companyId, branchId];
+    let whereClause = "WHERE a.companyId = ? AND a.branchId = ?";
 
     if (search) {
       whereClause += ` AND (a.action LIKE ? OR a.description LIKE ?)`;

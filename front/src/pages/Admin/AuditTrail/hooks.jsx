@@ -1,15 +1,16 @@
 import { useState, useCallback, useMemo } from "react";
-import { Button, Tag, Tooltip } from "antd";
+import { Button, Dropdown } from "antd";
 import dayjs from "dayjs";
-import { Eye, Plus, Pencil, Trash2, User as UserIcon } from "lucide-react";
+import { Eye, MoreVertical } from "lucide-react";
 import { useDebounce } from "../../../hooks/useDebounce";
 import { useGetAuditTrail } from "../../../services/requests/admin/audit-trail";
+import { decodeHTML } from "../../../utils/decode-html";
 
-// Action verb → tag color + icon
-const ACTION_CONFIG = {
-  CREATE: { color: "success", icon: Plus },
-  UPDATE: { color: "processing", icon: Pencil },
-  DELETE: { color: "error", icon: Trash2 },
+// Action verb → status-dot token. Tokens only, never a hardcoded hex.
+export const ACTION_DOT = {
+  CREATE: "var(--color-success)",
+  UPDATE: "var(--color-warning)",
+  DELETE: "var(--color-error)",
 };
 
 // Modules that are currently audited (see backend route middleware: auditTrail("..."))
@@ -72,48 +73,77 @@ export const useAuditTrailHooks = () => {
     setCurrentPage(1);
   }, []);
 
+  // ⋮ menu — Audit Trail is read-only, so viewing is the only action.
+  const getActionItems = useCallback(
+    (record) => [
+      {
+        key: "view",
+        label: "View details",
+        icon: <Eye className="w-4 h-4" />,
+        onClick: () => handleViewDetails(record),
+      },
+    ],
+    [handleViewDetails],
+  );
+
   // ─── Columns ──────────────────────────────────────────────────────
+  // # (mono) · initial-avatar + user · action dot · module · description · ⋮
   const columns = useMemo(
     () => [
       {
-        title: "Date & Time",
-        dataIndex: "dateCreated",
-        key: "dateCreated",
-        fixed: "left",
-        width: 180,
-        render: (date) => (
-          <div className="min-w-0">
-            <div
-              className="font-medium"
-              style={{ color: "var(--color-text-dark)" }}
-            >
-              {dayjs(date).format("MMM D, YYYY")}
-            </div>
-            <div
-              className="text-xs"
-              style={{ color: "var(--color-text-secondary)" }}
-            >
-              {dayjs(date).format("h:mm:ss A")}
-            </div>
-          </div>
+        title: "#",
+        key: "index",
+        width: 56,
+        render: (_, __, index) => (
+          <span
+            className="font-mono"
+            style={{ fontSize: 12, color: "var(--color-text-muted)" }}
+          >
+            {String((currentPage - 1) * pageSize + index + 1).padStart(2, "0")}
+          </span>
         ),
       },
       {
         title: "User",
         key: "user",
-        width: 200,
+        width: 220,
         render: (_, record) => {
-          const name = [record.firstName, record.lastName]
-            .filter(Boolean)
-            .join(" ");
+          const label =
+            decodeHTML(
+              [record.firstName, record.lastName].filter(Boolean).join(" "),
+            ) ||
+            record.accountId ||
+            "—";
+          const initial = (label.trim().charAt(0) || "?").toUpperCase();
           return (
-            <div className="flex items-center gap-2 min-w-0">
-              <UserIcon className="w-4 h-4 text-gray-400 shrink-0" />
+            <div className="flex items-center gap-3 min-w-0">
+              <span
+                style={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: 8,
+                  background: "var(--color-surface-sunken)",
+                  border: "1px solid var(--color-line)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flex: "none",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: "var(--color-text-secondary)",
+                }}
+              >
+                {initial}
+              </span>
               <span
                 className="truncate"
-                style={{ color: "var(--color-text-dark)" }}
+                style={{
+                  fontSize: 14,
+                  fontWeight: 500,
+                  color: "var(--color-text-dark)",
+                }}
               >
-                {name || record.accountId || "—"}
+                {label}
               </span>
             </div>
           );
@@ -124,48 +154,71 @@ export const useAuditTrailHooks = () => {
         dataIndex: "action",
         key: "action",
         width: 130,
-        render: (action) => {
-          const cfg = ACTION_CONFIG[action] || { color: "default", icon: null };
-          const Icon = cfg.icon;
-          return (
-            <Tag
-              icon={Icon ? <Icon className="w-3 h-3" /> : null}
-              color={cfg.color}
-            >
-              {action}
-            </Tag>
-          );
-        },
+        render: (action) => (
+          <span
+            className="inline-flex items-center gap-2"
+            style={{ fontSize: 13, color: "var(--color-text-secondary)" }}
+          >
+            <span
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: "50%",
+                flex: "none",
+                background: ACTION_DOT[action] || "var(--color-text-muted)",
+              }}
+            />
+            {action || "—"}
+          </span>
+        ),
       },
       {
         title: "Module",
         dataIndex: "module",
         key: "module",
         width: 160,
-        render: (module) => <Tag>{module}</Tag>,
+        render: (module) => (
+          <span style={{ fontSize: 13.5, color: "var(--color-text-secondary)" }}>
+            {module || "—"}
+          </span>
+        ),
       },
       {
         title: "Description",
         dataIndex: "description",
         key: "description",
+        ellipsis: true,
         render: (description) => (
-          <span
-            className="truncate"
-            style={{ color: "var(--color-text-secondary)" }}
-          >
-            {description || "—"}
+          <span style={{ fontSize: 13.5, color: "var(--color-text-secondary)" }}>
+            {decodeHTML(description) || "—"}
           </span>
         ),
       },
       {
-        title: "IP Address",
+        title: "Date & time",
+        dataIndex: "dateCreated",
+        key: "dateCreated",
+        width: 180,
+        render: (date) => (
+          <div className="min-w-0">
+            <div style={{ fontSize: 13.5, color: "var(--color-text-dark)" }}>
+              {dayjs(date).format("MMM D, YYYY")}
+            </div>
+            <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+              {dayjs(date).format("h:mm:ss A")}
+            </div>
+          </div>
+        ),
+      },
+      {
+        title: "IP address",
         dataIndex: "ipAddress",
         key: "ipAddress",
         width: 150,
         render: (ip) => (
           <span
-            className="font-mono text-xs"
-            style={{ color: "var(--color-text-muted)" }}
+            className="font-mono"
+            style={{ fontSize: 12, color: "var(--color-text-muted)" }}
           >
             {ip || "—"}
           </span>
@@ -174,21 +227,24 @@ export const useAuditTrailHooks = () => {
       {
         title: "",
         key: "actions",
-        fixed: "right",
         width: 60,
+        align: "right",
         render: (_, record) => (
-          <Tooltip title="View details">
+          <Dropdown
+            menu={{ items: getActionItems(record) }}
+            trigger={["click"]}
+            placement="bottomRight"
+          >
             <Button
               type="text"
-              icon={<Eye className="w-4 h-4" />}
-              onClick={() => handleViewDetails(record)}
-              className="hover:bg-gray-100"
+              icon={<MoreVertical className="w-4 h-4" />}
+              className="hover:bg-(--color-surface-sunken)"
             />
-          </Tooltip>
+          </Dropdown>
         ),
       },
     ],
-    [handleViewDetails],
+    [getActionItems, currentPage, pageSize],
   );
 
   const isSearching = search !== debouncedSearch;
@@ -226,5 +282,6 @@ export const useAuditTrailHooks = () => {
     isDetailOpen,
     handleViewDetails,
     handleCloseDetails,
+    getActionItems,
   };
 };

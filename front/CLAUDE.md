@@ -8,6 +8,19 @@ is imported from `docs/`; read the relevant one before writing code in that area
 
 React 19 (function components, hooks only) · JavaScript (no TypeScript) · Vite · Ant Design v5 ·
 Tailwind CSS v4 · Zustand · TanStack React Query · axios · react-router v7 · lucide-react · dayjs.
+Type is **Onest** (UI) + **JetBrains Mono** (micro-data only), self-hosted via `@fontsource-variable`.
+
+## Design system — "Modern"
+
+Monochrome surfaces + hairline borders + **one green accent used sparingly**. Structure comes from
+borders, **not shadows**; the primary button is **inverted monochrome** (never the accent, never a
+gradient). Every color is a token in `src/index.css` — **never hardcode a hex**.
+
+- **`../modern-module-pattern.md`** (repo root) — the canonical, copy-paste spec for a module's
+  list page + create/edit drawer. Read it before building either.
+- **`src/pages/Admin/UserManagement/Roles/`** — the reference implementation. Copy its shape.
+- Shared building blocks: `components/PageHeader.jsx`, `StatCard.jsx`, `PaginationFooter.jsx`,
+  `SectionLabel.jsx`, `StatusToggle.jsx`.
 
 ## Convention docs
 
@@ -21,7 +34,7 @@ Tailwind CSS v4 · Zustand · TanStack React Query · axios · react-router v7 �
   @docs/api-guide.md
 - **Auth & state** — Zustand auth stores, login/logout flow, `usePermissions`, `<ProtectedRoute>`.
   @docs/auth-state.md
-- **UI design system** — theme tokens, dark mode, page skeleton, table/drawer/card patterns, styling rules.
+- **UI design system** — the Modern system: tokens, dark mode, inverted primary, flat cards, the list-page skeleton, table columns, pagination footer.
   @docs/ui-design-system.md
-- **UI form design** — the Gradient Drawer Form pattern (the form owns its `<Drawer>`; props are `{ open, onClose, onSuccess, entity? }`).
+- **UI form design** — the Modern Drawer Form pattern (the form owns its `<Drawer>`; props are `{ open, onClose, onSuccess, entity? }`).
   @docs/ui-form-design.md

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { Table, Select, Button, Space, message, Spin, Tag, Alert } from "antd";
-import { Shield, Key, AlertCircle } from "lucide-react";
+import { Alert, Button, Drawer, Select, Space, Spin, Table, message } from "antd";
+import { AlertCircle, Key, Shield, X } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getUserPermissions,
@@ -9,7 +9,52 @@ import {
 
 const { Option } = Select;
 
-const UserPermissionsDrawer = ({ user, onClose }) => {
+// Monochrome chip — access levels read as plain labels, the accent is reserved
+// for the "Override" signal.
+const Chip = ({ children, accent }) => (
+  <span
+    className="inline-flex items-center gap-1.5 uppercase"
+    style={{
+      fontSize: 11,
+      fontWeight: 600,
+      letterSpacing: "0.04em",
+      padding: "2px 8px",
+      borderRadius: 6,
+      background: "var(--color-surface-sunken)",
+      border: "1px solid var(--color-line)",
+      color: accent ? "var(--color-link)" : "var(--color-text-secondary)",
+    }}
+  >
+    {children}
+  </span>
+);
+
+// Rebuild the merged permission rows from a fetched payload — role permissions
+// with the user's overrides layered on top.
+const mergePermissions = (data) => {
+  const rolePerms = data?.data?.rolePermissions || [];
+  const userPerms = data?.data?.userPermissions || [];
+
+  if (rolePerms.length === 0) return [];
+
+  const userPermMap = new Map(
+    userPerms.map((p) => [p.permissionId, p.accessLevel]),
+  );
+
+  return rolePerms.map((rolePerm) => ({
+    permissionId: rolePerm.permissionId,
+    module: rolePerm.module,
+    submodule: rolePerm.submodule,
+    description: rolePerm.description,
+    roleAccessLevel: rolePerm.accessLevel,
+    userAccessLevel: userPermMap.get(rolePerm.permissionId) || null,
+    currentAccessLevel:
+      userPermMap.get(rolePerm.permissionId) || rolePerm.accessLevel,
+    hasOverride: userPermMap.has(rolePerm.permissionId),
+  }));
+};
+
+const UserPermissionsDrawer = ({ open, user, onClose }) => {
   const queryClient = useQueryClient();
   const [permissions, setPermissions] = useState([]);
   const [hasChanges, setHasChanges] = useState(false);
@@ -18,7 +63,7 @@ const UserPermissionsDrawer = ({ user, onClose }) => {
   const { data, isLoading, error } = useQuery({
     queryKey: ["userPermissions", user?.accountId],
     queryFn: () => getUserPermissions(user.accountId),
-    enabled: !!user?.accountId,
+    enabled: open && !!user?.accountId,
   });
 
   // Bulk update mutation
@@ -28,8 +73,10 @@ const UserPermissionsDrawer = ({ user, onClose }) => {
     onSuccess: () => {
       message.success("User permissions updated successfully");
       setHasChanges(false);
-      queryClient.invalidateQueries(["userPermissions", user.accountId]);
-      queryClient.invalidateQueries(["users"]);
+      queryClient.invalidateQueries({
+        queryKey: ["userPermissions", user.accountId],
+      });
+      queryClient.invalidateQueries({ queryKey: ["users"] });
     },
     onError: (error) => {
       message.error(
@@ -39,37 +86,7 @@ const UserPermissionsDrawer = ({ user, onClose }) => {
   });
 
   useEffect(() => {
-    if (data) {
-      // Merge role permissions with user overrides
-      const rolePerms = data?.data?.rolePermissions || [];
-      const userPerms = data?.data?.userPermissions || [];
-
-      // If no role permissions, show empty state
-      if (rolePerms.length === 0) {
-        setPermissions([]);
-        return;
-      }
-
-      // Create a map of user overrides
-      const userPermMap = new Map(
-        userPerms.map((p) => [p.permissionId, p.accessLevel]),
-      );
-
-      // Merge permissions
-      const merged = rolePerms.map((rolePerm) => ({
-        permissionId: rolePerm.permissionId,
-        module: rolePerm.module,
-        submodule: rolePerm.submodule,
-        description: rolePerm.description,
-        roleAccessLevel: rolePerm.accessLevel,
-        userAccessLevel: userPermMap.get(rolePerm.permissionId) || null,
-        currentAccessLevel:
-          userPermMap.get(rolePerm.permissionId) || rolePerm.accessLevel,
-        hasOverride: userPermMap.has(rolePerm.permissionId),
-      }));
-
-      setPermissions(merged);
-    }
+    if (data) setPermissions(mergePermissions(data));
   }, [data]);
 
   const handleAccessLevelChange = (permissionId, newAccessLevel) => {
@@ -124,39 +141,8 @@ const UserPermissionsDrawer = ({ user, onClose }) => {
 
   const handleReset = () => {
     if (data) {
-      const rolePerms = data?.data?.rolePermissions || [];
-      const userPerms = data?.data?.userPermissions || [];
-      const userPermMap = new Map(
-        userPerms.map((p) => [p.permissionId, p.accessLevel]),
-      );
-
-      const merged = rolePerms.map((rolePerm) => ({
-        permissionId: rolePerm.permissionId,
-        module: rolePerm.module,
-        submodule: rolePerm.submodule,
-        description: rolePerm.description,
-        roleAccessLevel: rolePerm.accessLevel,
-        userAccessLevel: userPermMap.get(rolePerm.permissionId) || null,
-        currentAccessLevel:
-          userPermMap.get(rolePerm.permissionId) || rolePerm.accessLevel,
-        hasOverride: userPermMap.has(rolePerm.permissionId),
-      }));
-
-      setPermissions(merged);
+      setPermissions(mergePermissions(data));
       setHasChanges(false);
-    }
-  };
-
-  const getAccessLevelColor = (level) => {
-    switch (level) {
-      case "write":
-        return "green";
-      case "read":
-        return "blue";
-      case "none":
-        return "default";
-      default:
-        return "default";
     }
   };
 
@@ -165,18 +151,32 @@ const UserPermissionsDrawer = ({ user, onClose }) => {
       title: "Module",
       dataIndex: "module",
       key: "module",
-      width: 150,
+      width: 140,
       render: (text) => (
-        <div className="font-medium text-gray-900 capitalize">{text}</div>
+        <span
+          className="capitalize"
+          style={{
+            fontSize: 13.5,
+            fontWeight: 500,
+            color: "var(--color-text-dark)",
+          }}
+        >
+          {text}
+        </span>
       ),
     },
     {
       title: "Submodule",
       dataIndex: "submodule",
       key: "submodule",
-      width: 150,
+      width: 140,
       render: (text) => (
-        <div className="text-gray-600 capitalize">{text || "-"}</div>
+        <span
+          className="capitalize"
+          style={{ fontSize: 13.5, color: "var(--color-text-secondary)" }}
+        >
+          {text || "-"}
+        </span>
       ),
     },
     {
@@ -184,23 +184,24 @@ const UserPermissionsDrawer = ({ user, onClose }) => {
       dataIndex: "description",
       key: "description",
       ellipsis: true,
-    },
-    {
-      title: "Role Permission",
-      dataIndex: "roleAccessLevel",
-      key: "roleAccessLevel",
-      width: 150,
-      align: "center",
-      render: (level) => (
-        <Tag color={getAccessLevelColor(level)} className="uppercase">
-          {level}
-        </Tag>
+      render: (d) => (
+        <span style={{ fontSize: 13.5, color: "var(--color-text-secondary)" }}>
+          {d}
+        </span>
       ),
     },
     {
-      title: "User Override",
+      title: "Role permission",
+      dataIndex: "roleAccessLevel",
+      key: "roleAccessLevel",
+      width: 140,
+      align: "center",
+      render: (level) => <Chip>{level}</Chip>,
+    },
+    {
+      title: "User override",
       key: "userOverride",
-      width: 200,
+      width: 190,
       align: "center",
       render: (_, record) => (
         <Space>
@@ -232,24 +233,67 @@ const UserPermissionsDrawer = ({ user, onClose }) => {
     {
       title: "Status",
       key: "status",
-      width: 100,
+      width: 110,
       align: "center",
       render: (_, record) =>
-        record.hasOverride ? (
-          <Tag color="orange" icon={<AlertCircle className="w-3 h-3" />}>
-            Override
-          </Tag>
-        ) : (
-          <Tag color="default">Default</Tag>
-        ),
+        record.hasOverride ? <Chip accent>Override</Chip> : <Chip>Default</Chip>,
     },
   ];
 
-  if (error) {
-    return (
-      <div className="p-6">
+  // Check if user has no role assigned
+  const hasNoRole = !isLoading && data && !data?.data?.roleId;
+  const overrideCount = permissions.filter((p) => p.hasOverride).length;
+
+  return (
+    <Drawer
+      open={open}
+      onClose={onClose}
+      width={1000}
+      closable={false}
+      styles={{ body: { padding: 24 } }}
+    >
+      {/* Header — accent chip + title + subtitle + bordered X */}
+      <div className="flex items-start justify-between gap-3 mb-7">
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="inline-flex items-center justify-center w-11 h-11 rounded-xl shrink-0 bg-(image:--gradient-primary)">
+            <Key className="w-[22px] h-[22px] text-white" />
+          </span>
+          <div className="min-w-0">
+            <h2
+              className="m-0 font-semibold leading-tight truncate"
+              style={{ fontSize: 19, color: "var(--color-text-dark)" }}
+            >
+              Manage permissions
+            </h2>
+            <p
+              className="m-0 mt-0.5 truncate"
+              style={{ fontSize: 13, color: "var(--color-text-secondary)" }}
+            >
+              {user
+                ? `Access levels for ${user.firstName} ${user.lastName}`
+                : "Configure access levels for this user"}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          aria-label="Close"
+          className="inline-flex items-center justify-center shrink-0 transition-colors hover:bg-(--color-surface-sunken)"
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 8,
+            border: "1px solid var(--color-line)",
+            color: "var(--color-text-secondary)",
+          }}
+        >
+          <X className="w-[18px] h-[18px]" />
+        </button>
+      </div>
+
+      {error ? (
         <Alert
-          message="Error Loading Permissions"
+          message="Error loading permissions"
           description={
             error.response?.data?.message ||
             "Failed to load user permissions. Please try again."
@@ -257,141 +301,187 @@ const UserPermissionsDrawer = ({ user, onClose }) => {
           type="error"
           showIcon
         />
-      </div>
-    );
-  }
-
-  // Check if user has no role assigned
-  const hasNoRole = !isLoading && data && !data?.data?.roleId;
-
-  return (
-    <div className="h-full flex flex-col">
-      {/* Header */}
-      <div className="p-6 border-b border-gray-200">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-2.5 bg-linear-to-br from-purple-500 to-indigo-500 rounded-xl">
-            <Key className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <h2 className="text-xl font-bold text-gray-900">
-              Manage Permissions
-            </h2>
-            <p className="text-sm text-gray-500">
-              {user?.firstName} {user?.lastName}
-            </p>
-          </div>
-        </div>
-
-        {data?.data?.roleId && (
-          <div className="mt-4 p-3 bg-blue-50 rounded-lg flex items-center gap-2">
-            <Shield className="w-4 h-4 text-blue-600" />
-            <span className="text-sm text-blue-900">
-              <strong>Role:</strong> {data.data.roleName || "No Role"}
-            </span>
-          </div>
-        )}
-
-        {!hasNoRole && (
-          <Alert
-            message="Permission Overrides"
-            description="User-specific permissions will override role permissions. Changes only affect this user."
-            type="info"
-            showIcon
-            className="mt-4"
-          />
-        )}
-      </div>
-
-      {/* Table */}
-      <div className="flex-1 overflow-auto p-6">
-        {isLoading ? (
-          <div className="flex items-center justify-center h-64">
-            <Spin size="large" tip="Loading permissions..." />
-          </div>
-        ) : hasNoRole ? (
-          <div className="flex flex-col items-center justify-center h-64 text-center">
-            <div className="p-4 bg-gray-100 rounded-full mb-4">
-              <Shield className="w-12 h-12 text-gray-400" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              No Role Assigned
-            </h3>
-            <p className="text-gray-500 max-w-md mb-4">
-              This user has no role assigned. Please assign a role to the user
-              first before managing permissions.
-            </p>
-            <Alert
-              message="How to assign a role"
-              description="Edit the user and select a role from the Role dropdown in the user form."
-              type="warning"
-              showIcon
-              className="max-w-md"
-            />
-          </div>
-        ) : permissions.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-center">
-            <div className="p-4 bg-gray-100 rounded-full mb-4">
-              <AlertCircle className="w-12 h-12 text-gray-400" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              No Permissions Available
-            </h3>
-            <p className="text-gray-500 max-w-md">
-              The assigned role has no permissions configured. Please configure
-              permissions for the role first.
-            </p>
-          </div>
-        ) : (
-          <Table
-            columns={columns}
-            dataSource={permissions}
-            rowKey="permissionId"
-            pagination={false}
-            scroll={{ y: "calc(100vh - 400px)" }}
-            size="small"
-          />
-        )}
-      </div>
-
-      {/* Footer */}
-      <div className="p-6 border-t border-gray-200 bg-gray-50">
-        <div className="flex justify-between items-center">
-          <div className="text-sm text-gray-600">
-            {hasNoRole
-              ? "No role assigned"
-              : `${permissions.filter((p) => p.hasOverride).length} override(s)`}
-          </div>
-          <Space>
-            <Button onClick={onClose} disabled={updateMutation.isPending}>
-              {hasNoRole ? "Close" : "Cancel"}
-            </Button>
-            {!hasNoRole && (
-              <>
-                <Button
-                  onClick={handleReset}
-                  disabled={!hasChanges || updateMutation.isPending}
-                >
-                  Reset Changes
-                </Button>
-                <Button
-                  type="primary"
-                  onClick={handleSave}
-                  loading={updateMutation.isPending}
-                  disabled={!hasChanges}
+      ) : (
+        <>
+          {/* Assigned role well */}
+          {data?.data?.roleId && (
+            <div
+              className="flex items-center gap-2 p-3 mb-4"
+              style={{
+                background: "var(--color-surface-sunken)",
+                border: "1px solid var(--color-line)",
+                borderRadius: 9,
+              }}
+            >
+              <Shield
+                className="w-4 h-4 shrink-0"
+                style={{ color: "var(--color-text-muted)" }}
+              />
+              <span
+                style={{ fontSize: 13, color: "var(--color-text-secondary)" }}
+              >
+                Role:{" "}
+                <span
                   style={{
-                    background:
-                      "linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)",
-                    border: "none",
+                    fontWeight: 500,
+                    color: "var(--color-text-dark)",
                   }}
                 >
-                  Save Permissions
-                </Button>
-              </>
-            )}
-          </Space>
+                  {data.data.roleName || "No Role"}
+                </span>
+              </span>
+            </div>
+          )}
+
+          {!hasNoRole && (
+            <Alert
+              message="Permission overrides"
+              description="User-specific permissions will override role permissions. Changes only affect this user."
+              type="info"
+              showIcon
+              className="mb-5"
+            />
+          )}
+
+          {isLoading ? (
+            <div className="flex items-center justify-center h-64">
+              <Spin size="large" />
+            </div>
+          ) : hasNoRole ? (
+            <div className="flex flex-col items-center justify-center h-64 text-center">
+              <span
+                className="inline-flex items-center justify-center mb-4"
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 14,
+                  background: "var(--color-surface-sunken)",
+                  border: "1px solid var(--color-line)",
+                }}
+              >
+                <Shield
+                  className="w-6 h-6"
+                  style={{ color: "var(--color-text-muted)" }}
+                />
+              </span>
+              <h3
+                className="m-0 mb-2 font-semibold"
+                style={{ fontSize: 16, color: "var(--color-text-dark)" }}
+              >
+                No role assigned
+              </h3>
+              <p
+                className="m-0 mb-4 max-w-md"
+                style={{ fontSize: 13, color: "var(--color-text-secondary)" }}
+              >
+                This user has no role assigned. Please assign a role to the user
+                first before managing permissions.
+              </p>
+              <Alert
+                message="How to assign a role"
+                description="Edit the user and select a role from the Role dropdown in the user form."
+                type="warning"
+                showIcon
+                className="max-w-md"
+              />
+            </div>
+          ) : permissions.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-64 text-center">
+              <span
+                className="inline-flex items-center justify-center mb-4"
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 14,
+                  background: "var(--color-surface-sunken)",
+                  border: "1px solid var(--color-line)",
+                }}
+              >
+                <AlertCircle
+                  className="w-6 h-6"
+                  style={{ color: "var(--color-text-muted)" }}
+                />
+              </span>
+              <h3
+                className="m-0 mb-2 font-semibold"
+                style={{ fontSize: 16, color: "var(--color-text-dark)" }}
+              >
+                No permissions available
+              </h3>
+              <p
+                className="m-0 max-w-md"
+                style={{ fontSize: 13, color: "var(--color-text-secondary)" }}
+              >
+                The assigned role has no permissions configured. Please configure
+                permissions for the role first.
+              </p>
+            </div>
+          ) : (
+            <div
+              className="overflow-hidden"
+              style={{
+                border: "1px solid var(--color-line)",
+                borderRadius: "var(--radius-card)",
+              }}
+            >
+              <Table
+                columns={columns}
+                dataSource={permissions}
+                rowKey="permissionId"
+                pagination={false}
+                scroll={{ x: 820, y: "calc(100vh - 460px)" }}
+                size="small"
+                className="border-none"
+              />
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Footer */}
+      <div
+        className="mt-8 pt-5 flex items-center justify-between gap-3 flex-wrap"
+        style={{
+          borderTop: "1px solid var(--color-line)",
+          paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))",
+        }}
+      >
+        <span className="text-[12.5px]" style={{ color: "var(--color-text-muted)" }}>
+          {hasNoRole
+            ? "No role assigned"
+            : `${overrideCount} override${overrideCount === 1 ? "" : "s"}`}
+        </span>
+        <div className="flex items-center gap-3">
+          <Button
+            onClick={onClose}
+            size="large"
+            disabled={updateMutation.isPending}
+          >
+            {hasNoRole ? "Close" : "Cancel"}
+          </Button>
+          {!hasNoRole && (
+            <>
+              <Button
+                onClick={handleReset}
+                size="large"
+                disabled={!hasChanges || updateMutation.isPending}
+              >
+                Reset changes
+              </Button>
+              <Button
+                type="primary"
+                onClick={handleSave}
+                loading={updateMutation.isPending}
+                disabled={!hasChanges}
+                size="large"
+              >
+                Save permissions
+              </Button>
+            </>
+          )}
         </div>
       </div>
-    </div>
+    </Drawer>
   );
 };
 

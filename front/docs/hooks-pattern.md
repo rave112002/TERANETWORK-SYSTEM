@@ -26,7 +26,7 @@ src/pages/[Portal]/[Module]/[SubModule]/hooks.jsx
 | Users         | `useUserHooks`         |
 | Roles         | `useRolesData`         |
 | Dashboard     | `useDashboardHooks`    |
-| Organizations | `useOrganizationHooks` |
+| Companies | `useCompanyHooks` |
 
 Pattern: `use[Entity]Hooks` or `use[Entity]Data`. Pick one per project — `useXHooks` is preferred.
 
@@ -282,16 +282,17 @@ export const useItemHooks = () => {
 
 For pages with stat cards, define them in the hook and return them:
 
+`StatCard` is flat: `{ title, value, change, icon }`. There are no `color` / `bgColor` /
+`textColor` props — the card takes no accent.
+
 ```jsx
 const statCards = useMemo(
   () => [
     {
-      title: "Total Items",
+      title: "Total items",
       value: data?.pagination?.total || 0,
-      icon: <Package className="w-5 h-5" />,
-      color: "from-primary-color to-secondary-color",
-      bgColor: "bg-primary-pale",
-      textColor: "text-primary-color",
+      change: "all time", // the unit / caption beside the value
+      icon: <Package className="w-4.25 h-4.25" strokeWidth={1.8} />,
     },
     // ...
   ],

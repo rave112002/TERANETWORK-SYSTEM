@@ -41,7 +41,7 @@ src/pages/
 ## Rules
 
 1. **Portal folders:** `Admin/` and `SuperAdmin/` are the two portal roots. All modules go inside one of these.
-2. **Module folder:** Always a PascalCase directory (e.g., `Dashboard/`, `UserManagement/`, `Organizations/`).
+2. **Module folder:** Always a PascalCase directory (e.g., `Dashboard/`, `UserManagement/`, `Companies/`).
 3. **No sub-modules:** The module folder directly contains `index.jsx`, `hooks.jsx`, and `components/`.
 4. **With sub-modules:** The module folder contains sub-module folders, each with their own `index.jsx`, `hooks.jsx`, and `components/`.
 5. **Never** put page logic directly in the portal folder (e.g., never `Admin/index.jsx` for a page — only `Admin/Login.jsx` for the login page is an exception).
@@ -64,12 +64,12 @@ src/pages/Admin/Dashboard/
 ```
 
 ```
-src/pages/SuperAdmin/Organizations/
-├── index.jsx                 # Organizations list page
-├── hooks.jsx                 # useOrganizationHooks()
-├── OrganizationForm.jsx      # Create/Edit form (can live at module root if it's the only form)
+src/pages/SuperAdmin/Companies/
+├── index.jsx                 # Companies list page
+├── hooks.jsx                 # useCompanyHooks()
+├── CompanyForm.jsx      # Create/Edit form (can live at module root if it's the only form)
 └── components/
-    └── ViewOrganizationModal.jsx
+    └── ViewCompanyModal.jsx
 ```
 
 ### Module with sub-modules
@@ -113,7 +113,7 @@ src/pages/Admin/UserManagement/
 | Sub-module folder | PascalCase                 | `Users/`, `Roles/`                                              |
 | Page component    | PascalCase, default export | `const UsersPage = () => {}`                                    |
 | Hooks file        | camelCase hook name        | `export const useUserHooks = () => {}`                          |
-| Component files   | PascalCase                 | `UserForm.jsx`, `ViewOrganizationModal.jsx`                     |
+| Component files   | PascalCase                 | `UserForm.jsx`, `ViewCompanyModal.jsx`                     |
 | Barrel export     | N/A                        | Import directly: `import UserForm from "./components/UserForm"` |
 
 ---
@@ -160,6 +160,10 @@ const NewModule = lazy(() => import("../../pages/Admin/NewModule"));
   isShow: true,
 }
 ```
+
+**Optional `section`:** add `section: "system"` to render the item below the sidebar's divider with
+the other system links (Settings, Audit Trail). Omit it for normal modules — anything without a
+`section` renders in the main group, in order.
 
 ### Navigation entry — module WITH sub-modules:
 
@@ -249,14 +253,14 @@ src/services/
 │   │   └── permissions.js
 │   └── superadmin/
 │       ├── auth.js
-│       └── organizations.js
+│       └── companies.js
 └── requests/
     ├── admin/
     │   ├── auth.js           # React Query hooks for admin auth
     │   └── user.js           # React Query hooks for users
     └── superadmin/
         ├── auth.js
-        └── organizations.js
+        └── companies.js
 ```
 
 ---

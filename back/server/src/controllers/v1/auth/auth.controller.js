@@ -104,7 +104,7 @@ router.post(
       user = { ...saRows[0], email: credential.email, type: credential.type };
     } else {
       const userRows = await req.db.query(
-        `SELECT u.accountId, u.firstName, u.lastName, u.brandId, u.branchId, u.roleId, u.status,
+        `SELECT u.accountId, u.firstName, u.lastName, u.companyId, u.branchId, u.roleId, u.status,
                 r.roleName
          FROM users u
          LEFT JOIN roles r ON r.roleId = u.roleId

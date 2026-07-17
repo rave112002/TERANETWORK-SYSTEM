@@ -1,11 +1,13 @@
-import { Button, Form, Input, Tooltip, message } from "antd";
+import { App, Button, Form, Input, Tooltip } from "antd";
 import { Lock } from "lucide-react";
 import { useMemo, useState } from "react";
 import PasswordStrengthIndicator from "../../../../components/PasswordStrengthIndicator";
+import SectionLabel from "../../../../components/SectionLabel";
 import { validationRules } from "../../../../utils/validation";
 
 const PasswordSection = () => {
   const [form] = Form.useForm();
+  const { message } = App.useApp();
   const [newPassword, setNewPassword] = useState("");
 
   // Enable Save only once the user has started entering values.
@@ -22,86 +24,95 @@ const PasswordSection = () => {
     setNewPassword("");
   };
 
+  const lockPrefix = (
+    <Lock className="w-4 h-4 mr-2" style={{ color: "var(--color-text-muted)" }} />
+  );
+
   return (
     <Form
       form={form}
       layout="vertical"
       onFinish={handleSubmit}
-      requiredMark={false}
+      requiredMark
+      autoComplete="off"
       scrollToFirstError={{ behavior: "smooth", block: "center", focus: true }}
     >
-      <Form.Item
-        name="currentPassword"
-        label="Current Password"
-        rules={[{ required: true, message: "Current password is required" }]}
+      {/* Current password */}
+      <div>
+        <SectionLabel>Current password</SectionLabel>
+
+        <Form.Item
+          name="currentPassword"
+          label="Current password"
+          rules={[{ required: true, message: "Current password is required" }]}
+        >
+          <Input.Password
+            prefix={lockPrefix}
+            placeholder="Enter current password"
+            size="large"
+          />
+        </Form.Item>
+      </div>
+
+      {/* New password */}
+      <div className="mt-7">
+        <SectionLabel>New password</SectionLabel>
+
+        <Form.Item
+          name="newPassword"
+          label="New password"
+          required
+          rules={[validationRules.strongPassword(8)]}
+        >
+          <Input.Password
+            prefix={lockPrefix}
+            placeholder="Enter new password"
+            size="large"
+            onChange={(e) => setNewPassword(e.target.value)}
+          />
+        </Form.Item>
+
+        <PasswordStrengthIndicator password={newPassword} />
+
+        <Form.Item
+          name="confirmPassword"
+          label="Confirm new password"
+          dependencies={["newPassword"]}
+          className="mt-4"
+          rules={[
+            { required: true, message: "Please confirm your new password" },
+            ({ getFieldValue }) => ({
+              validator(_, value) {
+                if (!value || getFieldValue("newPassword") === value) {
+                  return Promise.resolve();
+                }
+                return Promise.reject(new Error("Passwords do not match"));
+              },
+            }),
+          ]}
+        >
+          <Input.Password
+            prefix={lockPrefix}
+            placeholder="Confirm new password"
+            size="large"
+          />
+        </Form.Item>
+      </div>
+
+      {/* Footer */}
+      <div
+        className="mt-7 pt-5 flex justify-end"
+        style={{ borderTop: "1px solid var(--color-line)" }}
       >
-        <Input.Password
-          prefix={<Lock className="w-4 h-4 text-gray-400" />}
-          placeholder="Enter current password"
-          size="large"
-          className="rounded-xl"
-        />
-      </Form.Item>
-
-      <Form.Item
-        name="newPassword"
-        label="New Password"
-        rules={[validationRules.strongPassword(8)]}
-      >
-        <Input.Password
-          prefix={<Lock className="w-4 h-4 text-gray-400" />}
-          placeholder="Enter new password"
-          size="large"
-          className="rounded-xl"
-          onChange={(e) => setNewPassword(e.target.value)}
-        />
-      </Form.Item>
-
-      <PasswordStrengthIndicator password={newPassword} />
-
-      <Form.Item
-        name="confirmPassword"
-        label="Confirm New Password"
-        dependencies={["newPassword"]}
-        rules={[
-          { required: true, message: "Please confirm your new password" },
-          ({ getFieldValue }) => ({
-            validator(_, value) {
-              if (!value || getFieldValue("newPassword") === value) {
-                return Promise.resolve();
-              }
-              return Promise.reject(new Error("Passwords do not match"));
-            },
-          }),
-        ]}
-      >
-        <Input.Password
-          prefix={<Lock className="w-4 h-4 text-gray-400" />}
-          placeholder="Confirm new password"
-          size="large"
-          className="rounded-xl"
-        />
-      </Form.Item>
-
-      <div className="flex justify-end pt-2">
-        <Tooltip title={!isDirty ? "Enter your new password to continue" : undefined}>
+        <Tooltip
+          title={!isDirty ? "Enter your new password to continue" : undefined}
+        >
           <span>
             <Button
               type="primary"
               htmlType="submit"
               disabled={!isDirty}
               size="large"
-              className="rounded-xl"
-              style={
-                !isDirty
-                  ? undefined
-                  : {
-                      background: "var(--gradient-primary)",
-                      border: "none",
-                      boxShadow:
-                        "0 4px 12px color-mix(in srgb, var(--color-primary-color) 35%, transparent)",
-                    }
-              }
             >
               Change Password
             </Button>

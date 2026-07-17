@@ -1,6 +1,7 @@
-import { Button, Form, Input, Tooltip, message } from "antd";
+import { App, Button, Form, Input, Tooltip } from "antd";
 import { Mail, Phone, User } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
+import SectionLabel from "../../../../components/SectionLabel";
 import { useAdminAuthStore } from "../../../../store/authStore";
 
 // Dependency-free value compare for the dirty check.
@@ -14,6 +15,7 @@ const isFormEqual = (a = {}, b = {}) => {
 
 const ProfileSection = () => {
   const [form] = Form.useForm();
+  const { message } = App.useApp();
   const { userData } = useAdminAuthStore();
   const initialValuesRef = useRef({});
 
@@ -33,7 +35,11 @@ const ProfileSection = () => {
   // Live dirty flag so Save stays disabled until something actually changes.
   const watchedValues = Form.useWatch([], form);
   const isDirty = useMemo(
-    () => !isFormEqual(watchedValues ?? form.getFieldsValue(), initialValuesRef.current),
+    () =>
+      !isFormEqual(
+        watchedValues ?? form.getFieldsValue(),
+        initialValuesRef.current,
+      ),
     [watchedValues, form],
   );
 
@@ -52,82 +58,102 @@ const ProfileSection = () => {
       form={form}
       layout="vertical"
       onFinish={handleSubmit}
-      requiredMark={false}
+      requiredMark
+      autoComplete="off"
       scrollToFirstError={{ behavior: "smooth", block: "center", focus: true }}
     >
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {/* Personal details */}
+      <div>
+        <SectionLabel>Personal details</SectionLabel>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+          <Form.Item
+            name="firstName"
+            label="First name"
+            rules={[{ required: true, message: "First name is required" }]}
+          >
+            <Input
+              prefix={
+                <User
+                  className="w-4 h-4 mr-2"
+                  style={{ color: "var(--color-text-muted)" }}
+                />
+              }
+              placeholder="e.g., Juan"
+              size="large"
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="lastName"
+            label="Last name"
+            rules={[{ required: true, message: "Last name is required" }]}
+          >
+            <Input
+              prefix={
+                <User
+                  className="w-4 h-4 mr-2"
+                  style={{ color: "var(--color-text-muted)" }}
+                />
+              }
+              placeholder="e.g., Dela Cruz"
+              size="large"
+            />
+          </Form.Item>
+        </div>
+      </div>
+
+      {/* Contact */}
+      <div className="mt-7">
+        <SectionLabel>Contact</SectionLabel>
+
         <Form.Item
-          name="firstName"
-          label="First Name"
-          rules={[{ required: true, message: "First name is required" }]}
+          name="email"
+          label="Email address"
+          rules={[
+            { required: true, message: "Email is required" },
+            { type: "email", message: "Please enter a valid email" },
+          ]}
         >
           <Input
-            prefix={<User className="w-4 h-4 text-gray-400" />}
-            placeholder="First name"
+            prefix={
+              <Mail
+                className="w-4 h-4 mr-2"
+                style={{ color: "var(--color-text-muted)" }}
+              />
+            }
+            placeholder="juan@example.com"
             size="large"
-            className="rounded-xl"
+            disabled
           />
         </Form.Item>
 
-        <Form.Item
-          name="lastName"
-          label="Last Name"
-          rules={[{ required: true, message: "Last name is required" }]}
-        >
+        <Form.Item name="phone" label="Phone number">
           <Input
-            prefix={<User className="w-4 h-4 text-gray-400" />}
-            placeholder="Last name"
+            prefix={
+              <Phone
+                className="w-4 h-4 mr-2"
+                style={{ color: "var(--color-text-muted)" }}
+              />
+            }
+            placeholder="e.g., +63 912 345 6789"
             size="large"
-            className="rounded-xl"
           />
         </Form.Item>
       </div>
 
-      <Form.Item
-        name="email"
-        label="Email Address"
-        rules={[
-          { required: true, message: "Email is required" },
-          { type: "email", message: "Please enter a valid email" },
-        ]}
+      {/* Footer */}
+      <div
+        className="mt-7 pt-5 flex justify-end"
+        style={{ borderTop: "1px solid var(--color-line)" }}
       >
-        <Input
-          prefix={<Mail className="w-4 h-4 text-gray-400" />}
-          placeholder="Email address"
-          size="large"
-          className="rounded-xl"
-          disabled
-        />
-      </Form.Item>
-
-      <Form.Item name="phone" label="Phone Number">
-        <Input
-          prefix={<Phone className="w-4 h-4 text-gray-400" />}
-          placeholder="Phone number"
-          size="large"
-          className="rounded-xl"
-        />
-      </Form.Item>
-
-      <div className="flex justify-end pt-2">
-        <Tooltip title={!isDirty ? "No changes to save" : undefined}>
+        <Tooltip title={!isDirty ? "No changes to save yet" : undefined}>
           <span>
             <Button
               type="primary"
               htmlType="submit"
               disabled={!isDirty}
               size="large"
-              className="rounded-xl"
-              style={
-                !isDirty
-                  ? undefined
-                  : {
-                      background: "var(--gradient-primary)",
-                      border: "none",
-                      boxShadow:
-                        "0 4px 12px color-mix(in srgb, var(--color-primary-color) 35%, transparent)",
-                    }
-              }
             >
               Save Changes
             </Button>

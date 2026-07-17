@@ -59,12 +59,18 @@ export const formatPhoneDisplay = (phone) => {
 };
 
 /**
- * Custom validator for Ant Design Form
+ * Custom validator for Ant Design Form.
+ *
+ * Phone is OPTIONAL: every `phone` column is NULL-able and the API writes
+ * `phone || null`, so an empty value passes. Only the *format* is enforced, and
+ * only once something has been typed.
+ *
+ * If a form ever needs phone to be mandatory, pair this with a separate
+ * `{ required: true }` rule — that way Ant also renders the required asterisk,
+ * instead of the field erroring "required" with no `*` next to its label.
  */
 export const phoneValidator = (_, value) => {
-  if (!value) {
-    return Promise.reject(new Error("Phone number is required"));
-  }
+  if (!value) return Promise.resolve();
 
   const formatted = formatPhoneNumber(value);
 

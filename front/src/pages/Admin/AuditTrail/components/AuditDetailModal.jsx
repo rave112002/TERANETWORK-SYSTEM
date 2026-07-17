@@ -1,12 +1,9 @@
-import { Descriptions, Modal, Tag } from "antd";
+import { Button, Modal } from "antd";
 import dayjs from "dayjs";
-import { FileText } from "lucide-react";
-
-const ACTION_COLORS = {
-  CREATE: "success",
-  UPDATE: "processing",
-  DELETE: "error",
-};
+import { FileText, X } from "lucide-react";
+import { ACTION_DOT } from "../hooks";
+import SectionLabel from "../../../../components/SectionLabel";
+import { decodeHTML } from "../../../../utils/decode-html";
 
 // metadata is a JSON column — mysql2 may return it as a parsed object or a string.
 const parseMetadata = (metadata) => {
@@ -19,12 +16,33 @@ const parseMetadata = (metadata) => {
   }
 };
 
+// One label/value row in a field group.
+const Field = ({ label, children }) => (
+  <div
+    className="flex items-start justify-between gap-6 py-2.5"
+    style={{ borderBottom: "1px solid var(--color-line-soft)" }}
+  >
+    <span
+      className="shrink-0"
+      style={{ fontSize: 13, color: "var(--color-text-secondary)" }}
+    >
+      {label}
+    </span>
+    <span
+      className="min-w-0 text-right"
+      style={{ fontSize: 13.5, color: "var(--color-text-dark)" }}
+    >
+      {children}
+    </span>
+  </div>
+);
+
 const AuditDetailModal = ({ open, onClose, log }) => {
   if (!log) return null;
 
   const meta = parseMetadata(log.metadata);
   const userName =
-    [log.firstName, log.lastName].filter(Boolean).join(" ") ||
+    decodeHTML([log.firstName, log.lastName].filter(Boolean).join(" ")) ||
     log.accountId ||
     "—";
 
@@ -33,58 +51,93 @@ const AuditDetailModal = ({ open, onClose, log }) => {
       open={open}
       onCancel={onClose}
       footer={null}
+      closable={false}
       width={640}
-      title={
-        <div className="flex items-center gap-3">
-          <div
-            className="p-2.5 rounded-xl"
-            style={{ background: "var(--gradient-primary)" }}
-          >
-            <FileText className="w-5 h-5 text-white" />
-          </div>
-          <div>
+      styles={{ body: { padding: 24 } }}
+    >
+      {/* Header — accent chip + title + subtitle + bordered X */}
+      <div className="flex items-start justify-between gap-3 mb-7">
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="inline-flex items-center justify-center w-11 h-11 rounded-xl shrink-0 bg-(image:--gradient-primary)">
+            <FileText className="w-[22px] h-[22px] text-white" />
+          </span>
+          <div className="min-w-0">
             <h2
-              className="text-lg font-bold"
-              style={{ color: "var(--color-text-dark)" }}
+              className="m-0 font-semibold leading-tight"
+              style={{ fontSize: 19, color: "var(--color-text-dark)" }}
             >
               Audit Event
             </h2>
             <p
-              className="text-sm"
-              style={{ color: "var(--color-text-secondary)" }}
+              className="m-0 mt-0.5"
+              style={{ fontSize: 13, color: "var(--color-text-secondary)" }}
             >
               {dayjs(log.dateCreated).format("MMM D, YYYY h:mm:ss A")}
             </p>
           </div>
         </div>
-      }
-    >
-      <Descriptions column={1} bordered size="small" className="mt-4">
-        <Descriptions.Item label="Action">
-          <Tag color={ACTION_COLORS[log.action] || "default"}>{log.action}</Tag>
-        </Descriptions.Item>
-        <Descriptions.Item label="Module">{log.module}</Descriptions.Item>
-        <Descriptions.Item label="User">{userName}</Descriptions.Item>
-        <Descriptions.Item label="Description">
-          {log.description || "—"}
-        </Descriptions.Item>
-        <Descriptions.Item label="IP Address">
-          {log.ipAddress || "—"}
-        </Descriptions.Item>
-      </Descriptions>
+        <button
+          onClick={onClose}
+          aria-label="Close"
+          className="inline-flex items-center justify-center shrink-0 transition-colors hover:bg-(--color-surface-sunken)"
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 8,
+            border: "1px solid var(--color-line)",
+            color: "var(--color-text-secondary)",
+          }}
+        >
+          <X className="w-[18px] h-[18px]" />
+        </button>
+      </div>
 
+      {/* Event */}
+      <div>
+        <SectionLabel>Event</SectionLabel>
+
+        <Field label="Action">
+          <span className="inline-flex items-center gap-2">
+            <span
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: "50%",
+                flex: "none",
+                background: ACTION_DOT[log.action] || "var(--color-text-muted)",
+              }}
+            />
+            {log.action || "—"}
+          </span>
+        </Field>
+        <Field label="Module">{log.module || "—"}</Field>
+        <Field label="Description">{decodeHTML(log.description) || "—"}</Field>
+      </div>
+
+      {/* Origin */}
+      <div className="mt-7">
+        <SectionLabel>Origin</SectionLabel>
+
+        <Field label="User">{userName}</Field>
+        <Field label="IP address">
+          <span className="font-mono" style={{ fontSize: 12.5 }}>
+            {log.ipAddress || "—"}
+          </span>
+        </Field>
+      </div>
+
+      {/* Metadata */}
       {meta && (
-        <div className="mt-4">
-          <p
-            className="text-xs font-semibold uppercase tracking-wide mb-2"
-            style={{ color: "var(--color-text-secondary)" }}
-          >
-            Metadata
-          </p>
+        <div className="mt-7">
+          <SectionLabel>Metadata</SectionLabel>
+
           <pre
-            className="rounded-xl p-4 text-xs overflow-auto max-h-72 whitespace-pre-wrap break-words"
+            className="font-mono p-4 overflow-auto max-h-72 whitespace-pre-wrap break-words"
             style={{
+              fontSize: 12,
               background: "var(--color-surface-sunken)",
+              border: "1px solid var(--color-line)",
+              borderRadius: "var(--radius-card)",
               color: "var(--color-text-dark)",
             }}
           >
@@ -92,6 +145,16 @@ const AuditDetailModal = ({ open, onClose, log }) => {
           </pre>
         </div>
       )}
+
+      {/* Footer */}
+      <div
+        className="mt-8 pt-5 flex justify-end gap-3"
+        style={{ borderTop: "1px solid var(--color-line)" }}
+      >
+        <Button type="primary" onClick={onClose} size="large">
+          Close
+        </Button>
+      </div>
     </Modal>
   );
 };

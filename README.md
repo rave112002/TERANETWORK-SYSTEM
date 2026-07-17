@@ -1,8 +1,8 @@
-#Full-Stack Multi-Tenant Template
+# Full-Stack Multi-Tenant Template
 
 A production-style starter for multi-tenant admin platforms. It ships two portals out of the box —
-a **SuperAdmin** portal that manages organizations across the whole platform, and an **Admin**
-portal scoped to a single organization + branch — with role-based access control, an audit trail,
+a **SuperAdmin** portal that manages companies across the whole platform, and an **Admin**
+portal scoped to a single company + branch — with role-based access control, an audit trail,
 file uploads, and a hardened Express API.
 
 The repository is a **monorepo of two independent apps**:
@@ -60,8 +60,8 @@ The repository is a **monorepo of two independent apps**:
                                 └─────────────────┘
 ```
 
-- **Tenancy:** every Admin-portal query is scoped to the authenticated user's `brandId` / `branchId`.
-  SuperAdmin operates across all organizations.
+- **Tenancy:** every Admin-portal query is scoped to the authenticated user's `companyId` / `branchId`.
+  SuperAdmin operates across all companies.
 - **Auth:** stateless JWT (RS256). The token carries a `userId`; the Passport strategy loads the full
   user (including `roleId`) onto `req.user` per request.
 - **Authorization:** a `module / submodule / accessLevel` permission model, enforced on the backend by
@@ -73,10 +73,10 @@ The repository is a **monorepo of two independent apps**:
 
 | Concept               | What it means                                                                                                                                                                                               |
 | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Two portals**       | `SuperAdmin` (platform owner — manages brands/branches/owners) and `Admin` (an organization's own users, roles, settings).                                                                                  |
-| **Multi-tenancy**     | Data isolation by `brandId` (organization) + `branchId` (location). Admin endpoints filter by the values on `req.user`; never trust client-sent scope.                                                      |
+| **Two portals**       | `SuperAdmin` (platform owner — manages companies/branches/owners) and `Admin` (a company's own users, roles, settings).                                                                                  |
+| **Multi-tenancy**     | Data isolation by `companyId` (company) + `branchId` (location). Admin endpoints filter by the values on `req.user`; never trust client-sent scope.                                                      |
 | **RBAC**              | Permissions are `module` + optional `submodule` + `accessLevel` (`none < read < write`). Per-user overrides take precedence over role permissions.                                                          |
-| **Business IDs**      | Every row has an internal `id BIGINT` (never exposed) and a `varchar(50)` business ID (`accountId`, `brandId`, `roleId`, …) used in all APIs, URLs, and foreign keys. Generated with MySQL `SELECT UUID()`. |
+| **Business IDs**      | Every row has an internal `id BIGINT` (never exposed) and a `varchar(50)` business ID (`accountId`, `companyId`, `roleId`, …) used in all APIs, URLs, and foreign keys. Generated with MySQL `SELECT UUID()`. |
 | **Soft deletes**      | Rows are never physically deleted — `status` is set to `'Deleted'` and queries filter `status != 'Deleted'`.                                                                                                |
 | **Response envelope** | Every endpoint replies via `res.sendSuccess(message, data, status?)` → `{ success, message, data }`. The frontend unwraps `apiData.data.<entity>`.                                                          |
 | **Audit trail**       | Middleware auto-logs successful `CREATE/UPDATE/DELETE`s (with sanitized metadata) on the audited admin routes; viewable in the Admin → Audit Trail page.                                                    |
@@ -94,7 +94,8 @@ The repository is a **monorepo of two independent apps**:
 │   └── src/
 │       ├── pages/             ← Admin/ and SuperAdmin/ portal modules
 │       │   └── <Module>/      ← index.jsx (view) · hooks.jsx (logic) · components/
-│       ├── components/        ← shared UI (StatCard, ProtectedRoute, layout, …)
+│       ├── components/        ← shared UI (PageHeader, StatCard, PaginationFooter,
+│       │                        SectionLabel, StatusToggle, ProtectedRoute, layout, …)
 │       ├── hooks/             ← usePermissions, useDebounce, …
 │       ├── routes/            ← portal route trees + auth guards
 │       ├── services/
@@ -106,8 +107,8 @@ The repository is a **monorepo of two independent apps**:
     ├── CLAUDE.md  · docs/     ← backend conventions (6 topic docs)
     ├── .env.example
     ├── database/schema.sql    ← full DDL (10 tables)
-    ├── scripts/               ← db:setup / reset / check
-    ├── auth-keys/             ← RS256 JWT keypair (you generate these)
+    ├── scripts/               ← keys / db:setup / db:reset / db:check
+    ├── auth-keys/             ← RS256 JWT keypair (generate with `npm run keys`; gitignored)
     └── server/
         ├── bin/www.js         ← entrypoint (boot, health check, listen)
         ├── config/            ← express.js (middleware chain) · database.js (pool)
@@ -127,7 +128,6 @@ The repository is a **monorepo of two independent apps**:
 
 - **Node.js** 18+ and **npm**
 - **MySQL** 8 (a reachable database/schema)
-- **OpenSSL** (to generate the JWT signing keys)
 
 ### 1. Backend
 
@@ -138,13 +138,14 @@ npm install
 # Configure environment
 cp .env.example .env          # then edit DB_*, ISSUER, AUDIENCE, CSRF_SECRET, LOG_SALT, …
 
-# Generate the RS256 JWT keypair referenced by .env (jwtAuthPrivatePath / jwtAuthPublicPath)
-mkdir -p auth-keys
-openssl genpkey -algorithm RSA -out auth-keys/private.pem -pkeyopt rsa_keygen_bits:2048
-openssl rsa -pubout -in auth-keys/private.pem -out auth-keys/public.pem
+# Generate the RS256 JWT keypair referenced by .env (jwtAuthPrivatePath / jwtAuthPublicPath).
+# Refuses to overwrite existing keys; pass --force to regenerate.
+npm run keys
 
-# Create the schema and seed baseline data (permissions, a superadmin, etc.)
-npm run db:setup         # or db:setup (schema only) / db:setup:clean
+# ⚠️  Build the schema — this DROPS every existing table, then recreates them and
+#     seeds the permission set + a default SuperAdmin. Destructive: never run it
+#     against a database you care about.
+npm run db:setup
 
 npm run dev                   # nodemon on http://localhost:3000  (API under /api/v1)
 ```
@@ -181,24 +182,25 @@ The Admin portal lives at `/admin/*` and the SuperAdmin portal at `/superadmin/*
 
 ### 3. Where to start
 
-`npm run db:setup:data` already seeds a SuperAdmin (and a sample organization, branch, and Admin
-owner — the script prints every login). Sign in to the **SuperAdmin portal** at `/superadmin` with:
+`npm run db:setup` seeds the permission set and a default SuperAdmin (the script prints the
+login). Sign in to the **SuperAdmin portal** at `/superadmin` with:
 
 - **Email:** `superadmin@template.com`
 - **Password:** `superadmin123` _(change this before any real use)_
 
-To onboard a **new** organization, follow the chain — each step unlocks the next:
+That SuperAdmin is the **only** account seeded — there is no sample company or Admin user. Follow
+the chain below to create your first Admin login; each step unlocks the next:
 
-1. **Create an organization** — SuperAdmin → **Organizations** → _New_. This creates the brand (tenant).
-   `POST /api/v1/superadmin/organizations`
-2. **Create a branch** under that organization — SuperAdmin → **Branches**. This also auto-provisions
-   an **Owner** role with full permissions for that brand + branch.
+1. **Create a company** — SuperAdmin → **Companies** → _New_. This creates the company (tenant).
+   `POST /api/v1/superadmin/companies`
+2. **Create a branch** under that company — SuperAdmin → **Branches**. This also auto-provisions
+   an **Owner** role with full permissions for that company + branch.
    `POST /api/v1/superadmin/branches`
 3. **Create a user** (the branch Owner) — SuperAdmin → **Users**. One Owner per branch; they receive
    the Owner role and login credentials.
    `POST /api/v1/superadmin/users`
 
-That Owner can now sign in to the **Admin portal** at `/admin` and manage their own organization's
+That Owner can now sign in to the **Admin portal** at `/admin` and manage their own company's
 users, roles, permissions, and settings.
 
 ---
@@ -211,11 +213,11 @@ users, roles, permissions, and settings.
 | ------------------------------------------------------------ | ---------------------------------------------------------------------------- |
 | `npm run dev`                                                | Start with nodemon (auto-reload)                                             |
 | `npm start`                                                  | Start the server (`server/bin/www.js`)                                       |
-| `npm run db:setup`                                           | Create the schema                                                            |
-| `npm run db:setup:data`                                      | Create schema **and** seed baseline data                                     |
-| `npm run db:setup:clean`                                     | Fresh schema (clean state)                                                   |
-| `npm run db:reset`                                           | Drop & recreate                                                              |
-| `npm run db:check`                                           | Verify DB connectivity / schema                                              |
+| `npm run keys`                                               | Generate the RS256 JWT keypair into `auth-keys/` (`-- --force` to overwrite) |
+| `npm run db:setup`                                           | ⚠️ **Drops all tables**, recreates the schema, seeds permissions + SuperAdmin |
+| `npm run db:setup:clean`                                     | ⚠️ **Drops all tables**, recreates the schema, seeds SuperAdmin only         |
+| `npm run db:reset`                                           | ⚠️ Nuclear: drops the whole **database** and recreates it empty (no tables)  |
+| `npm run db:check`                                           | Verify DB connectivity / list tables + row counts (read-only, safe)          |
 | `npm run lint` · `lint:fix`                                  | ESLint                                                                       |
 | `npm run format` · `format:check`                            | Prettier                                                                     |
 | `npm run pm2:start` · `pm2:prod` · `pm2:reload` · `pm2:stop` | PM2 process management ([`ecosystem.config.cjs`](back/ecosystem.config.cjs)) |
@@ -259,7 +261,7 @@ keep-alive, slow-query logging) and is injected as `req.db`:
 ### Auth & RBAC
 
 - **Authentication** — [`passport.jwt.config.js`](back/server/src/middlewares/passport.jwt.config.js) verifies RS256
-  tokens and loads the user (admin/staff _or_ superadmin) onto `req.user` (`accountId`, `brandId`,
+  tokens and loads the user (admin/staff _or_ superadmin) onto `req.user` (`accountId`, `companyId`,
   `branchId`, `roleId`, `type`, …).
 - **Authorization** — `checkPermission(module, submodule?, accessLevel?)` resolves the user's effective
   level (user override → role permission), enforcing `GET = read`, `POST/PUT/DELETE = write`.
@@ -269,7 +271,7 @@ keep-alive, slow-query logging) and is injected as `req.db`:
 
 - **Validation** — Zod schemas applied via `validateBody` / `validateQuery` / `validateParams`
   ([`back/docs/validators.md`](back/docs/validators.md)).
-- **Uploads** — stored under `public/uploads/{portal}/...`, tenant-scoped by `brandId`/`branchId`/`accountId`
+- **Uploads** — stored under `public/uploads/{portal}/...`, tenant-scoped by `companyId`/`branchId`/`accountId`
   ([`back/docs/file-uploads.md`](back/docs/file-uploads.md)).
 - **Audit trail** — [`auditTrail.middleware.js`](back/server/src/middlewares/auditTrail.middleware.js) intercepts
   successful state-changing responses on audited routes and writes a sanitized record to `audit_trail`.
@@ -290,8 +292,12 @@ keep-alive, slow-query logging) and is injected as `req.db`:
 - **Data layer** — `services/api/` holds raw axios calls; `services/requests/` holds the matching
   React Query hooks (list queries use `placeholderData: keepPreviousData` for smooth paging). See
   [`front/docs/api-guide.md`](front/docs/api-guide.md).
-- **UI system** — Ant Design v5 themed via CSS variables in `src/index.css` (light/dark), Tailwind v4,
-  and `lucide-react` icons. Forms follow the gradient-drawer pattern. See
+- **UI system — "Modern"** — monochrome surfaces + hairline borders + one green accent used sparingly;
+  structure comes from borders, not shadows, and the primary button is inverted monochrome (never the
+  accent, never a gradient). Every color is a token in `src/index.css` (light/dark); type is **Onest**
+  + **JetBrains Mono** (micro-data only), Ant Design v5, Tailwind v4, `lucide-react` icons. The
+  copy-paste spec is [`modern-module-pattern.md`](modern-module-pattern.md) and
+  `front/src/pages/Admin/UserManagement/Roles/` is the reference implementation. See
   [`front/docs/ui-design-system.md`](front/docs/ui-design-system.md) and [`front/docs/ui-form-design.md`](front/docs/ui-form-design.md).
 
 ---
@@ -309,7 +315,7 @@ resource routes additionally require the matching permission.
 | Admin · Permissions        | `/api/v1/admin/permissions`                     | `GET /` · `GET /modules` · `GET /user` · `POST /check`                                                |
 | Admin · User permissions   | `/api/v1/admin/user-permissions`                | `GET /:accountId` · `POST /:accountId` · `POST /:accountId/bulk` · `DELETE /:accountId/:permissionId` |
 | Admin · Audit trail        | `/api/v1/admin/audit-trail`                     | `GET /` (paginated + filterable)                                                                      |
-| SuperAdmin · Organizations | `/api/v1/superadmin/organizations`              | CRUD (brands)                                                                                         |
+| SuperAdmin · Companies | `/api/v1/superadmin/companies`              | CRUD (companies)                                                                                         |
 | SuperAdmin · Branches      | `/api/v1/superadmin/branches`                   | CRUD (+ auto-creates an Owner role)                                                                   |
 | SuperAdmin · Users         | `/api/v1/superadmin/users`                      | `GET /` · `POST /` (branch Owner)                                                                     |
 | Uploads                    | `/api/v1/upload`                                | `POST /logo` · `POST /avatar` · `POST /image` · `DELETE /file`                                        |
@@ -325,12 +331,12 @@ Full DDL: [`back/database/schema.sql`](back/database/schema.sql). Ten tables:
 
 | Table              | Business ID        | Purpose                                             |
 | ------------------ | ------------------ | --------------------------------------------------- |
-| `brands`           | `brandId`          | Organization (the tenant)                           |
-| `branches`         | `branchId`         | Physical location under a brand                     |
+| `companies`           | `companyId`          | Company (the tenant)                           |
+| `branches`         | `branchId`         | Physical location under a company                     |
 | `superadmins`      | `accountId`        | Platform-level admins                               |
 | `credentials`      | `accountId`        | Auth credentials (shared across portals via `type`) |
-| `users`            | `accountId`        | Admin/staff users (belong to a brand + branch)      |
-| `roles`            | `roleId`           | Permission roles (scoped to brand + branch)         |
+| `users`            | `accountId`        | Admin/staff users (belong to a company + branch)      |
+| `roles`            | `roleId`           | Permission roles (scoped to company + branch)         |
 | `permissions`      | `permissionId`     | Master permission definitions                       |
 | `role_permissions` | —                  | Maps roles → permissions                            |
 | `user_permissions` | `userPermissionId` | Per-user permission overrides                       |
@@ -347,8 +353,10 @@ not the numeric `id`. See [`back/docs/schema-conventions.md`](back/docs/schema-c
 The detailed, enforced coding patterns live next to the code:
 
 - **Project map (for AI agents):** [`CLAUDE.md`](CLAUDE.md)
+- **Design spec:** [`modern-module-pattern.md`](modern-module-pattern.md) — the canonical, copy-paste
+  reference for a module's list page + create/edit drawer.
 - **Frontend:** [`front/CLAUDE.md`](front/CLAUDE.md) → [`front/docs/`](front/docs/) — code conventions, folder
   structure, the table-page hook pattern, API/React-Query usage, auth & state, the UI design system,
-  and the gradient-drawer form pattern.
+  and the Modern drawer form pattern.
 - **Backend:** [`back/CLAUDE.md`](back/CLAUDE.md) → [`back/docs/`](back/docs/) — authenticated-user context,
   DB/transaction patterns, schema & ID conventions, validators, permission gating, and file uploads.

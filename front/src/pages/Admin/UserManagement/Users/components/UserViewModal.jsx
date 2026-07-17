@@ -1,135 +1,145 @@
-import { Modal, Descriptions, Tag, Avatar, Divider } from "antd";
-import {
-  User,
-  Mail,
-  Phone,
-  MapPin,
-  Briefcase,
-  Calendar,
-  CheckCircle,
-  XCircle,
-} from "lucide-react";
+import { Descriptions, Modal } from "antd";
+import { Briefcase, Calendar, Mail, MapPin, Phone, User } from "lucide-react";
+import dayjs from "dayjs";
+import SectionLabel from "../../../../../components/SectionLabel";
+import { decodeHTML } from "../../../../../utils/decode-html";
+
+const labelWithIcon = (Icon, text) => (
+  <span className="inline-flex items-center gap-2">
+    <Icon className="w-4 h-4" style={{ color: "var(--color-text-muted)" }} />
+    {text}
+  </span>
+);
 
 const UserViewModal = ({ open, onClose, user }) => {
   if (!user) return null;
 
+  const name = `${decodeHTML(user.firstName) || ""} ${
+    decodeHTML(user.lastName) || ""
+  }`.trim();
+  const initial = (name.charAt(0) || "?").toUpperCase();
+  const active = user.status === "Active";
+
   return (
     <Modal
+      open={open}
+      onCancel={onClose}
+      width={640}
+      footer={null}
       title={
-        <div className="flex items-center gap-3">
-          <Avatar
-            src={user.imageUrl}
-            size={48}
-            icon={<User className="w-6 h-6" />}
-          />
-          <div>
-            <div className="text-lg font-semibold">
-              {user.firstName} {user.lastName}
+        <div className="flex items-center gap-3 min-w-0">
+          <span
+            className="overflow-hidden"
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 10,
+              background: "var(--color-surface-sunken)",
+              border: "1px solid var(--color-line)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flex: "none",
+              fontSize: 15,
+              fontWeight: 600,
+              color: "var(--color-text-secondary)",
+            }}
+          >
+            {user.imageUrl ? (
+              <img
+                src={user.imageUrl}
+                alt=""
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              initial
+            )}
+          </span>
+          <div className="min-w-0">
+            <div
+              className="truncate font-semibold leading-tight"
+              style={{ fontSize: 16, color: "var(--color-text-dark)" }}
+            >
+              {name}
             </div>
-            <div className="text-sm text-gray-500 font-normal">
-              User Details
+            <div
+              className="font-normal"
+              style={{ fontSize: 12.5, color: "var(--color-text-secondary)" }}
+            >
+              User details
             </div>
           </div>
         </div>
       }
-      open={open}
-      onCancel={onClose}
-      width={700}
-      footer={null}
     >
-      <div className="mt-6 space-y-6">
-        {/* Status Badge */}
-        <div className="flex items-center gap-2">
-          <Tag
-            icon={
-              user.status === "Active" ? (
-                <CheckCircle className="w-3 h-3" />
-              ) : (
-                <XCircle className="w-3 h-3" />
-              )
-            }
-            color={user.status === "Active" ? "success" : "default"}
-            className="text-sm px-3 py-1"
-          >
-            {user.status}
-          </Tag>
-        </div>
+      <div className="mt-6 space-y-7">
+        {/* Status */}
+        <span
+          className="inline-flex items-center gap-2"
+          style={{ fontSize: 13, color: "var(--color-text-secondary)" }}
+        >
+          <span
+            style={{
+              width: 7,
+              height: 7,
+              borderRadius: "50%",
+              background: active
+                ? "var(--color-success)"
+                : "var(--color-text-muted)",
+              boxShadow: active ? "0 0 8px rgba(34,197,94,.5)" : "none",
+            }}
+          />
+          {user.status}
+        </span>
 
-        {/* Basic Information */}
+        {/* Basic information */}
         <div>
-          <h3 className="text-base font-semibold mb-4 flex items-center gap-2">
-            <User className="w-5 h-5 text-blue-600" />
-            Basic Information
-          </h3>
-          <Descriptions column={1} bordered>
-            <Descriptions.Item label="Full Name">
-              {user.firstName} {user.lastName}
+          <SectionLabel>Basic information</SectionLabel>
+          <Descriptions column={1} bordered size="small">
+            <Descriptions.Item label={labelWithIcon(User, "Full name")}>
+              {name || "-"}
             </Descriptions.Item>
             <Descriptions.Item label="Account ID">
-              {user.accountId}
+              <span className="font-mono" style={{ fontSize: 12.5 }}>
+                {user.accountId || "-"}
+              </span>
             </Descriptions.Item>
-            <Descriptions.Item
-              label={
-                <span className="flex items-center gap-2">
-                  <Mail className="w-4 h-4" />
-                  Email
-                </span>
-              }
-            >
-              {user.email}
+            <Descriptions.Item label={labelWithIcon(Mail, "Email")}>
+              {decodeHTML(user.email) || "-"}
             </Descriptions.Item>
-            <Descriptions.Item
-              label={
-                <span className="flex items-center gap-2">
-                  <Phone className="w-4 h-4" />
-                  Phone
-                </span>
-              }
-            >
-              {user.phone}
+            <Descriptions.Item label={labelWithIcon(Phone, "Phone")}>
+              {decodeHTML(user.phone) || "-"}
             </Descriptions.Item>
           </Descriptions>
         </div>
 
-        <Divider />
-
-        {/* Work Information */}
+        {/* Work information */}
         <div>
-          <h3 className="text-base font-semibold mb-4 flex items-center gap-2">
-            <Briefcase className="w-5 h-5 text-purple-600" />
-            Work Information
-          </h3>
-          <Descriptions column={1} bordered>
-            <Descriptions.Item
-              label={
-                <span className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4" />
-                  Branch
-                </span>
-              }
-            >
-              {user.branchName}
+          <SectionLabel>Work information</SectionLabel>
+          <Descriptions column={1} bordered size="small">
+            <Descriptions.Item label={labelWithIcon(Briefcase, "Role")}>
+              {decodeHTML(user.roleName) || "No role"}
+            </Descriptions.Item>
+            <Descriptions.Item label={labelWithIcon(MapPin, "Branch")}>
+              {decodeHTML(user.branchName) || "-"}
             </Descriptions.Item>
           </Descriptions>
         </div>
 
-        <Divider />
-
-        {/* Additional Info */}
+        {/* Additional information */}
         <div>
-          <h3 className="text-base font-semibold mb-4 flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-orange-600" />
-            Additional Information
-          </h3>
-          <Descriptions column={1} bordered>
-            <Descriptions.Item label="Created Date">
-              {new Date(user.dateCreated).toLocaleDateString("en-US", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })}
+          <SectionLabel>Additional information</SectionLabel>
+          <Descriptions column={1} bordered size="small">
+            <Descriptions.Item label={labelWithIcon(Calendar, "Created date")}>
+              {user.dateCreated
+                ? dayjs(user.dateCreated).format("MMMM D, YYYY")
+                : "-"}
             </Descriptions.Item>
-            <Descriptions.Item label="User ID">{user.id}</Descriptions.Item>
+            <Descriptions.Item label="User ID">
+              <span className="font-mono" style={{ fontSize: 12.5 }}>
+                {user.id ?? "-"}
+              </span>
+            </Descriptions.Item>
           </Descriptions>
         </div>
       </div>

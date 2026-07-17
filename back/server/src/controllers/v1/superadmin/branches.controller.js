@@ -16,7 +16,7 @@ router.get(
       pageSize = 10,
       search = "",
       status,
-      brandId,
+      companyId,
       sortBy = "dateCreated",
       sortOrder = "DESC",
     } = req.query;
@@ -38,9 +38,9 @@ router.get(
       params.push(`%${search}%`, `%${search}%`);
     }
 
-    if (brandId) {
-      whereClause += ` AND br.brandId = ?`;
-      params.push(brandId);
+    if (companyId) {
+      whereClause += ` AND br.companyId = ?`;
+      params.push(companyId);
     }
 
     const allowedSortColumns = ["dateCreated", "dateUpdated", "name"];
@@ -55,7 +55,7 @@ router.get(
       req.db.query(
         `SELECT
         br.branchId,
-        br.brandId,
+        br.companyId,
         br.name,
         br.email,
         br.phone,
@@ -64,9 +64,9 @@ router.get(
         br.status,
         br.dateCreated,
         br.dateUpdated,
-        b.name as brandName
+        b.name as companyName
       FROM branches br
-      LEFT JOIN brands b ON b.brandId = br.brandId
+      LEFT JOIN companies b ON b.companyId = br.companyId
       ${whereClause}
       ORDER BY br.${safeSortBy} ${safeSortOrder}
       LIMIT ? OFFSET ?`,
@@ -98,12 +98,12 @@ router.get(
 
     const branches = await req.db.query(
       `SELECT 
-        br.branchId, br.brandId, br.name, br.email, br.phone, br.address,
+        br.branchId, br.companyId, br.name, br.email, br.phone, br.address,
         br.regCode, br.provCode, br.citymunCode, br.brgyCode, br.zipCode,
         br.logoUrl, br.website, br.isMainBranch, br.status, br.dateCreated, br.dateUpdated,
-        b.name as brandName
+        b.name as companyName
       FROM branches br
-      LEFT JOIN brands b ON b.brandId = br.brandId
+      LEFT JOIN companies b ON b.companyId = br.companyId
       WHERE br.branchId = ? AND br.status != 'Deleted'
       LIMIT 1`,
       [branchId]
@@ -119,28 +119,28 @@ router.get(
 
 /**
  * POST /
- * Create a new branch for an existing brand
+ * Create a new branch for an existing company
  * Also creates an Owner role for the new branch with all permissions
  */
 router.post(
   "/",
   catchAsync(async (req, res) => {
-    const { brandId, name, email, phone, address } = req.body;
+    const { companyId, name, email, phone, address } = req.body;
     const now = getCurrentTimestampLocal();
 
     let conn;
     try {
       conn = await req.db.beginTransaction();
 
-      // Verify brand exists
-      const [brandRows] = await conn.execute(
-        `SELECT brandId FROM brands WHERE brandId = ? AND status != 'Deleted' LIMIT 1`,
-        [brandId]
+      // Verify company exists
+      const [companyRows] = await conn.execute(
+        `SELECT companyId FROM companies WHERE companyId = ? AND status != 'Deleted' LIMIT 1`,
+        [companyId]
       );
 
-      if (brandRows.length === 0) {
+      if (companyRows.length === 0) {
         await req.db.rollback(conn);
-        return res.sendError("Organization not found", 404);
+        return res.sendError("Company not found", 404);
       }
 
       // Generate UUIDs
@@ -150,16 +150,16 @@ router.post(
 
       // Create branch
       await conn.execute(
-        `INSERT INTO branches (branchId, brandId, name, email, phone, address, isMainBranch, status, dateCreated, dateUpdated)
+        `INSERT INTO branches (branchId, companyId, name, email, phone, address, isMainBranch, status, dateCreated, dateUpdated)
          VALUES (?, ?, ?, ?, ?, ?, 0, 'Active', ?, ?)`,
-        [branchId, brandId, name, email || null, phone || null, address || null, now, now]
+        [branchId, companyId, name, email || null, phone || null, address || null, now, now]
       );
 
-      // Create Owner role for this brand+branch
+      // Create Owner role for this company+branch
       await conn.execute(
-        `INSERT INTO roles (roleId, brandId, branchId, roleName, description, status, dateCreated, dateUpdated)
+        `INSERT INTO roles (roleId, companyId, branchId, roleName, description, status, dateCreated, dateUpdated)
          VALUES (?, ?, ?, 'Owner', 'Full access owner role. Not visible in Admin portal.', 'Active', ?, ?)`,
-        [roleId, brandId, branchId, now, now]
+        [roleId, companyId, branchId, now, now]
       );
 
       // Assign ALL active permissions to the Owner role in a single bulk insert

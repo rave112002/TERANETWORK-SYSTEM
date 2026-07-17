@@ -219,13 +219,13 @@ export const checkPasswordStrength = (password) => {
 export const getPasswordStrengthColor = (strength) => {
   switch (strength) {
     case "strong":
-      return "#52c41a"; // green
+      return "var(--color-success)";
     case "medium":
-      return "#faad14"; // orange
+      return "var(--color-warning)";
     case "weak":
-      return "#ff4d4f"; // red
+      return "var(--color-error)";
     default:
-      return "#d9d9d9"; // gray
+      return "var(--color-text-muted)";
   }
 };
 

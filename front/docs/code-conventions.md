@@ -120,8 +120,12 @@ This project uses Tailwind v4. Key syntax differences from v3:
 
 All CSS variables/tokens live in `src/index.css` under `@theme`. Reference them via:
 
-- Inline styles: `style={{ color: "var(--color-primary-color)" }}`
-- Tailwind classes: `text-primary-color`, `bg-primary-pale`
+- Inline styles: `style={{ color: "var(--color-text-secondary)" }}` — the usual form
+- Tailwind classes generated from `@theme`: `font-mono`, `bg-surface`
+
+**Never hardcode a hex** on a themed surface, and never use `bg-white` / `bg-gray-*` /
+`text-slate-*` (they don't flip in dark mode). See [ui-design-system.md](./ui-design-system.md)
+for the token cheat-sheet.
 
 ---
 

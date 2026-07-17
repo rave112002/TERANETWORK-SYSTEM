@@ -9,7 +9,7 @@ const router = express.Router();
 /**
  * GET /
  * List all users with pagination and filtering
- * Scoped to the authenticated user's brand/branch
+ * Scoped to the authenticated user's company/branch
  */
 router.get(
   "/",
@@ -23,12 +23,12 @@ router.get(
       sortBy = "dateCreated",
       sortOrder = "DESC",
     } = req.query;
-    const { brandId, branchId } = req.user;
+    const { companyId, branchId } = req.user;
 
     const offset = (page - 1) * pageSize;
-    const params = [brandId, branchId];
+    const params = [companyId, branchId];
     let whereClause =
-      "WHERE u.brandId = ? AND u.branchId = ? AND u.status != 'Deleted' AND r.roleName != 'Owner'";
+      "WHERE u.companyId = ? AND u.branchId = ? AND u.status != 'Deleted' AND r.roleName != 'Owner'";
 
     if (search) {
       whereClause += ` AND (u.firstName LIKE ? OR u.lastName LIKE ? OR c.email LIKE ?)`;
@@ -58,7 +58,7 @@ router.get(
       req.db.query(
         `SELECT
         u.accountId,
-        u.brandId,
+        u.companyId,
         u.branchId,
         u.firstName,
         u.lastName,
@@ -106,7 +106,7 @@ router.get(
     const users = await req.db.query(
       `SELECT 
         u.accountId,
-        u.brandId,
+        u.companyId,
         u.branchId,
         u.firstName,
         u.lastName,
@@ -144,7 +144,7 @@ router.post(
   checkPermission("users", "list", "write"),
   catchAsync(async (req, res) => {
     const { firstName, lastName, email, password, phone, roleId } = req.body;
-    const { brandId, branchId } = req.user;
+    const { companyId, branchId } = req.user;
     const now = getCurrentTimestampLocal();
 
     let conn;
@@ -170,9 +170,9 @@ router.post(
 
       // Create user
       await conn.execute(
-        `INSERT INTO users (accountId, brandId, branchId, firstName, lastName, phone, roleId, status, dateCreated, dateUpdated)
+        `INSERT INTO users (accountId, companyId, branchId, firstName, lastName, phone, roleId, status, dateCreated, dateUpdated)
          VALUES (?, ?, ?, ?, ?, ?, ?, 'Active', ?, ?)`,
-        [accountId, brandId, branchId, firstName, lastName, phone || null, roleId, now, now]
+        [accountId, companyId, branchId, firstName, lastName, phone || null, roleId, now, now]
       );
 
       // Create credential

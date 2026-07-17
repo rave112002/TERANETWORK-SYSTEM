@@ -3,32 +3,23 @@ import {
   PlusOutlined,
   ReloadOutlined,
 } from "@ant-design/icons";
-import {
-  Alert,
-  Button,
-  Empty,
-  Input,
-  Select,
-  Spin,
-  Table,
-  Typography,
-} from "antd";
+import { Alert, Button, Col, Empty, Input, Row, Select, Spin, Table } from "antd";
 import { useState } from "react";
-import { Search, Users, UserPlus } from "lucide-react";
+import { Building2, Search, UserCheck, Users } from "lucide-react";
 import { useUserHooks } from "./hooks";
 import CreateUserDrawer from "./components/CreateUserDrawer";
-
-const { Title, Text } = Typography;
+import PageHeader from "../../../components/PageHeader";
+import PaginationFooter from "../../../components/PaginationFooter";
+import StatCard from "../../../components/StatCard";
 
 const SuperAdminUsers = () => {
   const {
     data,
+    pagination,
     isLoading,
     error,
     refetch,
     columns,
-    currentPage,
-    pageSize,
     handleTableChange,
     isCreateDrawerOpen,
     handleOpenCreateDrawer,
@@ -37,8 +28,8 @@ const SuperAdminUsers = () => {
     setSearch,
     statusFilter,
     setStatusFilter,
-    brandFilter,
-    setBrandFilter,
+    companyFilter,
+    setCompanyFilter,
     handleClearFilters,
     isSearching,
     orgOptions,
@@ -46,13 +37,20 @@ const SuperAdminUsers = () => {
 
   const [isFilterVisible, setIsFilterVisible] = useState(false);
 
-  const hasActiveFilters = statusFilter || brandFilter || search;
+  const totalUsers = pagination?.total || 0;
+  const activeUsers = data?.filter((u) => u.status === "Active").length || 0;
+  const companiesOnPage = new Set(
+    (data || []).map((u) => u.companyId).filter(Boolean),
+  ).size;
+
+  const hasActiveFilters = Boolean(search || statusFilter || companyFilter);
+  const isEmpty = !isLoading && (data?.length || 0) === 0;
 
   if (error) {
     return (
-      <div className="p-6">
+      <div className="p-8">
         <Alert
-          message="Error Loading Users"
+          message="Error loading users"
           description={
             error.message || "Failed to load users. Please try again."
           }
@@ -64,136 +62,142 @@ const SuperAdminUsers = () => {
   }
 
   return (
-    <div className="p-6 space-y-5">
-      {/* 1. PAGE HEADER */}
-      <div className="flex items-center justify-between">
-        <div>
-          <Title level={2} className="mb-1! flex items-center gap-3">
-            <div
-              className="inline-flex items-center justify-center w-10 h-10 rounded-xl shadow-md"
-              style={{ background: "var(--gradient-primary)" }}
-            >
-              <Users className="w-5 h-5 text-white" />
-            </div>
-            User Management
-          </Title>
-          <Text
-            style={{ color: "var(--color-text-secondary)" }}
-            className="text-sm"
+    <div className="p-8 space-y-5">
+      {/* 1. HEADER */}
+      <PageHeader
+        title="Users"
+        subtitle="Manage company owners and admin users."
+        actions={
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={handleOpenCreateDrawer}
           >
-            Manage organization owners and admin users
-          </Text>
-        </div>
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={handleOpenCreateDrawer}
-          size="large"
-          style={{
-            background: "var(--gradient-primary)",
-            border: "none",
-            boxShadow:
-              "0 4px 12px color-mix(in srgb, var(--color-primary-color) 35%, transparent)",
-          }}
-        >
-          Create Owner
-        </Button>
-      </div>
+            New owner
+          </Button>
+        }
+      />
 
-      {/* 2. ACTION BAR */}
-      <div className="flex flex-wrap gap-2 items-center">
-        <Button
-          icon={<ReloadOutlined />}
-          onClick={() => refetch?.()}
-          loading={isLoading}
-          size="middle"
-          style={{
-            borderColor: "var(--color-primary-color)",
-            color: "var(--color-primary-color)",
-          }}
-        >
-          Refresh
-        </Button>
-        <Button
-          icon={<FilterOutlined />}
-          onClick={() => setIsFilterVisible(!isFilterVisible)}
-          size="middle"
-          style={
-            isFilterVisible || hasActiveFilters
-              ? {
-                  borderColor: "var(--color-primary-color)",
-                  color: "var(--color-primary-color)",
-                  background: "var(--color-primary-pale)",
-                }
-              : {
-                  borderColor: "var(--color-primary-color)",
-                  color: "var(--color-primary-color)",
-                }
-          }
-        >
-          Filters
-          {hasActiveFilters && (
-            <span
-              className="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full text-white text-[10px] font-bold"
-              style={{ background: "var(--color-primary-color)" }}
-            >
-              !
-            </span>
-          )}
-        </Button>
-      </div>
+      {/* 2. STAT CARDS */}
+      <Row gutter={[14, 14]}>
+        <Col xs={24} sm={12} lg={8}>
+          <StatCard
+            title="Total users"
+            value={totalUsers}
+            change="all time"
+            icon={<Users className="w-4.25 h-4.25" strokeWidth={1.8} />}
+          />
+        </Col>
+        <Col xs={24} sm={12} lg={8}>
+          <StatCard
+            title="Active users"
+            value={activeUsers}
+            change="on this page"
+            icon={<UserCheck className="w-4.25 h-4.25" strokeWidth={1.8} />}
+          />
+        </Col>
+        <Col xs={24} sm={12} lg={8}>
+          <StatCard
+            title="Companies represented"
+            value={companiesOnPage}
+            change="on this page"
+            icon={<Building2 className="w-4.25 h-4.25" strokeWidth={1.8} />}
+          />
+        </Col>
+      </Row>
 
-      {/* 3. FILTER PANEL */}
-      {isFilterVisible && (
+      {/* 3. TABLE CARD */}
+      <div
+        className="bg-surface overflow-hidden"
+        style={{
+          border: "1px solid var(--color-line)",
+          borderRadius: "var(--radius-card)",
+        }}
+      >
+        {/* Toolbar */}
         <div
-          className="rounded-xl p-4"
-          style={{
-            background:
-              "color-mix(in srgb, var(--color-primary-pale) 50%, white)",
-            border: "1px solid var(--color-primary-pale)",
-          }}
+          className="flex items-center justify-between gap-3 flex-wrap px-[18px] py-3.5"
+          style={{ borderBottom: "1px solid var(--color-line)" }}
         >
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="sm:col-span-2 lg:col-span-1">
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">
-                Search
-              </label>
-              <Input
-                placeholder="Search users..."
-                prefix={<Search className="w-3.5 h-3.5 text-gray-400" />}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                size="middle"
-                className={isSearching ? "bg-yellow-50 border-yellow-300" : ""}
+          <Input
+            placeholder="Filter users…"
+            prefix={
+              <Search
+                className="w-[15px] h-[15px]"
+                style={{ color: "var(--color-text-muted)" }}
               />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">
-                Organization
-              </label>
+            }
+            suffix={isSearching ? <Spin size="small" /> : null}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            allowClear
+            style={{ width: 280 }}
+          />
+          <div className="flex items-center gap-2">
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={() => refetch?.()}
+              loading={isLoading}
+            >
+              Refresh
+            </Button>
+            <Button
+              icon={<FilterOutlined />}
+              onClick={() => setIsFilterVisible(!isFilterVisible)}
+              type={isFilterVisible || hasActiveFilters ? "primary" : "default"}
+            >
+              Filters
+            </Button>
+          </div>
+        </div>
+
+        {/* Filter row */}
+        {isFilterVisible && (
+          <div
+            className="flex items-end gap-3 flex-wrap px-[18px] py-3.5"
+            style={{ borderBottom: "1px solid var(--color-line)" }}
+          >
+            <div className="flex flex-col gap-1.5">
+              <span
+                className="uppercase"
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  letterSpacing: "0.08em",
+                  color: "var(--color-text-muted)",
+                }}
+              >
+                Company
+              </span>
               <Select
-                value={brandFilter || undefined}
-                onChange={setBrandFilter}
-                placeholder="All organizations"
+                value={companyFilter || undefined}
+                onChange={setCompanyFilter}
+                placeholder="All companies"
                 allowClear
-                className="w-full"
-                size="middle"
-                options={orgOptions}
                 showSearch
                 optionFilterProp="label"
+                style={{ width: 220 }}
+                options={orgOptions}
               />
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">
+            <div className="flex flex-col gap-1.5">
+              <span
+                className="uppercase"
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  letterSpacing: "0.08em",
+                  color: "var(--color-text-muted)",
+                }}
+              >
                 Status
-              </label>
+              </span>
               <Select
                 value={statusFilter || undefined}
                 onChange={setStatusFilter}
                 placeholder="All statuses"
                 allowClear
-                className="w-full"
-                size="middle"
+                style={{ width: 200 }}
                 options={[
                   { value: "Active", label: "Active" },
                   { value: "Inactive", label: "Inactive" },
@@ -202,79 +206,57 @@ const SuperAdminUsers = () => {
                 ]}
               />
             </div>
-            <div className="flex flex-col">
-              <span className="block text-xs font-semibold text-transparent mb-1.5 uppercase tracking-wide select-none">
-                &nbsp;
-              </span>
+            {hasActiveFilters && (
               <button
                 onClick={handleClearFilters}
-                className="text-sm hover:underline cursor-pointer transition-colors font-medium h-8 flex items-center"
-                style={{ color: "var(--color-primary-color)" }}
+                className="h-8 text-[13px] cursor-pointer hover:underline"
+                style={{ color: "var(--color-link)" }}
               >
                 Clear all
               </button>
-            </div>
+            )}
           </div>
-        </div>
-      )}
+        )}
 
-      {/* 4. TABLE */}
-      <div
-        className="rounded-2xl bg-white ring-1 ring-gray-100 overflow-hidden"
-        style={{
-          boxShadow:
-            "0 4px 6px -1px rgba(0,0,0,0.07), 0 10px 15px -3px rgba(0,0,0,0.07)",
-        }}
-      >
-        {!isLoading && (data?.users?.length || 0) === 0 ? (
+        {/* Table + custom pagination footer */}
+        {isEmpty ? (
           <div className="flex items-center justify-center py-20">
-            <Empty description="No Users Found">
+            <Empty description="No users found">
               <Button
                 type="primary"
                 icon={<PlusOutlined />}
                 onClick={handleOpenCreateDrawer}
-                className="mt-4"
-                style={{
-                  background: "var(--gradient-primary)",
-                  border: "none",
-                }}
               >
-                Create First Owner
+                New owner
               </Button>
             </Empty>
           </div>
         ) : (
-          <Table
-            dataSource={data?.users}
-            columns={columns}
-            loading={{
-              spinning: isLoading,
-              indicator: <Spin size="large" style={{ marginTop: 50 }} />,
-            }}
-            rowKey="accountId"
-            pagination={{
-              current: currentPage,
-              pageSize: pageSize,
-              total: data?.pagination?.total || 0,
-              showSizeChanger: true,
-              showQuickJumper: true,
-              showTotal: (total, range) =>
-                `${range[0]}–${range[1]} of ${total} users`,
-              pageSizeOptions: ["10", "20", "50", "100"],
-              size: "default",
-              responsive: true,
-              className: "px-6 py-3",
-            }}
-            onChange={handleTableChange}
-            scroll={{ x: 900 }}
-            size="middle"
-            className="border-none"
-            rowClassName="hover:bg-primary-pale/30 transition-colors"
-          />
+          <>
+            <Table
+              dataSource={data}
+              columns={columns}
+              rowKey="accountId"
+              pagination={false}
+              loading={{
+                spinning: isLoading,
+                indicator: <Spin size="large" style={{ marginTop: 50 }} />,
+              }}
+              onChange={handleTableChange}
+              scroll={{ x: 900 }}
+              size="middle"
+              className="border-none"
+            />
+            <PaginationFooter
+              pagination={pagination}
+              onChange={handleTableChange}
+              noun="user"
+            />
+          </>
         )}
       </div>
 
-      {/* 5. DRAWERS */}
+      {/* 4. DRAWERS */}
       <CreateUserDrawer
         open={isCreateDrawerOpen}
         onClose={handleCloseCreateDrawer}

@@ -2,21 +2,39 @@ import { FilterOutlined, ReloadOutlined } from "@ant-design/icons";
 import {
   Alert,
   Button,
+  Col,
   DatePicker,
   Empty,
   Input,
+  Row,
   Select,
   Spin,
   Table,
-  Typography,
 } from "antd";
 import { useState } from "react";
-import { FileText, Search } from "lucide-react";
+import { Activity, Search, Trash2, Users } from "lucide-react";
 import { useAuditTrailHooks } from "./hooks";
 import AuditDetailModal from "./components/AuditDetailModal";
+import PageHeader from "../../../components/PageHeader";
+import PaginationFooter from "../../../components/PaginationFooter";
+import StatCard from "../../../components/StatCard";
 
-const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
+
+// Uppercase micro-label above a filter control.
+const FilterLabel = ({ children }) => (
+  <span
+    className="uppercase"
+    style={{
+      fontSize: 11,
+      fontWeight: 600,
+      letterSpacing: "0.08em",
+      color: "var(--color-text-muted)",
+    }}
+  >
+    {children}
+  </span>
+);
 
 const AuditTrailPage = () => {
   const {
@@ -38,7 +56,6 @@ const AuditTrailPage = () => {
     setDateRange,
     moduleOptions,
     handleClearFilters,
-    isSearching,
     selectedLog,
     isDetailOpen,
     handleCloseDetails,
@@ -51,12 +68,17 @@ const AuditTrailPage = () => {
     moduleFilter ||
     (dateRange && (dateRange[0] || dateRange[1]))
   );
+  const isEmpty = !isLoading && logs.length === 0;
+
+  const totalEvents = pagination?.total || 0;
+  const uniqueUsers = new Set(logs.map((l) => l.accountId).filter(Boolean)).size;
+  const deletions = logs.filter((l) => l.action === "DELETE").length;
 
   if (error) {
     return (
-      <div className="p-6">
+      <div className="p-8">
         <Alert
-          message="Error Loading Audit Trail"
+          message="Error loading audit trail"
           description={
             error.message || "Failed to load audit logs. Please try again."
           }
@@ -68,181 +90,154 @@ const AuditTrailPage = () => {
   }
 
   return (
-    <div className="p-6 space-y-5">
-      {/* 1. PAGE HEADER */}
-      <div className="flex items-center justify-between">
-        <div>
-          <Title level={2} className="mb-1! flex items-center gap-3">
-            <div
-              className="inline-flex items-center justify-center w-10 h-10 rounded-xl shadow-md"
-              style={{ background: "var(--gradient-primary)" }}
-            >
-              <FileText className="w-5 h-5 text-white" />
-            </div>
-            Audit Trail
-          </Title>
-          <Text
-            style={{ color: "var(--color-text-secondary)" }}
-            className="text-sm"
-          >
-            View system activity logs and audit history
-          </Text>
-        </div>
-      </div>
+    <div className="p-8 space-y-5">
+      {/* 1. HEADER — read-only module, so no primary action */}
+      <PageHeader
+        title="Audit Trail"
+        subtitle="View system activity logs and audit history."
+      />
 
-      {/* 2. ACTION BAR */}
-      <div className="flex flex-wrap gap-2 items-center">
-        <Button
-          icon={<ReloadOutlined />}
-          onClick={() => refetch()}
-          loading={isFetching}
-          size="middle"
-          style={{
-            borderColor: "var(--color-primary-color)",
-            color: "var(--color-primary-color)",
-          }}
-        >
-          Refresh
-        </Button>
-        <Button
-          icon={<FilterOutlined />}
-          onClick={() => setIsFilterVisible(!isFilterVisible)}
-          size="middle"
-          style={
-            isFilterVisible || hasActiveFilters
-              ? {
-                  borderColor: "var(--color-primary-color)",
-                  color: "var(--color-primary-color)",
-                  background: "var(--color-primary-pale)",
-                }
-              : {
-                  borderColor: "var(--color-primary-color)",
-                  color: "var(--color-primary-color)",
-                }
-          }
-        >
-          Filters
-          {hasActiveFilters && (
-            <span
-              className="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full text-white text-[10px] font-bold"
-              style={{ background: "var(--color-primary-color)" }}
-            >
-              !
-            </span>
-          )}
-        </Button>
-      </div>
+      {/* 2. STAT CARDS */}
+      <Row gutter={[14, 14]}>
+        <Col xs={24} sm={12} lg={8}>
+          <StatCard
+            title="Total events"
+            value={totalEvents}
+            change="all time"
+            icon={<Activity className="w-4.25 h-4.25" strokeWidth={1.8} />}
+          />
+        </Col>
+        <Col xs={24} sm={12} lg={8}>
+          <StatCard
+            title="Users involved"
+            value={uniqueUsers}
+            change="on this page"
+            icon={<Users className="w-4.25 h-4.25" strokeWidth={1.8} />}
+          />
+        </Col>
+        <Col xs={24} sm={12} lg={8}>
+          <StatCard
+            title="Deletions"
+            value={deletions}
+            change="on this page"
+            icon={<Trash2 className="w-4.25 h-4.25" strokeWidth={1.8} />}
+          />
+        </Col>
+      </Row>
 
-      {/* 3. FILTER PANEL */}
-      {isFilterVisible && (
+      {/* 3. TABLE CARD */}
+      <div
+        className="bg-surface overflow-hidden"
+        style={{
+          border: "1px solid var(--color-line)",
+          borderRadius: "var(--radius-card)",
+        }}
+      >
+        {/* Toolbar */}
         <div
-          className="rounded-xl p-4"
-          style={{
-            background:
-              "color-mix(in srgb, var(--color-primary-pale) 50%, white)",
-            border: "1px solid var(--color-primary-pale)",
-          }}
+          className="flex items-center justify-between gap-3 flex-wrap px-[18px] py-3.5"
+          style={{ borderBottom: "1px solid var(--color-line)" }}
         >
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">
-                Search
-              </label>
-              <Input
-                placeholder="Search action or description..."
-                prefix={<Search className="w-3.5 h-3.5 text-gray-400" />}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                size="middle"
-                className={isSearching ? "bg-yellow-50 border-yellow-300" : ""}
+          <Input
+            placeholder="Filter events…"
+            prefix={
+              <Search
+                className="w-[15px] h-[15px]"
+                style={{ color: "var(--color-text-muted)" }}
               />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">
-                Module
-              </label>
+            }
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            allowClear
+            style={{ width: 280 }}
+          />
+          <div className="flex items-center gap-2">
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={() => refetch()}
+              loading={isFetching}
+            >
+              Refresh
+            </Button>
+            <Button
+              icon={<FilterOutlined />}
+              onClick={() => setIsFilterVisible(!isFilterVisible)}
+              type={isFilterVisible || hasActiveFilters ? "primary" : "default"}
+            >
+              Filters
+            </Button>
+          </div>
+        </div>
+
+        {/* Filter row */}
+        {isFilterVisible && (
+          <div
+            className="flex items-end gap-3 flex-wrap px-[18px] py-3.5"
+            style={{ borderBottom: "1px solid var(--color-line)" }}
+          >
+            <div className="flex flex-col gap-1.5">
+              <FilterLabel>Module</FilterLabel>
               <Select
                 value={moduleFilter || undefined}
                 onChange={(value) => setModuleFilter(value || "")}
                 placeholder="All modules"
                 allowClear
-                className="w-full"
-                size="middle"
+                style={{ width: 200 }}
                 options={moduleOptions}
               />
             </div>
-            <div className="sm:col-span-2 lg:col-span-1">
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">
-                Date Range
-              </label>
+            <div className="flex flex-col gap-1.5">
+              <FilterLabel>Date range</FilterLabel>
               <RangePicker
                 value={dateRange}
                 onChange={setDateRange}
-                className="w-full"
-                size="middle"
                 allowClear
+                style={{ width: 260 }}
               />
             </div>
-            <div className="flex flex-col">
-              <span className="block text-xs font-semibold text-transparent mb-1.5 uppercase tracking-wide select-none">
-                &nbsp;
-              </span>
+            {hasActiveFilters && (
               <button
                 onClick={handleClearFilters}
-                className="text-sm hover:underline cursor-pointer transition-colors font-medium h-8 flex items-center"
-                style={{ color: "var(--color-primary-color)" }}
+                className="h-8 text-[13px] cursor-pointer hover:underline"
+                style={{ color: "var(--color-link)" }}
               >
                 Clear all
               </button>
-            </div>
+            )}
           </div>
-        </div>
-      )}
+        )}
 
-      {/* 4. TABLE */}
-      <div
-        className="rounded-2xl bg-white ring-1 ring-gray-100 overflow-hidden"
-        style={{
-          boxShadow:
-            "0 4px 6px -1px rgba(0,0,0,0.07), 0 10px 15px -3px rgba(0,0,0,0.07)",
-        }}
-      >
-        {!isLoading && logs.length === 0 ? (
+        {/* Table + custom pagination footer */}
+        {isEmpty ? (
           <div className="flex items-center justify-center py-20">
             <Empty description="No audit logs found" />
           </div>
         ) : (
-          <Table
-            dataSource={logs}
-            columns={columns}
-            loading={{
-              spinning: isLoading,
-              indicator: <Spin size="large" style={{ marginTop: 50 }} />,
-            }}
-            rowKey="auditId"
-            pagination={{
-              current: currentPage,
-              pageSize: pageSize,
-              total: pagination?.total || 0,
-              showSizeChanger: true,
-              showQuickJumper: true,
-              showTotal: (total, range) =>
-                `${range[0]}–${range[1]} of ${total} events`,
-              pageSizeOptions: ["10", "20", "50", "100"],
-              size: "default",
-              responsive: true,
-              className: "px-6 py-3",
-            }}
-            onChange={handleTableChange}
-            scroll={{ x: 1100 }}
-            size="middle"
-            className="border-none"
-            rowClassName="hover:bg-primary-pale/30 transition-colors"
-          />
+          <>
+            <Table
+              dataSource={logs}
+              columns={columns}
+              rowKey="auditId"
+              pagination={false}
+              loading={{
+                spinning: isLoading,
+                indicator: <Spin size="large" style={{ marginTop: 50 }} />,
+              }}
+              onChange={handleTableChange}
+              scroll={{ x: 1100 }}
+              size="middle"
+              className="border-none"
+            />
+            <PaginationFooter
+              pagination={{ current: currentPage, pageSize, total: totalEvents }}
+              onChange={handleTableChange}
+              noun="event"
+            />
+          </>
         )}
       </div>
 
-      {/* 5. DETAIL MODAL */}
+      {/* 4. DETAIL MODAL */}
       <AuditDetailModal
         open={isDetailOpen}
         onClose={handleCloseDetails}

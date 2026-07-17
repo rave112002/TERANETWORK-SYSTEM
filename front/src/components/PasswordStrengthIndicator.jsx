@@ -17,8 +17,11 @@ const PasswordStrengthIndicator = ({ password, showRequirements = true }) => {
       {password && (
         <div className="space-y-1">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-600">
-              Password Strength
+            <span
+              className="text-xs font-medium"
+              style={{ color: "var(--color-text-secondary)" }}
+            >
+              Password strength
             </span>
             <span
               className="text-xs font-semibold"
@@ -27,7 +30,10 @@ const PasswordStrengthIndicator = ({ password, showRequirements = true }) => {
               {strength.message}
             </span>
           </div>
-          <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
+          <div
+            className="h-1.5 rounded-full overflow-hidden"
+            style={{ background: "var(--color-surface-sunken)" }}
+          >
             <div
               className="h-full transition-all duration-300 rounded-full"
               style={{
@@ -42,20 +48,34 @@ const PasswordStrengthIndicator = ({ password, showRequirements = true }) => {
       {/* Requirements List */}
       {showRequirements && (
         <div className="space-y-1.5">
-          <p className="text-xs font-medium text-slate-600">Requirements:</p>
+          <p
+            className="text-xs font-medium"
+            style={{ color: "var(--color-text-secondary)" }}
+          >
+            Requirements:
+          </p>
           {passwordRequirements.map((req) => {
             const isMet = strength.requirements[req.key];
             return (
               <div key={req.key} className="flex items-start gap-2">
                 {isMet ? (
-                  <Check className="w-3.5 h-3.5 text-green-500 mt-0.5 flex-shrink-0" />
+                  <Check
+                    className="w-3.5 h-3.5 mt-0.5 shrink-0"
+                    style={{ color: "var(--color-success)" }}
+                  />
                 ) : (
-                  <X className="w-3.5 h-3.5 text-slate-300 mt-0.5 flex-shrink-0" />
+                  <X
+                    className="w-3.5 h-3.5 mt-0.5 shrink-0"
+                    style={{ color: "var(--color-text-muted)" }}
+                  />
                 )}
                 <span
-                  className={`text-xs ${
-                    isMet ? "text-green-600" : "text-slate-500"
-                  }`}
+                  className="text-xs"
+                  style={{
+                    color: isMet
+                      ? "var(--color-success)"
+                      : "var(--color-text-secondary)",
+                  }}
                 >
                   {req.label}
                 </span>

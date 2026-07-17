@@ -88,8 +88,16 @@ axiosInstance.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        // Fetch new CSRF token
-        const response = await axiosInstance.get("/api/v1/auth/csrf-token");
+        // Fetch a new CSRF token from the portal the failing request targeted
+        // (e.g. /api/v1/admin/... → /api/v1/admin/auth/csrf-token). The generic
+        // /api/v1/auth/csrf-token route does not exist on the backend and 404s
+        // with "API not found", which would break the retry.
+        const portal =
+          originalRequest.url?.match(/\/api\/v1\/(admin|superadmin)\//)?.[1] ||
+          "admin";
+        const response = await axiosInstance.get(
+          `/api/v1/${portal}/auth/csrf-token`,
+        );
         const newCsrfToken = response.data.csrfToken;
 
         // Update the store with the new token

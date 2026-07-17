@@ -1,93 +1,134 @@
-import { Card, Col, Row, Table, Tag, Avatar, Progress, Typography } from "antd";
+import { Col, Progress, Row, Table } from "antd";
 import {
-  Users,
-  Building2,
   Activity,
-  TrendingUp,
-  ShieldCheck,
-  Database,
-  Server,
   AlertCircle,
-  MapPin,
+  Building2,
   CheckCircle,
   Clock,
-  UserPlus,
-  FileText,
-  Settings,
   CreditCard,
+  Database,
+  FileText,
+  MapPin,
+  Server,
+  Settings,
+  TrendingUp,
+  UserPlus,
+  Users,
 } from "lucide-react";
+
+import PageHeader from "../../../components/PageHeader";
 import StatCard from "../../../components/StatCard";
 
-const { Title, Text } = Typography;
+/**
+ * Section panel — hairline border, radius 14, no shadow. The header carries a
+ * dim lucide icon, the title, and an optional right-hand action.
+ */
+const Panel = ({
+  icon,
+  title,
+  extra,
+  className = "",
+  bodyClass = "p-[18px]",
+  children,
+}) => (
+  <div
+    className={`flex flex-col overflow-hidden ${className}`}
+    style={{
+      background: "var(--color-surface)",
+      border: "1px solid var(--color-line)",
+      borderRadius: "var(--radius-card)",
+    }}
+  >
+    <div
+      className="flex items-center justify-between gap-3 px-[18px] py-3.5"
+      style={{ borderBottom: "1px solid var(--color-line)" }}
+    >
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="shrink-0" style={{ color: "var(--color-text-muted)" }}>
+          {icon}
+        </span>
+        <span
+          className="truncate"
+          style={{
+            fontSize: 13.5,
+            fontWeight: 600,
+            color: "var(--color-text-dark)",
+          }}
+        >
+          {title}
+        </span>
+      </div>
+      {extra}
+    </div>
+    <div className={`flex-1 ${bodyClass}`}>{children}</div>
+  </div>
+);
+
+const ViewAllLink = () => (
+  <button
+    className="shrink-0 cursor-pointer hover:underline"
+    style={{ fontSize: 12.5, color: "var(--color-link)" }}
+  >
+    View all
+  </button>
+);
 
 const Dashboard = () => {
   const statCards = [
     {
-      title: "Total Organizations",
+      title: "Total companies",
       value: 48,
-      icon: <Building2 className="w-5 h-5" />,
-      color: "from-primary-color to-secondary-color",
-      bgColor: "bg-primary-pale",
-      textColor: "text-primary-color",
       change: "+8 this month",
+      icon: <Building2 className="w-4.25 h-4.25" strokeWidth={1.8} />,
     },
     {
-      title: "Active Organizations",
+      title: "Active companies",
       value: 45,
-      icon: <CheckCircle className="w-5 h-5" />,
-      color: "from-emerald-400 to-emerald-600",
-      bgColor: "bg-emerald-100",
-      textColor: "text-emerald-600",
       change: "93.8% active rate",
+      icon: <CheckCircle className="w-4.25 h-4.25" strokeWidth={1.8} />,
     },
     {
-      title: "Total Branches",
+      title: "Total branches",
       value: 156,
-      icon: <MapPin className="w-5 h-5" />,
-      color: "from-secondary-color to-secondary-dark",
-      bgColor: "bg-secondary-pale",
-      textColor: "text-secondary-color",
       change: "+12 this month",
+      icon: <MapPin className="w-4.25 h-4.25" strokeWidth={1.8} />,
     },
     {
-      title: "Monthly Revenue",
+      title: "Monthly revenue",
       value: "$24K",
-      icon: <TrendingUp className="w-5 h-5" />,
-      color: "from-orange-400 to-orange-600",
-      bgColor: "bg-orange-100",
-      textColor: "text-orange-600",
       change: "+12.5% growth",
+      icon: <TrendingUp className="w-4.25 h-4.25" strokeWidth={1.8} />,
     },
   ];
 
   const systemStats = [
     {
-      title: "Database Status",
+      title: "Database status",
       value: "Healthy",
-      icon: <Database className="w-5 h-5" />,
+      icon: <Database className="w-4 h-4" strokeWidth={1.8} />,
       status: "success",
     },
     {
-      title: "Server Load",
+      title: "Server load",
       value: "45%",
-      icon: <Server className="w-5 h-5" />,
+      icon: <Server className="w-4 h-4" strokeWidth={1.8} />,
       status: "success",
     },
     {
-      title: "Active Sessions",
+      title: "Active sessions",
       value: "234",
-      icon: <Users className="w-5 h-5" />,
+      icon: <Users className="w-4 h-4" strokeWidth={1.8} />,
       status: "success",
     },
     {
       title: "Alerts",
       value: "2",
-      icon: <AlertCircle className="w-5 h-5" />,
+      icon: <AlertCircle className="w-4 h-4" strokeWidth={1.8} />,
       status: "warning",
     },
   ];
 
-  const recentOrganizations = [
+  const recentCompanies = [
     {
       key: "1",
       name: "Acme Corporation",
@@ -125,16 +166,16 @@ const Dashboard = () => {
   const recentActivities = [
     {
       id: 1,
-      type: "organization",
-      icon: <Building2 className="w-4 h-4" />,
-      title: "New organization registered",
+      type: "company",
+      icon: <Building2 className="w-4 h-4" strokeWidth={1.8} />,
+      title: "New company registered",
       description: "Acme Corporation joined the platform",
       time: "5 minutes ago",
     },
     {
       id: 2,
       type: "user",
-      icon: <UserPlus className="w-4 h-4" />,
+      icon: <UserPlus className="w-4 h-4" strokeWidth={1.8} />,
       title: "New admin user created",
       description: "John Smith added to TechStart Inc.",
       time: "15 minutes ago",
@@ -142,7 +183,7 @@ const Dashboard = () => {
     {
       id: 3,
       type: "subscription",
-      icon: <CreditCard className="w-4 h-4" />,
+      icon: <CreditCard className="w-4 h-4" strokeWidth={1.8} />,
       title: "Subscription upgraded",
       description: "Global Services upgraded to Enterprise plan",
       time: "1 hour ago",
@@ -150,7 +191,7 @@ const Dashboard = () => {
     {
       id: 4,
       type: "document",
-      icon: <FileText className="w-4 h-4" />,
+      icon: <FileText className="w-4 h-4" strokeWidth={1.8} />,
       title: "Document submitted",
       description: "StartUp Hub submitted compliance documents",
       time: "2 hours ago",
@@ -158,13 +199,14 @@ const Dashboard = () => {
     {
       id: 5,
       type: "system",
-      icon: <Settings className="w-4 h-4" />,
+      icon: <Settings className="w-4 h-4" strokeWidth={1.8} />,
       title: "System maintenance completed",
       description: "Database optimization finished successfully",
       time: "3 hours ago",
     },
   ];
 
+  // Plan tiers ramp muted → accent green; they're a scale, not a severity.
   const subscriptionData = [
     {
       plan: "Basic",
@@ -175,7 +217,7 @@ const Dashboard = () => {
     {
       plan: "Standard",
       count: 15,
-      color: "var(--color-primary-color)",
+      color: "var(--color-secondary-light)",
       revenue: "$45K",
     },
     {
@@ -187,102 +229,159 @@ const Dashboard = () => {
     {
       plan: "Enterprise",
       count: 7,
-      color: "var(--color-warning)",
+      color: "var(--color-secondary-dark)",
       revenue: "$77K",
     },
   ];
 
-  const organizationColumns = [
+  const systemAlerts = [
     {
-      title: "Organization",
+      id: 1,
+      icon: <AlertCircle className="w-4.5 h-4.5 shrink-0 mt-0.5" strokeWidth={1.8} />,
+      color: "var(--color-warning)",
+      title: "Payment pending",
+      description: "2 companies have pending subscription payments",
+      meta: "Requires attention",
+    },
+    {
+      id: 2,
+      icon: <AlertCircle className="w-4.5 h-4.5 shrink-0 mt-0.5" strokeWidth={1.8} />,
+      color: "var(--color-warning)",
+      title: "Document verification",
+      description: "3 companies awaiting document verification",
+      meta: "Review required",
+    },
+    {
+      id: 3,
+      icon: <Activity className="w-4.5 h-4.5 shrink-0 mt-0.5" strokeWidth={1.8} />,
+      color: "var(--color-text-muted)",
+      title: "System update available",
+      description: "New version 2.5.0 is ready to install",
+      meta: "Optional update",
+    },
+  ];
+
+  const companyColumns = [
+    {
+      title: "Company",
       dataIndex: "name",
       key: "name",
-      render: (text, record) => (
-        <div className="flex items-center gap-2">
-          <Avatar
-            size={32}
-            icon={<Building2 className="w-4 h-4" />}
-            className="bg-primary-pale text-primary-color"
-          />
-          <div>
-            <div className="font-semibold text-text-dark">{text}</div>
-            <div className="text-xs text-text-secondary flex items-center gap-1">
-              <MapPin className="w-3 h-3" />
-              {record.city}
+      render: (text, record) => {
+        const initial = (text?.trim().charAt(0) || "?").toUpperCase();
+        return (
+          <div className="flex items-center gap-3 min-w-0">
+            <span
+              style={{
+                width: 30,
+                height: 30,
+                borderRadius: 8,
+                background: "var(--color-surface-sunken)",
+                border: "1px solid var(--color-line)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flex: "none",
+                fontSize: 13,
+                fontWeight: 600,
+                color: "var(--color-text-secondary)",
+              }}
+            >
+              {initial}
+            </span>
+            <div className="min-w-0">
+              <div
+                className="truncate"
+                style={{
+                  fontSize: 14,
+                  fontWeight: 500,
+                  color: "var(--color-text-dark)",
+                }}
+              >
+                {text}
+              </div>
+              <div
+                className="flex items-center gap-1"
+                style={{ fontSize: 12, color: "var(--color-text-muted)" }}
+              >
+                <MapPin className="w-3 h-3 shrink-0" strokeWidth={1.8} />
+                {record.city}
+              </div>
             </div>
           </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       title: "Branches",
       dataIndex: "branches",
       key: "branches",
       align: "center",
-      render: (count) => <span className="font-medium">{count}</span>,
+      render: (count) => (
+        <span style={{ fontSize: 13.5, color: "var(--color-text-secondary)" }}>
+          {count}
+        </span>
+      ),
     },
     {
       title: "Subscription",
       dataIndex: "subscription",
       key: "subscription",
-      render: (plan) => {
-        const colors = {
-          Basic: "default",
-          Standard: "blue",
-          Premium: "purple",
-          Enterprise: "gold",
-        };
-        return <Tag color={colors[plan]}>{plan}</Tag>;
-      },
+      render: (plan) => (
+        <span
+          className="inline-flex items-center"
+          style={{
+            height: 22,
+            padding: "0 8px",
+            borderRadius: 6,
+            background: "var(--color-surface-sunken)",
+            border: "1px solid var(--color-line)",
+            fontSize: 12,
+            color: "var(--color-text-secondary)",
+          }}
+        >
+          {plan}
+        </span>
+      ),
     },
     {
       title: "Status",
       dataIndex: "status",
       key: "status",
-      render: (status) => (
-        <Tag color={status === "active" ? "success" : "default"}>
-          {status === "active" ? "Active" : "Inactive"}
-        </Tag>
-      ),
+      render: (status) => {
+        const active = status === "active";
+        return (
+          <span
+            className="inline-flex items-center gap-2"
+            style={{ fontSize: 13, color: "var(--color-text-secondary)" }}
+          >
+            <span
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: "50%",
+                background: active
+                  ? "var(--color-success)"
+                  : "var(--color-text-muted)",
+                boxShadow: active ? "0 0 8px rgba(34,197,94,.5)" : "none",
+              }}
+            />
+            {active ? "Active" : "Inactive"}
+          </span>
+        );
+      },
     },
   ];
 
-  const getActivityColor = (type) => {
-    const colors = {
-      organization: "bg-primary-pale text-primary-color",
-      user: "bg-emerald-100 text-emerald-600",
-      subscription: "bg-secondary-pale text-secondary-color",
-      document: "bg-orange-100 text-orange-600",
-      system: "bg-gray-100 text-gray-600",
-    };
-    return colors[type] || colors.system;
-  };
-
   return (
-    <div className="p-6 space-y-5">
-      {/* 1. PAGE HEADER */}
-      <div className="flex items-center justify-between">
-        <div>
-          <Title level={2} className="mb-1! flex items-center gap-3">
-            <div
-              className="inline-flex items-center justify-center w-10 h-10 rounded-xl shadow-md"
-              style={{ background: "var(--gradient-primary)" }}
-            >
-              <ShieldCheck className="w-5 h-5 text-white" />
-            </div>
-            SuperAdmin Dashboard
-          </Title>
-          <Text
-            style={{ color: "var(--color-text-secondary)" }}
-            className="text-sm"
-          >
-            System overview and management console
-          </Text>
-        </div>
-      </div>
+    <div className="p-8 space-y-5">
+      {/* 1. HEADER */}
+      <PageHeader
+        title="SuperAdmin Dashboard"
+        subtitle="System overview and management console"
+      />
 
       {/* 2. STAT CARDS */}
-      <Row gutter={[16, 16]}>
+      <Row gutter={[14, 14]}>
         {statCards.map((stat, index) => (
           <Col xs={24} sm={12} lg={6} key={index}>
             <StatCard {...stat} />
@@ -291,238 +390,297 @@ const Dashboard = () => {
       </Row>
 
       {/* 3. SYSTEM STATUS */}
-      <Card
-        title={
-          <div className="flex items-center gap-2">
-            <Activity className="w-5 h-5 text-primary-color" />
-            <span>System Status</span>
-          </div>
-        }
-        className="shadow-lg border-0"
+      <Panel
+        icon={<Activity className="w-4 h-4" strokeWidth={1.8} />}
+        title="System status"
       >
-        <Row gutter={[16, 16]}>
+        <Row gutter={[14, 14]}>
           {systemStats.map((stat, index) => (
             <Col xs={24} sm={12} lg={6} key={index}>
-              <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors duration-200">
-                <div
-                  className={`p-3 rounded-xl ${
-                    stat.status === "success"
-                      ? "bg-emerald-100 text-emerald-600"
-                      : "bg-orange-100 text-orange-600"
-                  }`}
+              <div
+                className="flex items-center gap-3 p-3.5"
+                style={{
+                  background: "var(--color-surface-sunken)",
+                  border: "1px solid var(--color-line)",
+                  borderRadius: "var(--radius-control)",
+                }}
+              >
+                <span
+                  className="inline-flex items-center justify-center shrink-0"
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 8,
+                    background: "var(--color-surface)",
+                    border: "1px solid var(--color-line)",
+                    color: "var(--color-text-muted)",
+                  }}
                 >
                   {stat.icon}
-                </div>
-                <div>
-                  <Text
-                    style={{ color: "var(--color-text-secondary)" }}
-                    className="text-sm block"
+                </span>
+                <div className="min-w-0">
+                  <div
+                    className="truncate"
+                    style={{
+                      fontSize: 12.5,
+                      color: "var(--color-text-secondary)",
+                    }}
                   >
                     {stat.title}
-                  </Text>
-                  <Text className="text-lg font-semibold">{stat.value}</Text>
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    {/* the dot carries the health signal, so the icon stays dim */}
+                    <span
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: "50%",
+                        flex: "none",
+                        background:
+                          stat.status === "success"
+                            ? "var(--color-success)"
+                            : "var(--color-warning)",
+                      }}
+                    />
+                    <span
+                      style={{
+                        fontSize: 15,
+                        fontWeight: 600,
+                        color: "var(--color-text-dark)",
+                      }}
+                    >
+                      {stat.value}
+                    </span>
+                  </div>
                 </div>
               </div>
             </Col>
           ))}
         </Row>
-      </Card>
+      </Panel>
 
-      {/* 4. RECENT ORGANIZATIONS & SUBSCRIPTION */}
-      <Row gutter={[16, 16]}>
+      {/* 4. RECENT COMPANIES & SUBSCRIPTION */}
+      <Row gutter={[14, 14]}>
         <Col xs={24} lg={16}>
-          <Card
-            title={
-              <div className="flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-primary-color" />
-                <span>Recent Organizations</span>
-              </div>
-            }
-            className="shadow-lg border-0"
-            extra={
-              <Text
-                className="cursor-pointer hover:underline"
-                style={{ color: "var(--color-primary-color)" }}
-              >
-                View All
-              </Text>
-            }
+          <Panel
+            icon={<Building2 className="w-4 h-4" strokeWidth={1.8} />}
+            title="Recent companies"
+            extra={<ViewAllLink />}
+            className="h-full"
+            bodyClass=""
           >
             <Table
-              columns={organizationColumns}
-              dataSource={recentOrganizations}
+              columns={companyColumns}
+              dataSource={recentCompanies}
               pagination={false}
-              size="small"
+              size="middle"
+              className="border-none"
             />
-          </Card>
+          </Panel>
         </Col>
 
         <Col xs={24} lg={8}>
-          <Card
-            title={
-              <div className="flex items-center gap-2">
-                <CreditCard className="w-5 h-5 text-secondary-color" />
-                <span>Subscription Overview</span>
-              </div>
-            }
-            className="shadow-lg border-0 h-full"
+          <Panel
+            icon={<CreditCard className="w-4 h-4" strokeWidth={1.8} />}
+            title="Subscription overview"
+            className="h-full"
           >
             <div className="space-y-4">
               {subscriptionData.map((sub, index) => (
-                <div key={index} className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: sub.color }}
-                      ></div>
-                      <Text className="font-medium">{sub.plan}</Text>
+                <div key={index} className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span
+                        style={{
+                          width: 7,
+                          height: 7,
+                          borderRadius: "50%",
+                          flex: "none",
+                          background: sub.color,
+                        }}
+                      />
+                      <span
+                        className="truncate"
+                        style={{
+                          fontSize: 13.5,
+                          fontWeight: 500,
+                          color: "var(--color-text-dark)",
+                        }}
+                      >
+                        {sub.plan}
+                      </span>
                     </div>
-                    <Text style={{ color: "var(--color-text-secondary)" }}>
-                      {sub.count} organizations
-                    </Text>
+                    <span
+                      className="shrink-0"
+                      style={{
+                        fontSize: 12.5,
+                        color: "var(--color-text-secondary)",
+                      }}
+                    >
+                      {sub.count} companies
+                    </span>
                   </div>
                   <Progress
                     percent={(sub.count / 48) * 100}
                     strokeColor={sub.color}
+                    trailColor="var(--color-surface-sunken)"
                     showInfo={false}
                     size="small"
                   />
-                  <Text
-                    style={{ color: "var(--color-text-muted)" }}
-                    className="text-xs"
-                  >
+                  <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
                     {sub.revenue}
-                  </Text>
+                  </span>
                 </div>
               ))}
-              <div className="pt-4 mt-4 border-t border-gray-200">
-                <div className="flex items-center justify-between">
-                  <Text className="font-semibold">Total Revenue</Text>
-                  <Text className="text-lg font-bold text-secondary-color">
+
+              <div
+                className="pt-4 mt-4"
+                style={{ borderTop: "1px solid var(--color-line)" }}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <span
+                    style={{
+                      fontSize: 13.5,
+                      fontWeight: 500,
+                      color: "var(--color-text-secondary)",
+                    }}
+                  >
+                    Total revenue
+                  </span>
+                  <span
+                    style={{
+                      fontSize: 18,
+                      fontWeight: 600,
+                      letterSpacing: "-0.3px",
+                      color: "var(--color-text-dark)",
+                    }}
+                  >
                     $242K
-                  </Text>
+                  </span>
                 </div>
               </div>
             </div>
-          </Card>
+          </Panel>
         </Col>
       </Row>
 
       {/* 5. RECENT ACTIVITY & ALERTS */}
-      <Row gutter={[16, 16]}>
+      <Row gutter={[14, 14]}>
         <Col xs={24} lg={16}>
-          <Card
-            title={
-              <div className="flex items-center gap-2">
-                <Clock className="w-5 h-5 text-emerald-600" />
-                <span>Recent Activity</span>
-              </div>
-            }
-            className="shadow-lg border-0 h-full"
-            extra={
-              <Text
-                className="cursor-pointer hover:underline"
-                style={{ color: "var(--color-primary-color)" }}
-              >
-                View All
-              </Text>
-            }
+          <Panel
+            icon={<Clock className="w-4 h-4" strokeWidth={1.8} />}
+            title="Recent activity"
+            extra={<ViewAllLink />}
+            className="h-full"
           >
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               {recentActivities.map((activity) => (
                 <div
                   key={activity.id}
-                  className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors duration-200"
+                  className="flex items-start gap-3 p-3"
+                  style={{
+                    background: "var(--color-surface-sunken)",
+                    border: "1px solid var(--color-line)",
+                    borderRadius: "var(--radius-control)",
+                  }}
                 >
-                  <div
-                    className={`p-2 rounded-lg ${getActivityColor(activity.type)}`}
+                  <span
+                    className="inline-flex items-center justify-center shrink-0"
+                    style={{
+                      width: 30,
+                      height: 30,
+                      borderRadius: 8,
+                      background: "var(--color-surface)",
+                      border: "1px solid var(--color-line)",
+                      color: "var(--color-text-muted)",
+                    }}
                   >
                     {activity.icon}
-                  </div>
+                  </span>
                   <div className="flex-1 min-w-0">
-                    <Text className="block font-medium text-text-dark">
+                    <div
+                      style={{
+                        fontSize: 13.5,
+                        fontWeight: 500,
+                        color: "var(--color-text-dark)",
+                      }}
+                    >
                       {activity.title}
-                    </Text>
-                    <Text className="text-sm text-text-secondary block truncate">
+                    </div>
+                    <div
+                      className="truncate"
+                      style={{
+                        fontSize: 13,
+                        color: "var(--color-text-secondary)",
+                      }}
+                    >
                       {activity.description}
-                    </Text>
-                    <Text className="text-xs text-text-muted mt-1 flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
+                    </div>
+                    <div
+                      className="flex items-center gap-1 mt-1"
+                      style={{ fontSize: 12, color: "var(--color-text-muted)" }}
+                    >
+                      <Clock className="w-3 h-3 shrink-0" strokeWidth={1.8} />
                       {activity.time}
-                    </Text>
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
-          </Card>
+          </Panel>
         </Col>
 
         <Col xs={24} lg={8}>
-          <Card
-            title={
-              <div className="flex items-center gap-2">
-                <AlertCircle className="w-5 h-5 text-orange-600" />
-                <span>System Alerts</span>
-              </div>
-            }
-            className="shadow-lg border-0 h-full"
-            extra={
-              <Text
-                className="cursor-pointer hover:underline"
-                style={{ color: "var(--color-primary-color)" }}
-              >
-                View All
-              </Text>
-            }
+          <Panel
+            icon={<AlertCircle className="w-4 h-4" strokeWidth={1.8} />}
+            title="System alerts"
+            extra={<ViewAllLink />}
+            className="h-full"
           >
-            <div className="space-y-3">
-              <div className="flex items-start gap-3 p-3 bg-orange-50 rounded-xl border border-orange-200">
-                <AlertCircle className="w-5 h-5 text-orange-600 shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <Text className="block font-medium text-text-dark">
-                    Payment Pending
-                  </Text>
-                  <Text className="text-sm text-text-secondary">
-                    2 organizations have pending subscription payments
-                  </Text>
-                  <Text className="text-xs text-text-muted mt-1">
-                    Requires attention
-                  </Text>
+            <div className="space-y-2.5">
+              {systemAlerts.map((alert) => (
+                <div
+                  key={alert.id}
+                  className="flex items-start gap-3 p-3"
+                  style={{
+                    background: "var(--color-surface-sunken)",
+                    border: "1px solid var(--color-line)",
+                    borderRadius: "var(--radius-control)",
+                  }}
+                >
+                  {/* severity stays meaningful: the icon carries the tone */}
+                  <span style={{ color: alert.color }} className="shrink-0">
+                    {alert.icon}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div
+                      style={{
+                        fontSize: 13.5,
+                        fontWeight: 500,
+                        color: "var(--color-text-dark)",
+                      }}
+                    >
+                      {alert.title}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        color: "var(--color-text-secondary)",
+                      }}
+                    >
+                      {alert.description}
+                    </div>
+                    <div
+                      className="mt-1"
+                      style={{ fontSize: 12, color: "var(--color-text-muted)" }}
+                    >
+                      {alert.meta}
+                    </div>
+                  </div>
                 </div>
-              </div>
-
-              <div className="flex items-start gap-3 p-3 bg-amber-50 rounded-xl border border-amber-200">
-                <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <Text className="block font-medium text-text-dark">
-                    Document Verification
-                  </Text>
-                  <Text className="text-sm text-text-secondary">
-                    3 organizations awaiting document verification
-                  </Text>
-                  <Text className="text-xs text-text-muted mt-1">
-                    Review required
-                  </Text>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3 p-3 bg-primary-pale rounded-xl border border-primary-pale">
-                <Activity className="w-5 h-5 text-primary-color shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <Text className="block font-medium text-text-dark">
-                    System Update Available
-                  </Text>
-                  <Text className="text-sm text-text-secondary">
-                    New version 2.5.0 is ready to install
-                  </Text>
-                  <Text className="text-xs text-text-muted mt-1">
-                    Optional update
-                  </Text>
-                </div>
-              </div>
+              ))}
             </div>
-          </Card>
+          </Panel>
         </Col>
       </Row>
     </div>

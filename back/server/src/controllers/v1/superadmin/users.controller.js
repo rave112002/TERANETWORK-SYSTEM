@@ -7,7 +7,7 @@ const router = express.Router();
 
 /**
  * GET /
- * List all users across all brands (SuperAdmin view)
+ * List all users across all companies (SuperAdmin view)
  */
 router.get(
   "/",
@@ -16,7 +16,7 @@ router.get(
       page = 1,
       pageSize = 10,
       search = "",
-      brandId,
+      companyId,
       branchId,
       status,
       sortBy = "dateCreated",
@@ -40,9 +40,9 @@ router.get(
       params.push(`%${search}%`, `%${search}%`, `%${search}%`);
     }
 
-    if (brandId) {
-      whereClause += ` AND u.brandId = ?`;
-      params.push(brandId);
+    if (companyId) {
+      whereClause += ` AND u.companyId = ?`;
+      params.push(companyId);
     }
 
     if (branchId) {
@@ -65,7 +65,7 @@ router.get(
       req.db.query(
         `SELECT
         u.accountId,
-        u.brandId,
+        u.companyId,
         u.branchId,
         u.firstName,
         u.lastName,
@@ -75,12 +75,12 @@ router.get(
         u.dateCreated,
         c.email,
         r.roleName,
-        b.name as brandName,
+        b.name as companyName,
         br.name as branchName
       FROM users u
       LEFT JOIN credentials c ON c.accountId = u.accountId
       LEFT JOIN roles r ON r.roleId = u.roleId
-      LEFT JOIN brands b ON b.brandId = u.brandId
+      LEFT JOIN companies b ON b.companyId = u.companyId
       LEFT JOIN branches br ON br.branchId = u.branchId
       ${whereClause}
       ORDER BY u.${safeSortBy} ${safeSortOrder}
@@ -104,12 +104,12 @@ router.get(
 
 /**
  * POST /
- * Create a new user (Owner) for a specific brand+branch
+ * Create a new user (Owner) for a specific company+branch
  *
  * Flow:
- * 1. Validate that the branch exists and belongs to the brand
+ * 1. Validate that the branch exists and belongs to the company
  * 2. Check that the branch doesn't already have an Owner
- * 3. Find the Owner role for that brand+branch
+ * 3. Find the Owner role for that company+branch
  * 4. Create user + credential with the Owner role
  *
  * Rule: 1 Owner per branch
@@ -117,32 +117,32 @@ router.get(
 router.post(
   "/",
   catchAsync(async (req, res) => {
-    const { firstName, lastName, email, password, phone, brandId, branchId } = req.body;
+    const { firstName, lastName, email, password, phone, companyId, branchId } = req.body;
     const now = getCurrentTimestampLocal();
 
     let conn;
     try {
       conn = await req.db.beginTransaction();
 
-      // 1. Verify branch exists and belongs to the brand
+      // 1. Verify branch exists and belongs to the company
       const [branchRows] = await conn.execute(
         `SELECT branchId FROM branches 
-         WHERE branchId = ? AND brandId = ? AND status != 'Deleted'
+         WHERE branchId = ? AND companyId = ? AND status != 'Deleted'
          LIMIT 1`,
-        [branchId, brandId]
+        [branchId, companyId]
       );
 
       if (branchRows.length === 0) {
         await req.db.rollback(conn);
-        return res.sendError("Branch not found or does not belong to this brand", 404);
+        return res.sendError("Branch not found or does not belong to this company", 404);
       }
 
-      // 2. Find the Owner role for this brand+branch
+      // 2. Find the Owner role for this company+branch
       const [ownerRoleRows] = await conn.execute(
         `SELECT roleId FROM roles 
-         WHERE brandId = ? AND branchId = ? AND roleName = 'Owner' AND status = 'Active'
+         WHERE companyId = ? AND branchId = ? AND roleName = 'Owner' AND status = 'Active'
          LIMIT 1`,
-        [brandId, branchId]
+        [companyId, branchId]
       );
 
       if (ownerRoleRows.length === 0) {
@@ -158,9 +158,9 @@ router.post(
       // 3. Check that the branch doesn't already have an Owner (1 owner per branch)
       const [existingOwner] = await conn.execute(
         `SELECT accountId FROM users 
-         WHERE brandId = ? AND branchId = ? AND roleId = ? AND status != 'Deleted'
+         WHERE companyId = ? AND branchId = ? AND roleId = ? AND status != 'Deleted'
          LIMIT 1 FOR UPDATE`,
-        [brandId, branchId, roleId]
+        [companyId, branchId, roleId]
       );
 
       if (existingOwner.length > 0) {
@@ -187,9 +187,9 @@ router.post(
 
       // 6. Create user with Owner role
       await conn.execute(
-        `INSERT INTO users (accountId, brandId, branchId, firstName, lastName, phone, roleId, status, dateCreated, dateUpdated)
+        `INSERT INTO users (accountId, companyId, branchId, firstName, lastName, phone, roleId, status, dateCreated, dateUpdated)
          VALUES (?, ?, ?, ?, ?, ?, ?, 'Active', ?, ?)`,
-        [accountId, brandId, branchId, firstName, lastName, phone || null, roleId, now, now]
+        [accountId, companyId, branchId, firstName, lastName, phone || null, roleId, now, now]
       );
 
       // 7. Create credential

@@ -1,9 +1,18 @@
-import { Button, Dropdown, Tag, Avatar } from "antd";
+import { Button, Dropdown } from "antd";
 import { useCallback, useMemo, useState } from "react";
+import { Eye, MoreVertical } from "lucide-react";
 import { useDebounce } from "../../../hooks/useDebounce";
-import { MoreVertical, Eye, UserPlus, Building2 } from "lucide-react";
 import { useGetSuperAdminUsers } from "../../../services/requests/superadmin/users";
-import { useGetOrganizations } from "../../../services/requests/superadmin/organizations";
+import { useGetCompanies } from "../../../services/requests/superadmin/companies";
+import { decodeHTML } from "../../../utils/decode-html";
+
+// Status dot colors — tokens only, so light/dark both work.
+const STATUS_DOT = {
+  Active: "var(--color-success)",
+  Inactive: "var(--color-text-muted)",
+  Suspended: "var(--color-warning)",
+  Deleted: "var(--color-error)",
+};
 
 export const useUserHooks = () => {
   // State
@@ -15,7 +24,7 @@ export const useUserHooks = () => {
   // Filter state
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [brandFilter, setBrandFilter] = useState("");
+  const [companyFilter, setCompanyFilter] = useState("");
 
   const debouncedSearch = useDebounce(search, 500);
 
@@ -30,11 +39,11 @@ export const useUserHooks = () => {
     pageSize: pageSize,
     search: debouncedSearch,
     status: statusFilter || undefined,
-    brandId: brandFilter || undefined,
+    companyId: companyFilter || undefined,
   });
 
-  // Get organizations for filter dropdown
-  const { data: orgsData } = useGetOrganizations({ pageSize: 100 });
+  // Get companies for filter dropdown
+  const { data: orgsData } = useGetCompanies({ pageSize: 100 });
 
   // Transform data
   const transformedData = useMemo(() => {
@@ -47,9 +56,9 @@ export const useUserHooks = () => {
       fullName: `${user.firstName} ${user.lastName}`,
       email: user.email,
       phone: user.phone,
-      brandId: user.brandId,
+      companyId: user.companyId,
       branchId: user.branchId,
-      brandName: user.brandName,
+      companyName: user.companyName,
       branchName: user.branchName,
       roleId: user.roleId,
       roleName: user.roleName,
@@ -63,12 +72,12 @@ export const useUserHooks = () => {
     };
   }, [apiData]);
 
-  // Organization options for filter
+  // Company options for filter
   const orgOptions = useMemo(() => {
     if (!orgsData?.data?.data) return [];
     return orgsData.data.data.map((org) => ({
-      value: org.brandId,
-      label: org.name,
+      value: org.companyId,
+      label: decodeHTML(org.name),
     }));
   }, [orgsData]);
 
@@ -90,12 +99,13 @@ export const useUserHooks = () => {
     setViewingUser(null);
   }, []);
 
-  // Dropdown menu items
+  // ⋮ menu — SuperAdmin users are read-only here (no update/delete endpoint),
+  // so the primary action is the only item.
   const getActionItems = useCallback(
     (record) => [
       {
         key: "view",
-        label: "View Details",
+        label: "View details",
         icon: <Eye className="w-4 h-4" />,
         onClick: () => handleView(record),
       },
@@ -103,42 +113,92 @@ export const useUserHooks = () => {
     [handleView],
   );
 
-  // Columns
+  // # (mono) · initial-avatar + name · secondary text · status dot · ⋮
   const columns = useMemo(
     () => [
       {
-        title: "User",
-        key: "user",
-        fixed: "left",
-        width: 250,
-        render: (_, record) => (
-          <div className="flex items-center gap-3">
-            <Avatar size={40} className="bg-primary-pale text-primary-color">
-              {record.firstName?.[0]}
-              {record.lastName?.[0]}
-            </Avatar>
-            <div className="min-w-0">
-              <div className="font-semibold text-gray-900 truncate">
-                {record.fullName}
-              </div>
-              <div className="text-sm text-gray-500 truncate">
-                {record.email}
-              </div>
-            </div>
-          </div>
+        title: "#",
+        key: "index",
+        width: 56,
+        render: (_, __, index) => (
+          <span
+            className="font-mono"
+            style={{ fontSize: 12, color: "var(--color-text-muted)" }}
+          >
+            {String((currentPage - 1) * pageSize + index + 1).padStart(2, "0")}
+          </span>
         ),
       },
       {
-        title: "Organization",
-        key: "organization",
-        width: 200,
-        render: (_, record) => (
-          <div>
-            <div className="font-medium text-gray-900 flex items-center gap-1">
-              <Building2 className="w-3.5 h-3.5 text-gray-400" />
-              {record.brandName}
+        title: "User",
+        key: "user",
+        render: (_, record) => {
+          const name = decodeHTML(record.fullName) || "";
+          const first = decodeHTML(record.firstName) || "";
+          const last = decodeHTML(record.lastName) || "";
+          const initials =
+            `${first.trim().charAt(0)}${last.trim().charAt(0)}`.toUpperCase() ||
+            "?";
+          return (
+            <div className="flex items-center gap-3 min-w-0">
+              <span
+                style={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: 8,
+                  background: "var(--color-surface-sunken)",
+                  border: "1px solid var(--color-line)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flex: "none",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: "var(--color-text-secondary)",
+                }}
+              >
+                {initials}
+              </span>
+              <div className="min-w-0">
+                <div
+                  className="truncate"
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 500,
+                    color: "var(--color-text-dark)",
+                  }}
+                >
+                  {name}
+                </div>
+                <div
+                  className="truncate"
+                  style={{ fontSize: 12.5, color: "var(--color-text-muted)" }}
+                >
+                  {decodeHTML(record.email)}
+                </div>
+              </div>
             </div>
-            <div className="text-sm text-gray-500">{record.branchName}</div>
+          );
+        },
+      },
+      {
+        title: "Company",
+        key: "company",
+        width: 220,
+        render: (_, record) => (
+          <div className="min-w-0">
+            <div
+              className="truncate"
+              style={{ fontSize: 13.5, color: "var(--color-text-secondary)" }}
+            >
+              {decodeHTML(record.companyName) || "—"}
+            </div>
+            <div
+              className="truncate"
+              style={{ fontSize: 12.5, color: "var(--color-text-muted)" }}
+            >
+              {decodeHTML(record.branchName) || "—"}
+            </div>
           </div>
         ),
       },
@@ -146,44 +206,63 @@ export const useUserHooks = () => {
         title: "Role",
         dataIndex: "roleName",
         key: "roleName",
-        width: 120,
-        render: (roleName) => <Tag color="purple">{roleName || "—"}</Tag>,
+        width: 150,
+        ellipsis: true,
+        render: (roleName) => (
+          <span style={{ fontSize: 13.5, color: "var(--color-text-secondary)" }}>
+            {decodeHTML(roleName) || "—"}
+          </span>
+        ),
       },
       {
         title: "Status",
         dataIndex: "status",
         key: "status",
-        width: 100,
+        width: 130,
         render: (status) => {
-          const colors = {
-            Active: "success",
-            Inactive: "default",
-            Suspended: "warning",
-            Deleted: "error",
-          };
-          return <Tag color={colors[status] || "default"}>{status}</Tag>;
+          const active = status === "Active";
+          return (
+            <span
+              className="inline-flex items-center gap-2"
+              style={{ fontSize: 13, color: "var(--color-text-secondary)" }}
+            >
+              <span
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: "50%",
+                  background: STATUS_DOT[status] || "var(--color-text-muted)",
+                  boxShadow: active
+                    ? "0 0 8px color-mix(in srgb, var(--color-success) 50%, transparent)"
+                    : "none",
+                }}
+              />
+              {status}
+            </span>
+          );
         },
       },
       {
-        title: "Actions",
+        title: "",
         key: "actions",
-        fixed: "right",
-        width: 70,
+        width: 60,
+        align: "right",
         render: (_, record) => (
           <Dropdown
             menu={{ items: getActionItems(record) }}
             trigger={["click"]}
+            placement="bottomRight"
           >
             <Button
               type="text"
               icon={<MoreVertical className="w-4 h-4" />}
-              className="hover:bg-gray-100"
+              className="hover:bg-(--color-surface-sunken)"
             />
           </Dropdown>
         ),
       },
     ],
-    [getActionItems],
+    [getActionItems, currentPage, pageSize],
   );
 
   // Pagination handler
@@ -196,20 +275,23 @@ export const useUserHooks = () => {
   const handleClearFilters = useCallback(() => {
     setSearch("");
     setStatusFilter("");
-    setBrandFilter("");
+    setCompanyFilter("");
     setCurrentPage(1);
   }, []);
 
   const isSearching = search !== debouncedSearch;
 
   return {
-    data: transformedData,
+    data: transformedData.users,
+    pagination: {
+      current: currentPage,
+      pageSize,
+      total: transformedData.pagination?.total || 0,
+    },
     isLoading,
     error,
     refetch,
     columns,
-    currentPage,
-    pageSize,
     handleTableChange,
     isCreateDrawerOpen,
     handleOpenCreateDrawer,
@@ -220,8 +302,8 @@ export const useUserHooks = () => {
     setSearch,
     statusFilter,
     setStatusFilter,
-    brandFilter,
-    setBrandFilter,
+    companyFilter,
+    setCompanyFilter,
     handleClearFilters,
     isSearching,
     orgOptions,

@@ -9,11 +9,11 @@ import { Auth, UnAuth } from "../ValidateAuth";
 
 const Login = lazy(() => import("../../pages/SuperAdmin/Login"));
 const Dashboard = lazy(() => import("../../pages/SuperAdmin/Dashboard"));
-const Organizations = lazy(
-  () => import("../../pages/SuperAdmin/Organizations"),
+const Companies = lazy(
+  () => import("../../pages/SuperAdmin/Companies"),
 );
 const Branches = lazy(
-  () => import("../../pages/SuperAdmin/OrganizationManagement/Branches"),
+  () => import("../../pages/SuperAdmin/CompanyManagement/Branches"),
 );
 const SuperAdminUsers = lazy(() => import("../../pages/SuperAdmin/Users"));
 const AccountSettings = lazy(() => import("../../pages/Admin/AccountSettings"));
@@ -35,20 +35,20 @@ const SuperAdminRoute = () => {
       isShow: true,
     },
     {
-      key: "organization-management",
-      name: "Organization Management",
-      label: "Organization Management",
+      key: "company-management",
+      name: "Company Management",
+      label: "Company Management",
       icon: <Building2 className="h-5 w-5" />,
       isFilter: true,
       isShow: true,
       children: [
         {
-          route: "/organizations",
-          name: "Organizations",
-          label: "Organizations",
+          route: "/companies",
+          name: "Companies",
+          label: "Companies",
           component: (
             <Suspense fallback={<ComponentLoader />}>
-              <Organizations />
+              <Companies />
             </Suspense>
           ),
           isFilter: true,
@@ -88,14 +88,25 @@ const SuperAdminRoute = () => {
       icon: <Settings className="h-5 w-5" />,
       component: (
         <Suspense fallback={<ComponentLoader />}>
-          <div className="p-6">
-            <h1 className="text-2xl font-bold">System Settings</h1>
-            <p className="text-gray-600 mt-2">Configure system settings</p>
+          <div className="p-8">
+            <h1
+              className="font-semibold"
+              style={{ fontSize: 26, letterSpacing: "-0.5px" }}
+            >
+              System Settings
+            </h1>
+            <p
+              className="mt-2"
+              style={{ fontSize: 13.5, color: "var(--color-text-secondary)" }}
+            >
+              Configure system settings
+            </p>
           </div>
         </Suspense>
       ),
       isFilter: true,
       isShow: true,
+      section: "system", // renders below the sidebar divider
     },
   ].map((page) => {
     if (page.children) {

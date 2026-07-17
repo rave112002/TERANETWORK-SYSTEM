@@ -6,7 +6,7 @@ const getUploadApi = (userType = "admin") =>
   createAxiosInstanceWithInterceptor("multipart", userType);
 
 /**
- * Upload organization logo
+ * Upload company logo
  */
 export const uploadLogoApi = async (file, userType = "admin") => {
   const api = getUploadApi(userType);

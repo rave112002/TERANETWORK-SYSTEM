@@ -1,34 +1,49 @@
-import { Typography } from "antd";
 import { Settings } from "lucide-react";
-
-const { Title, Text } = Typography;
+import PageHeader from "../../../components/PageHeader";
 
 const SettingsPage = () => {
   return (
-    <div className="p-6 space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <Title level={2} className="mb-1! flex items-center gap-3">
-            <div
-              className="inline-flex items-center justify-center w-10 h-10 rounded-xl shadow-md"
-              style={{ background: "var(--gradient-primary)" }}
-            >
-              <Settings className="w-5 h-5 text-white" />
-            </div>
-            Settings
-          </Title>
-          <Text
-            style={{ color: "var(--color-text-secondary)" }}
-            className="text-sm"
-          >
-            Manage system settings and configurations
-          </Text>
-        </div>
-      </div>
+    <div className="p-8 space-y-5">
+      {/* 1. HEADER */}
+      <PageHeader
+        title="Settings"
+        subtitle="Manage system settings and configurations."
+      />
 
-      <div className="rounded-2xl bg-white ring-1 ring-gray-100 p-12 text-center">
-        <Settings className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-        <Text className="text-gray-500">Settings management coming soon</Text>
+      {/* 2. PLACEHOLDER PANEL */}
+      <div
+        className="flex flex-col items-center justify-center text-center px-6 py-20"
+        style={{
+          background: "var(--color-surface)",
+          border: "1px solid var(--color-line)",
+          borderRadius: "var(--radius-card)",
+        }}
+      >
+        <span
+          className="inline-flex items-center justify-center mb-4"
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: 12,
+            background: "var(--color-surface-sunken)",
+            border: "1px solid var(--color-line)",
+            color: "var(--color-text-muted)",
+          }}
+        >
+          <Settings className="w-5 h-5" strokeWidth={1.8} />
+        </span>
+        <p
+          className="m-0 font-semibold"
+          style={{ fontSize: 15, color: "var(--color-text-dark)" }}
+        >
+          Nothing to configure yet
+        </p>
+        <p
+          className="m-0 mt-1"
+          style={{ fontSize: 13, color: "var(--color-text-secondary)" }}
+        >
+          Settings management is coming soon.
+        </p>
       </div>
     </div>
   );

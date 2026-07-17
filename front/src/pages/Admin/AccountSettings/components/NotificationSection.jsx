@@ -1,5 +1,34 @@
-import { Switch } from "antd";
 import { useState } from "react";
+import StatusToggle from "../../../../components/StatusToggle";
+
+// Two-option choice → segmented toggle, not a Switch.
+const TOGGLE_OPTIONS = [
+  { v: "On", dot: "var(--color-success)" },
+  { v: "Off", dot: "var(--color-text-muted)" },
+];
+
+const items = [
+  {
+    key: "emailNotifications",
+    label: "Email Notifications",
+    description: "Receive updates via email",
+  },
+  {
+    key: "pushNotifications",
+    label: "Push Notifications",
+    description: "Browser push notifications",
+  },
+  {
+    key: "securityAlerts",
+    label: "Security Alerts",
+    description: "Login attempts and password changes",
+  },
+  {
+    key: "activityUpdates",
+    label: "Activity Updates",
+    description: "Team activity and mentions",
+  },
+];
 
 const NotificationSection = () => {
   const [preferences, setPreferences] = useState({
@@ -9,60 +38,49 @@ const NotificationSection = () => {
     activityUpdates: true,
   });
 
-  const handleToggle = (key) => {
+  const handleToggle = (key, next) => {
     setPreferences((prev) => ({
       ...prev,
-      [key]: !prev[key],
+      [key]: next === "On",
     }));
     // TODO: Call update notification preferences API
   };
 
-  const items = [
-    {
-      key: "emailNotifications",
-      label: "Email Notifications",
-      description: "Receive updates via email",
-    },
-    {
-      key: "pushNotifications",
-      label: "Push Notifications",
-      description: "Browser push notifications",
-    },
-    {
-      key: "securityAlerts",
-      label: "Security Alerts",
-      description: "Login attempts and password changes",
-    },
-    {
-      key: "activityUpdates",
-      label: "Activity Updates",
-      description: "Team activity and mentions",
-    },
-  ];
-
   return (
-    <div className="space-y-4">
-      {items.map((item) => (
+    <div>
+      {items.map((item, index) => (
         <div
           key={item.key}
-          className="flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 transition-colors"
+          className={`py-4 ${index === 0 ? "pt-0" : ""} ${
+            index === items.length - 1 ? "pb-0" : ""
+          }`}
+          style={
+            index === 0
+              ? undefined
+              : { borderTop: "1px solid var(--color-line-soft)" }
+          }
         >
-          <div>
+          <div className="min-w-0">
             <p
-              className="text-sm font-medium"
-              style={{ color: "var(--color-text-dark)" }}
+              className="m-0 font-medium"
+              style={{ fontSize: 13.5, color: "var(--color-text-dark)" }}
             >
               {item.label}
             </p>
-            <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            <p
+              className="m-0 mt-0.5"
+              style={{ fontSize: 12, color: "var(--color-text-muted)" }}
+            >
               {item.description}
             </p>
           </div>
-          <Switch
-            checked={preferences[item.key]}
-            onChange={() => handleToggle(item.key)}
-            size="small"
-          />
+          <div className="mt-2.5">
+            <StatusToggle
+              value={preferences[item.key] ? "On" : "Off"}
+              onChange={(next) => handleToggle(item.key, next)}
+              options={TOGGLE_OPTIONS}
+            />
+          </div>
         </div>
       ))}
     </div>

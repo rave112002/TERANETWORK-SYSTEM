@@ -9,7 +9,7 @@ These conventions apply to all database tables and backend controller code in th
 Every table MUST follow this structure:
 
 1. **`id`** — `BIGINT PRIMARY KEY AUTO_INCREMENT` — internal surrogate key, never exposed to the frontend.
-2. **Business ID** — a separate `varchar(50) UNIQUE NOT NULL` column (e.g., `accountId`, `brandId`, `branchId`, `roleId`, `permissionId`) used in all API responses, URLs, and foreign key references.
+2. **Business ID** — a separate `varchar(50) UNIQUE NOT NULL` column (e.g., `accountId`, `companyId`, `branchId`, `roleId`, `permissionId`) used in all API responses, URLs, and foreign key references.
 3. **Timestamp columns** — `dateCreated DATETIME NOT NULL`, `dateUpdated DATETIME NOT NULL` (see Timestamp section below).
 
 ```sql
@@ -40,7 +40,7 @@ const accountId = uuidRow[0].id;
 
 // For pool queries (non-transaction):
 const uuidResult = await req.db.query(`SELECT UUID() as id`);
-const brandId = uuidResult[0].id;
+const companyId = uuidResult[0].id;
 ```
 
 ### Rules
@@ -85,7 +85,7 @@ import { v4 as uuidv4 } from "uuid";
 const accountId = uuidv4(); // ❌ Wrong
 
 // Never use crypto.randomUUID()
-const brandId = crypto.randomUUID(); // ❌ Wrong
+const companyId = crypto.randomUUID(); // ❌ Wrong
 
 // Never hardcode or generate IDs from timestamps/random strings
 const roleId = `role_${Date.now()}`; // ❌ Wrong
@@ -107,9 +107,9 @@ const now = getCurrentTimestampLocal();
 
 ```js
 await conn.execute(
-  `INSERT INTO brands (brandId, name, email, status, dateCreated, dateUpdated)
+  `INSERT INTO companies (companyId, name, email, status, dateCreated, dateUpdated)
    VALUES (?, ?, ?, 'Active', ?, ?)`,
-  [brandId, name, email, now, now],
+  [companyId, name, email, now, now],
 );
 ```
 
@@ -117,8 +117,8 @@ await conn.execute(
 
 ```js
 await req.db.query(
-  `UPDATE brands SET name = ?, dateUpdated = ? WHERE brandId = ? AND status != 'Deleted'`,
-  [name, now, brandId],
+  `UPDATE companies SET name = ?, dateUpdated = ? WHERE companyId = ? AND status != 'Deleted'`,
+  [name, now, companyId],
 );
 ```
 
@@ -136,7 +136,7 @@ await req.db.query(
 Foreign keys reference the **business ID column** (not the auto-increment `id`):
 
 ```sql
--- users.brandId references brands.brandId
+-- users.companyId references companies.companyId
 -- users.branchId references branches.branchId
 -- users.roleId references roles.roleId
 -- role_permissions.roleId references roles.roleId
@@ -169,12 +169,12 @@ Refer to `database/schema.sql` for the full table definitions. Key tables:
 
 | Table              | Business ID        | Purpose                                             |
 | ------------------ | ------------------ | --------------------------------------------------- |
-| `brands`           | `brandId`          | Multi-tenant organization (the brand/company)       |
-| `branches`         | `branchId`         | Physical locations under a brand                    |
+| `companies`           | `companyId`          | Multi-tenant company (the company)       |
+| `branches`         | `branchId`         | Physical locations under a company                    |
 | `superadmins`      | `accountId`        | Platform-level superadmin users                     |
 | `credentials`      | `accountId`        | Auth credentials (shared across portals via `type`) |
-| `users`            | `accountId`        | Admin/staff users (belong to a brand + branch)      |
-| `roles`            | `roleId`           | Permission roles (scoped to brand + branch)         |
+| `users`            | `accountId`        | Admin/staff users (belong to a company + branch)      |
+| `roles`            | `roleId`           | Permission roles (scoped to company + branch)         |
 | `permissions`      | `permissionId`     | Master permission definitions                       |
 | `role_permissions` | (composite)        | Maps roles → permissions                            |
 | `user_permissions` | `userPermissionId` | Per-user permission overrides                       |

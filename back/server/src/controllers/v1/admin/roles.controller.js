@@ -7,7 +7,7 @@ const router = express.Router();
 
 /**
  * GET /
- * List all roles (scoped by brandId/branchId from authenticated user)
+ * List all roles (scoped by companyId/branchId from authenticated user)
  */
 router.get(
   "/",
@@ -21,11 +21,11 @@ router.get(
       sortBy = "dateCreated",
       sortOrder = "DESC",
     } = req.query;
-    const { brandId, branchId } = req.user;
+    const { companyId, branchId } = req.user;
     const offset = (page - 1) * pageSize;
-    const params = [brandId, branchId];
+    const params = [companyId, branchId];
     let whereClause =
-      "WHERE r.brandId = ? AND r.branchId = ? AND r.status != 'Deleted' AND r.roleName != 'Owner'";
+      "WHERE r.companyId = ? AND r.branchId = ? AND r.status != 'Deleted' AND r.roleName != 'Owner'";
 
     if (search) {
       whereClause += ` AND (r.roleName LIKE ? OR r.description LIKE ?)`;
@@ -49,7 +49,7 @@ router.get(
       req.db.query(
         `SELECT
         r.roleId,
-        r.brandId,
+        r.companyId,
         r.branchId,
         r.roleName,
         r.description,
@@ -87,7 +87,7 @@ router.get(
   catchAsync(async (req, res) => {
     const { roleId } = req.params;
     const roles = await req.db.query(
-      `SELECT roleId, brandId, branchId, roleName, description, status, dateCreated, dateUpdated
+      `SELECT roleId, companyId, branchId, roleName, description, status, dateCreated, dateUpdated
        FROM roles WHERE roleId = ? AND status != 'Deleted' LIMIT 1`,
       [roleId]
     );
@@ -109,7 +109,7 @@ router.post(
   checkPermission("users", "roles", "write"),
   catchAsync(async (req, res) => {
     const { roleName, description } = req.body;
-    const { brandId, branchId } = req.user;
+    const { companyId, branchId } = req.user;
     const now = getCurrentTimestampLocal();
 
     let conn;
@@ -120,12 +120,12 @@ router.post(
       const [uuidRow] = await conn.execute(`SELECT UUID() as id`);
       const roleId = uuidRow[0].id;
 
-      // Check duplicate roleName within same brand/branch
+      // Check duplicate roleName within same company/branch
       const [existing] = await conn.execute(
         `SELECT roleId FROM roles 
-         WHERE roleName = ? AND brandId = ? AND branchId = ? AND status != 'Deleted'
+         WHERE roleName = ? AND companyId = ? AND branchId = ? AND status != 'Deleted'
          LIMIT 1 FOR UPDATE`,
-        [roleName, brandId, branchId]
+        [roleName, companyId, branchId]
       );
 
       if (existing.length > 0) {
@@ -134,9 +134,9 @@ router.post(
       }
 
       await conn.execute(
-        `INSERT INTO roles (roleId, brandId, branchId, roleName, description, status, dateCreated, dateUpdated)
+        `INSERT INTO roles (roleId, companyId, branchId, roleName, description, status, dateCreated, dateUpdated)
          VALUES (?, ?, ?, ?, ?, 'Active', ?, ?)`,
-        [roleId, brandId, branchId, roleName, description || null, now, now]
+        [roleId, companyId, branchId, roleName, description || null, now, now]
       );
 
       await req.db.commit(conn);

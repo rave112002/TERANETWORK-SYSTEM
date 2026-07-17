@@ -1,4 +1,3 @@
-@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap");
 @import "tailwindcss";
 @import "tailwindcss/theme.css" layer(theme);
 
@@ -9,117 +8,150 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* ============================================================================
-   DESIGN TOKENS — single source of truth.
-   To rebrand, change the values below. Two tiers:
-     1. BRAND scale  → your accent identity (mostly constant across modes).
-     2. SEMANTIC      → surfaces / text / borders that FLIP in dark mode
-                        (light defaults here, dark overrides in `.dark` block).
-   Keep `--color-primary` in sync with BRAND in `src/theme/antdTheme.js`
-   (Ant Design needs JS values, so the primary lives in both places).
+   MODERN DESIGN TOKENS — single source of truth.
+
+   The system: monochrome surfaces + hairline borders + ONE green accent used
+   sparingly (bars, ticks, focus, chips) — never on buttons. Primary buttons are
+   INVERTED (dark-on-light / light-on-dark). Cards are flat: 1px line, radius 14,
+   no shadow.
+
+   Never hardcode a hex in a page — reference these tokens so light/dark and
+   future re-themes "just work". Keep the accent in sync with `antdTheme.js`
+   (Ant Design needs JS values, so the accent lives in both places).
    ============================================================================ */
 @theme {
-  /* ── BRAND · Indigo → Violet ────────────────────────────────────────────── */
-  --color-primary: #4f46e5;
-  --color-primary-color: #4f46e5;
-  --color-primary-dark: #4338ca;
-  --color-primary-light: #6366f1;
-  --color-primary-pale: #eef2ff;
+  /* ── TYPE ───────────────────────────────────────────────────────────────
+     Bundled (@fontsource-variable, imported in main.jsx) first, then the plain
+     CDN name from the index.html <link> fallback, then system stacks. */
+  --font-sans: "Onest Variable", "Onest", ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace,
+    SFMono-Regular, Menlo, monospace;
 
-  /* ── BRAND · Secondary (Violet) ─────────────────────────────────────────── */
-  --color-secondary-color: #7c3aed;
-  --color-secondary-dark: #6d28d9;
-  --color-secondary-light: #a78bfa;
-  --color-secondary-pale: #f3e8ff;
+  /* ── ACCENT · green, used sparingly (never on buttons) ──────────────────── */
+  --color-secondary-color: #4ade80; /* bars, ticks, focus rings, chips */
+  --color-secondary-dark: #22c55e;
+  --color-secondary-light: #86efac;
+  --color-link: #16a34a; /* text links */
+
+  /* Legacy aliases → resolved to the accent so any unconverted reference
+     degrades to the new system instead of the old indigo. */
+  --color-primary: #22c55e;
+  --color-primary-color: #22c55e;
+  --color-primary-dark: #16a34a;
+  --color-primary-light: #4ade80;
 
   /* ── SEMANTIC · Text ────────────────────────────────────────────────────── */
   --color-text-color: #ffffff; /* on-accent text */
-  --color-text-dark: #0f172a; /* primary / heading text */
-  --color-text-secondary: #64748b; /* body / muted */
-  --color-text-muted: #94a3b8; /* captions / placeholders */
+  --color-text-dark: #18181b; /* primary text / values */
+  --color-text2: #27272a; /* mid text (expanded-parent nav label) */
+  --color-text-secondary: #52525b; /* body / labels */
+  --color-text-muted: #a1a1aa; /* captions, icons, `#`, units */
 
   /* ── SEMANTIC · Surfaces ────────────────────────────────────────────────── */
-  --color-canvas: #f8fafc; /* app background behind content */
-  --color-surface: #ffffff; /* cards, tables, panels */
-  --color-surface-raised: #ffffff; /* dropdowns, popovers, drawers */
-  --color-surface-sunken: #f1f5f9; /* wells, group backgrounds */
+  --color-canvas: #f5f5f6; /* page background */
+  --color-surface: #ffffff; /* cards, table, drawer body */
+  --color-surface-raised: #ffffff; /* dropdowns, popovers */
+  --color-surface-sunken: #f4f4f5; /* wells, hover, toggle track */
 
-  /* Back-compat aliases (existing pages reference these) */
-  --color-bg-primary: #f8fafc;
-  --color-bg-secondary: #f1f5f9;
-  --color-bg-tertiary: #e2e8f0;
+  /* ── SEMANTIC · Lines (hairline borders, not shadows) ───────────────────── */
+  --color-line: #e4e4e7; /* hairline borders */
+  --color-line-soft: #f4f4f5; /* row dividers */
 
-  /* ── SEMANTIC · Borders ─────────────────────────────────────────────────── */
-  --color-border: #e2e8f0;
-  --color-border-light: #f1f5f9;
+  /* Legacy aliases */
+  --color-border: #e4e4e7;
+  --color-border-light: #f4f4f5;
+  --color-primary-pale: #f4f4f5; /* was a pastel tint — now neutral */
+  --color-secondary-pale: #f4f4f5;
+  --color-bg-primary: #f5f5f6;
+  --color-bg-secondary: #f4f4f5;
+  --color-bg-tertiary: #e4e4e7;
 
-  /* ── STATUS ─────────────────────────────────────────────────────────────── */
-  --color-success: #10b981;
+  /* ── INVERTED PRIMARY BUTTON ────────────────────────────────────────────── */
+  --color-btn-bg: #18181b;
+  --color-btn-text: #fafafa;
+
+  /* ── RADII ──────────────────────────────────────────────────────────────── */
+  --radius-card: 14px;
+  --radius-control: 9px;
+
+  /* ── STATUS (constant across themes) ────────────────────────────────────── */
+  --color-success: #22c55e;
   --color-warning: #f59e0b;
   --color-error: #ef4444;
-  --color-info: #4f46e5;
+  --color-info: #22c55e;
 
-  /* ── GRADIENTS ──────────────────────────────────────────────────────────── */
-  --gradient-primary: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-  --gradient-header: linear-gradient(135deg, #312e81 0%, #4c1d95 100%);
-  --gradient-background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+  /* ── ACCENT CHIP GRADIENT (drawer header mark only) ─────────────────────── */
+  --gradient-primary: linear-gradient(135deg, #22c55e 0%, #4ade80 100%);
+  --gradient-background: linear-gradient(135deg, #f5f5f6 0%, #ffffff 100%);
 
-  /* ── SHADOWS (theme-aware via the .dark override) ───────────────────────── */
-  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04),
-    0 4px 12px rgba(15, 23, 42, 0.06);
-  --shadow-raised: 0 4px 6px -1px rgba(15, 23, 42, 0.07),
-    0 10px 15px -3px rgba(15, 23, 42, 0.08);
+  /* ── SHADOWS — structure comes from borders, not shadows. Flat by design;
+     floating layers (dropdown/modal/drawer) get their shadow from Ant. ────── */
+  --shadow-card: none;
+  --shadow-raised: none;
 }
 
 /* ============================================================================
-   DARK MODE — overrides only the semantic tokens. Written unlayered so it
-   reliably beats the layered `@theme` defaults. Brand accents are lightened
-   slightly for legibility on dark surfaces.
+   DARK MODE — overrides only the semantic tokens. Unlayered so it reliably
+   beats the layered `@theme` defaults.
    ============================================================================ */
 .dark {
-  /* Brand — lift for contrast on dark backgrounds */
-  --color-primary-color: #818cf8;
-  --color-primary-light: #a5b4fc;
-  --color-primary-pale: color-mix(in srgb, #818cf8 16%, transparent);
-  --color-secondary-pale: color-mix(in srgb, #a78bfa 16%, transparent);
+  /* Accent — lift slightly for legibility on dark surfaces */
+  --color-link: #4ade80;
+  --color-primary-color: #4ade80;
 
   /* Text */
-  --color-text-dark: #f1f5f9;
-  --color-text-secondary: #94a3b8;
-  --color-text-muted: #64748b;
+  --color-text-dark: #f4f4f5;
+  --color-text2: #e4e4e7;
+  --color-text-secondary: #a1a1aa;
+  --color-text-muted: #52525b;
 
   /* Surfaces */
-  --color-canvas: #0f172a;
-  --color-surface: #1e293b;
-  --color-surface-raised: #243044;
-  --color-surface-sunken: #172033;
+  --color-canvas: #09090b;
+  --color-surface: #0f0f12;
+  --color-surface-raised: #18181b;
+  --color-surface-sunken: #18181b;
 
-  /* Back-compat aliases */
-  --color-bg-primary: #0f172a;
-  --color-bg-secondary: #1e293b;
-  --color-bg-tertiary: #334155;
+  /* Lines */
+  --color-line: #27272a;
+  --color-line-soft: #1c1c20;
 
-  /* Borders */
-  --color-border: #334155;
-  --color-border-light: #1e293b;
+  /* Legacy aliases */
+  --color-border: #27272a;
+  --color-border-light: #1c1c20;
+  --color-primary-pale: #18181b;
+  --color-secondary-pale: #18181b;
+  --color-bg-primary: #09090b;
+  --color-bg-secondary: #18181b;
+  --color-bg-tertiary: #27272a;
 
-  /* Gradients */
-  --gradient-background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+  /* Inverted primary flips in dark */
+  --color-btn-bg: #fafafa;
+  --color-btn-text: #09090b;
 
-  /* Shadows — deeper on dark */
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.35);
-  --shadow-raised: 0 4px 6px -1px rgba(0, 0, 0, 0.45),
-    0 10px 15px -3px rgba(0, 0, 0, 0.4);
+  --gradient-background: linear-gradient(135deg, #09090b 0%, #0f0f12 100%);
 }
 
-/* ── Base ────────────────────────────────────────────────────────────────── */
-* {
-  font-family: "Poppins", sans-serif;
-}
-
+/* ── Base ────────────────────────────────────────────────────────────────────
+   Set on html/body (not `*`) so element-level utilities such as `font-mono`
+   still win via normal inheritance rules. */
 html,
 body {
+  font-family: var(--font-sans);
+  font-weight: 400;
   background-color: var(--color-canvas);
   color: var(--color-text-dark);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 /* Smooth the light↔dark transition on broad surfaces */
@@ -131,8 +163,7 @@ body,
     color 0.25s ease;
 }
 
-/* ── Reusable utility: icon button (topbar / toolbar) ───────────────────────
-   Token-driven hover so it works in both themes without inline handlers. */
+/* ── Reusable utility: icon button (topbar / toolbar) ─────────────────────── */
 .icon-btn {
   display: inline-flex;
   align-items: center;
@@ -148,8 +179,9 @@ body,
   color: var(--color-text-dark);
 }
 
-/* ── Sidebar nav items (token-driven hover/active, no inline JS) ─────────────── */
+/* ── Sidebar nav items — active = subtle fill + accent bar ─────────────────── */
 .nav-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 0.625rem;
@@ -168,10 +200,12 @@ body,
 }
 .nav-item.is-active,
 .nav-item.is-active:hover {
-  background-color: var(--color-primary-pale);
-  color: var(--color-primary-color);
-  font-weight: 600;
+  background-color: var(--color-surface-sunken);
+  color: var(--color-text-dark);
+  font-weight: 500;
 }
+/* The 2px accent bar is rendered by Sidebar.jsx per item, so it can sit on the
+   group rail for nested children rather than at the row's left edge. */
 .nav-item-danger {
   color: var(--color-error);
 }
@@ -180,12 +214,70 @@ body,
   color: var(--color-error);
 }
 
-/* ── Landing page helpers (unchanged behaviour) ─────────────────────────────── */
+/* ── Pagination footer (shared by every list page) ─────────────────────────── */
+.pager-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid var(--color-line);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+.pager-btn:hover:not(:disabled) {
+  background: var(--color-surface-sunken);
+  color: var(--color-text-dark);
+}
+.pager-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.pager-active {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid var(--color-line);
+  background: var(--color-surface-sunken);
+  color: var(--color-text-dark);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.pager-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--color-line);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 12.5px;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+.pager-size:hover {
+  background: var(--color-surface-sunken);
+  color: var(--color-text-dark);
+}
+
+/* ── Landing page helpers ─────────────────────────────────────────────────── */
 .nav-link {
   cursor: pointer;
   position: relative;
 }
-
 .nav-link::after {
   content: "";
   position: absolute;
@@ -193,19 +285,16 @@ body,
   left: 0;
   bottom: 0;
   width: 0;
-  background: var(--color-primary-color);
+  background: var(--color-secondary-color);
   transition: width 0.2s;
 }
-
 .nav-link:hover::after {
   width: 100%;
 }
-
 .up {
   top: -7rem;
   transition: 0.3s;
 }
-
 .down {
   top: 0;
   transition: 0.3s;
@@ -216,40 +305,96 @@ body,
   width: 8px;
   height: 8px;
 }
-
 ::-webkit-scrollbar-track {
   background: transparent;
 }
-
 ::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--color-text-muted) 45%, transparent);
   border-radius: 4px;
 }
-
 ::-webkit-scrollbar-thumb:hover {
   background: color-mix(in srgb, var(--color-text-muted) 70%, transparent);
 }
 
-/* ── Ant Design overrides — token-driven so they hold in both themes ──────── */
+/* ============================================================================
+   Ant Design overrides — token-driven so they hold in both themes.
+   ============================================================================ */
+
+/* Primary button is INVERTED and monochrome — never the accent, never a
+   gradient. Pages must not put an inline `background` on type="primary". */
 .ant-btn-primary {
-  background: var(--gradient-primary) !important;
-  border: none !important;
-  box-shadow: 0 4px 12px
-    color-mix(in srgb, var(--color-primary-color) 30%, transparent) !important;
+  background: var(--color-btn-bg) !important;
+  color: var(--color-btn-text) !important;
+  border: 1px solid transparent !important;
+  box-shadow: none !important;
+}
+.ant-btn-primary:hover:not(:disabled) {
+  background: color-mix(
+    in srgb,
+    var(--color-btn-bg) 86%,
+    var(--color-surface)
+  ) !important;
+  color: var(--color-btn-text) !important;
+}
+.ant-btn-primary:disabled,
+.ant-btn-primary.ant-btn-disabled {
+  opacity: 0.45;
+  background: var(--color-btn-bg) !important;
+  color: var(--color-btn-text) !important;
 }
 
-.ant-btn-primary:hover {
-  filter: brightness(1.05);
-  box-shadow: 0 6px 16px
-    color-mix(in srgb, var(--color-primary-color) 40%, transparent) !important;
+/* Default buttons: hairline outline, no shadow */
+.ant-btn-default {
+  border-color: var(--color-line) !important;
+  color: var(--color-text-secondary) !important;
+  box-shadow: none !important;
+}
+.ant-btn-default:hover:not(:disabled) {
+  border-color: var(--color-line) !important;
+  background: var(--color-surface-sunken) !important;
+  color: var(--color-text-dark) !important;
 }
 
+/* Table header — small, quiet, hairline rule beneath */
+.ant-table-thead > tr > th {
+  font-size: 11.5px !important;
+  font-weight: 500 !important;
+  color: var(--color-text-muted) !important;
+  background: var(--color-surface) !important;
+  border-bottom: 1px solid var(--color-line) !important;
+}
+.ant-table-thead > tr > th::before {
+  display: none !important;
+}
+.ant-table-tbody > tr > td {
+  border-bottom: 1px solid var(--color-line-soft) !important;
+}
+
+/* Cards are flat: hairline border, radius 14, no shadow */
+.ant-card {
+  border: 1px solid var(--color-line) !important;
+  border-radius: var(--radius-card) !important;
+  box-shadow: none !important;
+}
+
+/* Focus rings use the accent */
 .ant-input:focus,
 .ant-input-focused,
 .ant-input-affix-wrapper-focused {
-  border-color: var(--color-primary-color) !important;
+  border-color: var(--color-secondary-color) !important;
   box-shadow: 0 0 0 2px
-    color-mix(in srgb, var(--color-primary-color) 20%, transparent) !important;
+    color-mix(in srgb, var(--color-secondary-color) 25%, transparent) !important;
+}
+.ant-select:not(.ant-select-disabled):hover .ant-select-selector {
+  border-color: var(--color-secondary-color) !important;
+}
+.ant-select-focused:not(.ant-select-disabled).ant-select:not(
+    .ant-select-customize-input
+  )
+  .ant-select-selector {
+  border-color: var(--color-secondary-color) !important;
+  box-shadow: 0 0 0 2px
+    color-mix(in srgb, var(--color-secondary-color) 25%, transparent) !important;
 }
 
 /* Tags: Tailwind Preflight sets `svg { display: block }`, which knocks an icon
@@ -259,17 +404,4 @@ body,
   display: inline-flex;
   align-items: center;
   gap: 4px;
-}
-
-.ant-select:not(.ant-select-disabled):hover .ant-select-selector {
-  border-color: var(--color-primary-color) !important;
-}
-
-.ant-select-focused:not(.ant-select-disabled).ant-select:not(
-    .ant-select-customize-input
-  )
-  .ant-select-selector {
-  border-color: var(--color-primary-color) !important;
-  box-shadow: 0 0 0 2px
-    color-mix(in srgb, var(--color-primary-color) 20%, transparent) !important;
 }

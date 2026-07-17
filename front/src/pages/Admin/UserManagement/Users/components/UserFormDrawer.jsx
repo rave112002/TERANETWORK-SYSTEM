@@ -1,17 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import {
-  App,
-  Button,
-  Divider,
-  Drawer,
-  Form,
-  Input,
-  Select,
-  Tooltip,
-} from "antd";
-import { Eye, EyeOff, Lock, Mail, Phone, Shield, Users } from "lucide-react";
+import { PlusOutlined } from "@ant-design/icons";
+import { App, Button, Drawer, Form, Input, Select, Tooltip } from "antd";
+import { Eye, EyeOff, Lock, Mail, Phone, Shield, Users, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import PasswordStrengthIndicator from "../../../../../components/PasswordStrengthIndicator";
+import SectionLabel from "../../../../../components/SectionLabel";
+import StatusToggle from "../../../../../components/StatusToggle";
 import { getRoles } from "../../../../../services/api/admin/roles";
 import {
   useCreateUser,
@@ -129,7 +123,7 @@ export default function UserFormDrawer({
         phone: values.phone,
         roleId: values.roleId,
         status: values.status,
-        organizationId: userData?.organizationId,
+        companyId: userData?.companyId,
       };
 
       if (isEditMode) {
@@ -157,265 +151,235 @@ export default function UserFormDrawer({
     <Drawer
       open={open}
       onClose={handleClose}
-      width={720}
+      width={800}
       closable={false}
-      styles={{ body: { padding: 0 } }}
+      styles={{ body: { padding: 24 } }}
     >
-      <div className="h-full bg-linear-to-br from-slate-50 via-white to-slate-50 flex flex-col p-6 overflow-y-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2.5 bg-linear-to-br from-blue-500 to-indigo-500 rounded-xl">
-              <Users className="w-6 h-6 text-white" />
-            </div>
-            <h2 className="text-2xl font-bold bg-linear-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+      {/* Header — accent chip + title + subtitle + bordered X */}
+      <div className="flex items-start justify-between gap-3 mb-7">
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="inline-flex items-center justify-center w-11 h-11 rounded-xl shrink-0 bg-(image:--gradient-primary)">
+            <Users className="w-[22px] h-[22px] text-white" />
+          </span>
+          <div className="min-w-0">
+            <h2
+              className="m-0 font-semibold leading-tight"
+              style={{ fontSize: 19, color: "var(--color-text-dark)" }}
+            >
               {isEditMode ? "Edit User" : "Create New User"}
             </h2>
+            <p
+              className="m-0 mt-0.5"
+              style={{ fontSize: 13, color: "var(--color-text-secondary)" }}
+            >
+              {isEditMode
+                ? "Update user account and permissions"
+                : "Add a new team member to your company"}
+            </p>
           </div>
-          <p className="text-sm text-slate-500 ml-11">
-            {isEditMode
-              ? "Update user account and permissions"
-              : "Add a new team member to your organization"}
-          </p>
         </div>
-
-        <Form
-          form={form}
-          layout="vertical"
-          requiredMark={true}
-          className="flex-1 space-y-1"
-        >
-          {/* Personal Information Section */}
-          <div className="mb-8">
-            <h3 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
-              <span className="w-1 h-5 bg-linear-to-b from-blue-500 to-indigo-500 rounded-full"></span>
-              Personal Information
-            </h3>
-
-            <div className="grid grid-cols-2 gap-4">
-              <Form.Item
-                name="firstName"
-                label="First Name"
-                rules={[{ required: true, message: "First name is required" }]}
-              >
-                <Input
-                  placeholder="Juan"
-                  className="h-11 rounded-xl text-sm"
-                  size="large"
-                />
-              </Form.Item>
-
-              <Form.Item
-                name="lastName"
-                label="Last Name"
-                rules={[{ required: true, message: "Last name is required" }]}
-              >
-                <Input
-                  placeholder="Dela Cruz"
-                  className="h-11 rounded-xl text-sm"
-                  size="large"
-                />
-              </Form.Item>
-            </div>
-          </div>
-
-          <Divider className="my-6" />
-
-          {/* Contact Information Section */}
-          <div className="mb-8">
-            <h3 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
-              <span className="w-1 h-5 bg-linear-to-b from-blue-500 to-indigo-500 rounded-full"></span>
-              Contact Information
-            </h3>
-
-            <div className="grid grid-cols-2 gap-4">
-              <Form.Item
-                name="email"
-                label="Email Address"
-                rules={[
-                  { required: true, message: "Email is required" },
-                  { type: "email", message: "Enter a valid email address" },
-                ]}
-              >
-                <Input
-                  placeholder="juan@example.com"
-                  className="h-11 rounded-xl text-sm"
-                  prefix={<Mail className="w-4 h-4 text-slate-400 mr-2" />}
-                  disabled={isEditMode}
-                  size="large"
-                />
-              </Form.Item>
-
-              <Form.Item
-                name="phone"
-                label="Phone Number"
-                rules={[{ validator: phoneValidator }]}
-              >
-                <Input
-                  placeholder="09XX XXX XXXX"
-                  className="h-11 rounded-xl text-sm"
-                  prefix={<Phone className="w-4 h-4 text-slate-400 mr-2" />}
-                  size="large"
-                  maxLength={11}
-                  onBlur={(e) => {
-                    const formatted = formatPhoneNumber(e.target.value);
-                    form.setFieldsValue({ phone: formatted });
-                  }}
-                />
-              </Form.Item>
-            </div>
-          </div>
-
-          <Divider className="my-6" />
-
-          {/* Professional Information Section */}
-          <div className="mb-8">
-            <h3 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
-              <span className="w-1 h-5 bg-linear-to-b from-blue-500 to-indigo-500 rounded-full"></span>
-              Professional Information
-            </h3>
-
-            <div className="grid grid-cols-2 gap-4">
-              <Form.Item
-                name="roleId"
-                label="Role"
-                rules={[{ required: true, message: "Please select a role" }]}
-              >
-                <Select
-                  placeholder="Select role"
-                  className="h-11 rounded-xl text-sm"
-                  size="large"
-                  showSearch
-                  optionFilterProp="children"
-                >
-                  {roles.map((role) => (
-                    <Option key={role.roleId} value={role.roleId}>
-                      <span className="flex items-center gap-2">
-                        <Shield className="w-4 h-4" />
-                        {role.roleName}
-                      </span>
-                    </Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4">
-              <Form.Item
-                name="status"
-                label="Status"
-                initialValue="Active"
-                rules={[{ required: true, message: "Please select a status" }]}
-              >
-                <Select
-                  placeholder="Select status"
-                  className="h-11 rounded-xl text-sm"
-                  size="large"
-                >
-                  <Option value="Active">
-                    <span className="flex items-center gap-2">
-                      <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                      Active
-                    </span>
-                  </Option>
-                  <Option value="Inactive">
-                    <span className="flex items-center gap-2">
-                      <span className="w-2 h-2 bg-slate-300 rounded-full"></span>
-                      Inactive
-                    </span>
-                  </Option>
-                </Select>
-              </Form.Item>
-            </div>
-          </div>
-
-          {/* Password Section - Create Mode Only */}
-          {!isEditMode && (
-            <>
-              <Divider className="my-6" />
-              <div className="mb-8">
-                <h3 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                  <span className="w-1 h-5 bg-linear-to-b from-blue-500 to-indigo-500 rounded-full"></span>
-                  Security
-                </h3>
-
-                <Form.Item
-                  name="password"
-                  label="Temporary Password"
-                  rules={[validationRules.strongPassword(8)]}
-                >
-                  <Input
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Enter temporary password"
-                    className="h-11 rounded-xl text-sm"
-                    prefix={<Lock className="w-4 h-4 text-slate-400 mr-2" />}
-                    suffix={
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="text-slate-400 hover:text-slate-600 transition-colors"
-                      >
-                        {showPassword ? (
-                          <EyeOff className="w-4 h-4" />
-                        ) : (
-                          <Eye className="w-4 h-4" />
-                        )}
-                      </button>
-                    }
-                    size="large"
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                </Form.Item>
-
-                <PasswordStrengthIndicator password={password} />
-
-                <p className="text-xs text-slate-500 mt-3">
-                  User will be prompted to change this on first login.
-                </p>
-              </div>
-            </>
-          )}
-        </Form>
-
-        {/* Footer */}
-        <div
-          className="mt-8 pt-6 border-t border-slate-200 flex justify-end gap-3"
+        <button
+          onClick={handleClose}
+          aria-label="Close"
+          className="inline-flex items-center justify-center shrink-0 transition-colors hover:bg-(--color-surface-sunken)"
           style={{
-            paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))",
+            width: 32,
+            height: 32,
+            borderRadius: 8,
+            border: "1px solid var(--color-line)",
+            color: "var(--color-text-secondary)",
           }}
         >
-          <Button
-            onClick={handleClose}
-            className="h-11 px-6 rounded-xl font-medium text-slate-700 border-slate-200 hover:bg-slate-50"
-            size="large"
+          <X className="w-[18px] h-[18px]" />
+        </button>
+      </div>
+
+      <Form form={form} layout="vertical" requiredMark autoComplete="off">
+        {/* Personal information */}
+        <div>
+          <SectionLabel>Personal information</SectionLabel>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Form.Item
+              name="firstName"
+              label="First name"
+              rules={[{ required: true, message: "First name is required" }]}
+            >
+              <Input placeholder="Juan" size="large" />
+            </Form.Item>
+
+            <Form.Item
+              name="lastName"
+              label="Last name"
+              rules={[{ required: true, message: "Last name is required" }]}
+            >
+              <Input placeholder="Dela Cruz" size="large" />
+            </Form.Item>
+          </div>
+        </div>
+
+        {/* Contact information */}
+        <div className="mt-7">
+          <SectionLabel>Contact information</SectionLabel>
+
+          <Form.Item
+            name="email"
+            label="Email address"
+            rules={[
+              { required: true, message: "Email is required" },
+              { type: "email", message: "Enter a valid email address" },
+            ]}
           >
-            Cancel
-          </Button>
-          <Tooltip title={saveDisabled ? "No changes to save yet" : undefined}>
-            <span>
-              <Button
-                type="primary"
-                onClick={handleSubmit}
-                disabled={saveDisabled}
-                loading={
-                  createUserMutation.isPending || updateUserMutation.isPending
+            <Input
+              placeholder="juan@example.com"
+              prefix={
+                <Mail
+                  className="w-4 h-4 mr-2"
+                  style={{ color: "var(--color-text-muted)" }}
+                />
+              }
+              disabled={isEditMode}
+              size="large"
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="phone"
+            label="Phone number"
+            rules={[{ validator: phoneValidator }]}
+          >
+            <Input
+              placeholder="09XX XXX XXXX"
+              prefix={
+                <Phone
+                  className="w-4 h-4 mr-2"
+                  style={{ color: "var(--color-text-muted)" }}
+                />
+              }
+              size="large"
+              maxLength={11}
+              onBlur={(e) => {
+                const formatted = formatPhoneNumber(e.target.value);
+                form.setFieldsValue({ phone: formatted });
+              }}
+            />
+          </Form.Item>
+        </div>
+
+        {/* Role & access */}
+        <div className="mt-7">
+          <SectionLabel>Role &amp; access</SectionLabel>
+
+          <Form.Item
+            name="roleId"
+            label="Role"
+            rules={[{ required: true, message: "Please select a role" }]}
+          >
+            <Select
+              placeholder="Select role"
+              size="large"
+              showSearch
+              optionFilterProp="children"
+            >
+              {roles.map((role) => (
+                <Option key={role.roleId} value={role.roleId}>
+                  <span className="flex items-center gap-2">
+                    <Shield className="w-4 h-4" />
+                    {role.roleName}
+                  </span>
+                </Option>
+              ))}
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            name="status"
+            label="Status"
+            initialValue="Active"
+            rules={[{ required: true, message: "Please select a status" }]}
+          >
+            <StatusToggle />
+          </Form.Item>
+        </div>
+
+        {/* Security — create mode only */}
+        {!isEditMode && (
+          <div className="mt-7">
+            <SectionLabel>Security</SectionLabel>
+
+            <Form.Item
+              name="password"
+              label="Temporary password"
+              required
+              rules={[validationRules.strongPassword(8)]}
+            >
+              <Input
+                type={showPassword ? "text" : "password"}
+                placeholder="Enter temporary password"
+                prefix={
+                  <Lock
+                    className="w-4 h-4 mr-2"
+                    style={{ color: "var(--color-text-muted)" }}
+                  />
                 }
-                className="h-11 px-8 rounded-xl font-medium border-none text-white"
-                style={
-                  saveDisabled
-                    ? undefined
-                    : {
-                        background:
-                          "linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)",
-                      }
+                suffix={
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="transition-colors"
+                    style={{ color: "var(--color-text-muted)" }}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </button>
                 }
                 size="large"
-              >
-                {isEditMode ? "Update User" : "Create User"}
-              </Button>
-            </span>
-          </Tooltip>
-        </div>
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </Form.Item>
+
+            <PasswordStrengthIndicator password={password} />
+
+            <p
+              className="mt-3"
+              style={{ fontSize: 12, color: "var(--color-text-muted)" }}
+            >
+              User will be prompted to change this on first login.
+            </p>
+          </div>
+        )}
+      </Form>
+
+      {/* Footer */}
+      <div
+        className="mt-8 pt-5 flex justify-end gap-3"
+        style={{
+          borderTop: "1px solid var(--color-line)",
+          paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))",
+        }}
+      >
+        <Button onClick={handleClose} size="large">
+          Cancel
+        </Button>
+        <Tooltip title={saveDisabled ? "No changes to save yet" : undefined}>
+          <span>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={handleSubmit}
+              disabled={saveDisabled}
+              loading={
+                createUserMutation.isPending || updateUserMutation.isPending
+              }
+              size="large"
+            >
+              {isEditMode ? "Update User" : "Create User"}
+            </Button>
+          </span>
+        </Tooltip>
       </div>
     </Drawer>
   );

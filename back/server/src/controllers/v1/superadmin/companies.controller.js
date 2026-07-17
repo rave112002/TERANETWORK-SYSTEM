@@ -5,11 +5,11 @@ import { upload, compressImage } from "../../../utils/file/uploads.js";
 
 const router = express.Router();
 
-// Multer config for logo upload: uploads/superadmin/logos/{brandId}/
+// Multer config for logo upload: uploads/superadmin/logos/{companyId}/
 const logoUpload = upload({
   filePath: (req) => {
-    const brandId = req.params.brandId || "new";
-    return `uploads/superadmin/logos/${brandId}`;
+    const companyId = req.params.companyId || "new";
+    return `uploads/superadmin/logos/${companyId}`;
   },
   fileTypes: ["images"],
   maxFileSize: 1024 * 1024 * 2, // 2MB
@@ -17,7 +17,7 @@ const logoUpload = upload({
 
 /**
  * GET /
- * List all brands (organizations) with pagination
+ * List all companies (companies) with pagination
  */
 router.get(
   "/",
@@ -58,14 +58,14 @@ router.get(
     const safeSortBy = allowedSortColumns.includes(sortBy) ? sortBy : "dateCreated";
     const safeSortOrder = sortOrder.toUpperCase() === "ASC" ? "ASC" : "DESC";
 
-    const [countRows, organizations] = await Promise.all([
+    const [countRows, companies] = await Promise.all([
       req.db.query(
-        `SELECT COUNT(*) as total FROM brands b ${whereClause}`,
+        `SELECT COUNT(*) as total FROM companies b ${whereClause}`,
         params
       ),
       req.db.query(
         `SELECT
-        b.brandId,
+        b.companyId,
         b.name,
         b.email,
         b.website,
@@ -76,8 +76,8 @@ router.get(
         b.status,
         b.dateCreated,
         b.dateUpdated,
-        (SELECT COUNT(*) FROM branches br WHERE br.brandId = b.brandId AND br.status != 'Deleted') as branchCount
-      FROM brands b
+        (SELECT COUNT(*) FROM branches br WHERE br.companyId = b.companyId AND br.status != 'Deleted') as branchCount
+      FROM companies b
       ${whereClause}
       ORDER BY b.${safeSortBy} ${safeSortOrder}
       LIMIT ? OFFSET ?`,
@@ -86,8 +86,8 @@ router.get(
     ]);
     const total = countRows[0]?.total || 0;
 
-    return res.sendSuccess("Organizations retrieved successfully", {
-      data: organizations,
+    return res.sendSuccess("Companies retrieved successfully", {
+      data: companies,
       pagination: {
         page: Number(page),
         pageSize: Number(pageSize),
@@ -99,47 +99,47 @@ router.get(
 );
 
 /**
- * GET /:brandId
- * Get single brand (organization)
+ * GET /:companyId
+ * Get single company (company)
  */
 router.get(
-  "/:brandId",
+  "/:companyId",
   catchAsync(async (req, res) => {
-    const { brandId } = req.params;
+    const { companyId } = req.params;
 
-    const brands = await req.db.query(
+    const companies = await req.db.query(
       `SELECT 
-        brandId, name, email, website, logoUrl,
+        companyId, name, email, website, logoUrl,
         subscriptionPlan, subscriptionStartDate, subscriptionEndDate,
         status, dateCreated, dateUpdated
-      FROM brands
-      WHERE brandId = ? AND status != 'Deleted'
+      FROM companies
+      WHERE companyId = ? AND status != 'Deleted'
       LIMIT 1`,
-      [brandId]
+      [companyId]
     );
 
-    if (brands.length === 0) {
-      return res.sendError("Organization not found", 404);
+    if (companies.length === 0) {
+      return res.sendError("Company not found", 404);
     }
 
-    // Get branches for this brand
+    // Get branches for this company
     const branches = await req.db.query(
       `SELECT branchId, name, email, phone, address, isMainBranch, status, dateCreated
        FROM branches
-       WHERE brandId = ? AND status != 'Deleted'
+       WHERE companyId = ? AND status != 'Deleted'
        ORDER BY isMainBranch DESC, dateCreated ASC`,
-      [brandId]
+      [companyId]
     );
 
-    return res.sendSuccess("Organization retrieved successfully", {
-      data: { ...brands[0], branches },
+    return res.sendSuccess("Company retrieved successfully", {
+      data: { ...companies[0], branches },
     });
   })
 );
 
 /**
  * POST /
- * Create new brand (organization) only.
+ * Create new company (company) only.
  * Branch and Owner user are created separately via /branches and /users endpoints.
  */
 router.post(
@@ -156,7 +156,7 @@ router.post(
 
       // Check duplicate email
       const [existing] = await conn.execute(
-        `SELECT brandId FROM brands 
+        `SELECT companyId FROM companies 
          WHERE email = ? AND status != 'Deleted'
          LIMIT 1 FOR UPDATE`,
         [email]
@@ -164,35 +164,35 @@ router.post(
 
       if (existing.length > 0) {
         await req.db.rollback(conn);
-        return res.sendError("An organization with this email already exists", 409);
+        return res.sendError("An company with this email already exists", 409);
       }
 
       // Generate UUID
-      const [uuidRow] = await conn.execute(`SELECT UUID() as brandId`);
-      const brandId = uuidRow[0].brandId;
+      const [uuidRow] = await conn.execute(`SELECT UUID() as companyId`);
+      const companyId = uuidRow[0].companyId;
 
-      // Move uploaded logo to the correct brandId folder
+      // Move uploaded logo to the correct companyId folder
       let logoUrl = null;
       if (req.file) {
         const fs = await import("node:fs");
         const path = await import("node:path");
-        const correctDir = path.default.join("public", "uploads", "superadmin", "logos", brandId);
+        const correctDir = path.default.join("public", "uploads", "superadmin", "logos", companyId);
         fs.default.mkdirSync(correctDir, { recursive: true });
         const newPath = path.default.join(correctDir, req.file.filename);
         fs.default.renameSync(req.file.path, newPath);
         logoUrl = `/${newPath.replace(/\\/g, "/")}`;
       }
 
-      // Create brand
+      // Create company
       await conn.execute(
-        `INSERT INTO brands (brandId, name, email, website, logoUrl, subscriptionPlan, subscriptionStartDate, status, dateCreated, dateUpdated)
+        `INSERT INTO companies (companyId, name, email, website, logoUrl, subscriptionPlan, subscriptionStartDate, status, dateCreated, dateUpdated)
          VALUES (?, ?, ?, ?, ?, ?, CURDATE(), 'Active', ?, ?)`,
-        [brandId, name, email, website || null, logoUrl, subscriptionPlan || "Basic", now, now]
+        [companyId, name, email, website || null, logoUrl, subscriptionPlan || "Basic", now, now]
       );
 
       await req.db.commit(conn);
 
-      return res.sendSuccess("Organization created successfully", { brandId }, 201);
+      return res.sendSuccess("Company created successfully", { companyId }, 201);
     } catch (err) {
       await req.db.rollback(conn);
       throw err;
@@ -201,15 +201,15 @@ router.post(
 );
 
 /**
- * PUT /:brandId
- * Update brand (organization)
+ * PUT /:companyId
+ * Update company (company)
  */
 router.put(
-  "/:brandId",
+  "/:companyId",
   logoUpload.single("logo"),
   compressImage,
   catchAsync(async (req, res) => {
-    const { brandId } = req.params;
+    const { companyId } = req.params;
     const {
       name,
       email,
@@ -223,10 +223,10 @@ router.put(
     const logoUrl = req.file ? `/${req.file.path.replace(/\\/g, "/")}` : req.body.logoUrl || null;
 
     const result = await req.db.query(
-      `UPDATE brands 
+      `UPDATE companies 
        SET name = ?, email = ?, website = ?, logoUrl = ?, subscriptionPlan = ?, 
            subscriptionStartDate = ?, subscriptionEndDate = ?, status = ?, dateUpdated = ?
-       WHERE brandId = ? AND status != 'Deleted'`,
+       WHERE companyId = ? AND status != 'Deleted'`,
       [
         name,
         email,
@@ -237,52 +237,52 @@ router.put(
         subscriptionEndDate || null,
         status || "Active",
         now,
-        brandId,
+        companyId,
       ]
     );
 
     if (result.affectedRows === 0) {
-      return res.sendError("Organization not found", 404);
+      return res.sendError("Company not found", 404);
     }
 
-    return res.sendSuccess("Organization updated successfully");
+    return res.sendSuccess("Company updated successfully");
   })
 );
 
 /**
- * DELETE /:brandId
- * Soft delete brand (organization) — sets status to 'Deleted'
+ * DELETE /:companyId
+ * Soft delete company (company) — sets status to 'Deleted'
  */
 router.delete(
-  "/:brandId",
+  "/:companyId",
   catchAsync(async (req, res) => {
-    const { brandId } = req.params;
+    const { companyId } = req.params;
     const now = getCurrentTimestampLocal();
 
     let conn;
     try {
       conn = await req.db.beginTransaction();
 
-      // Soft delete brand
-      const [brandResult] = await conn.execute(
-        `UPDATE brands SET status = 'Deleted', dateUpdated = ? WHERE brandId = ? AND status != 'Deleted'`,
-        [now, brandId]
+      // Soft delete company
+      const [companyResult] = await conn.execute(
+        `UPDATE companies SET status = 'Deleted', dateUpdated = ? WHERE companyId = ? AND status != 'Deleted'`,
+        [now, companyId]
       );
 
-      if (brandResult.affectedRows === 0) {
+      if (companyResult.affectedRows === 0) {
         await req.db.rollback(conn);
-        return res.sendError("Organization not found", 404);
+        return res.sendError("Company not found", 404);
       }
 
-      // Soft delete all branches under this brand
+      // Soft delete all branches under this company
       await conn.execute(
-        `UPDATE branches SET status = 'Deleted', dateUpdated = ? WHERE brandId = ? AND status != 'Deleted'`,
-        [now, brandId]
+        `UPDATE branches SET status = 'Deleted', dateUpdated = ? WHERE companyId = ? AND status != 'Deleted'`,
+        [now, companyId]
       );
 
       await req.db.commit(conn);
 
-      return res.sendSuccess("Organization deleted successfully");
+      return res.sendSuccess("Company deleted successfully");
     } catch (err) {
       await req.db.rollback(conn);
       throw err;

@@ -1,20 +1,16 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  App,
-  Button,
-  Divider,
-  Drawer,
-  Form,
-  Input,
-  Select,
-  Tooltip,
-} from "antd";
-import { Shield } from "lucide-react";
+import { PlusOutlined } from "@ant-design/icons";
+import { App, Button, Drawer, Form, Input, Tooltip } from "antd";
+import { Shield, X } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
-import { createRole, updateRole } from "../../../../../services/api/admin/roles";
+import {
+  createRole,
+  updateRole,
+} from "../../../../../services/api/admin/roles";
+import SectionLabel from "../../../../../components/SectionLabel";
+import StatusToggle from "../../../../../components/StatusToggle";
 
 const { TextArea } = Input;
-const { Option } = Select;
 
 // Dependency-free value compare for the dirty check.
 const isFormEqual = (a = {}, b = {}) => {
@@ -68,7 +64,11 @@ export default function RoleFormDrawer({
 
   const watchedValues = Form.useWatch([], form);
   const isDirty = useMemo(
-    () => !isFormEqual(watchedValues ?? form.getFieldsValue(), initialValuesRef.current),
+    () =>
+      !isFormEqual(
+        watchedValues ?? form.getFieldsValue(),
+        initialValuesRef.current,
+      ),
     [watchedValues, form],
   );
   const saveDisabled = isEditMode && !isDirty;
@@ -109,7 +109,10 @@ export default function RoleFormDrawer({
       const values = await form.validateFields();
 
       if (isEditMode) {
-        await updateMutation.mutateAsync({ roleId: entity.roleId, data: values });
+        await updateMutation.mutateAsync({
+          roleId: entity.roleId,
+          data: values,
+        });
       } else {
         await createMutation.mutateAsync(values);
       }
@@ -127,152 +130,136 @@ export default function RoleFormDrawer({
     <Drawer
       open={open}
       onClose={handleClose}
-      width={600}
+      width={800}
       closable={false}
-      styles={{ body: { padding: 0 } }}
+      styles={{ body: { padding: 24 } }}
     >
-      <div className="h-full bg-linear-to-br from-slate-50 via-white to-slate-50 flex flex-col p-6 overflow-y-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2.5 bg-linear-to-br from-blue-500 to-indigo-500 rounded-xl">
-              <Shield className="w-6 h-6 text-white" />
-            </div>
-            <h2 className="text-2xl font-bold bg-linear-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+      {/* Header — accent chip + title + subtitle + bordered X */}
+      <div className="flex items-start justify-between gap-3 mb-7">
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="inline-flex items-center justify-center w-11 h-11 rounded-xl shrink-0 bg-(image:--gradient-primary)">
+            <Shield className="w-[22px] h-[22px] text-white" />
+          </span>
+          <div className="min-w-0">
+            <h2
+              className="m-0 font-semibold leading-tight"
+              style={{ fontSize: 19, color: "var(--color-text-dark)" }}
+            >
               {isEditMode ? "Edit Role" : "Create New Role"}
             </h2>
+            <p
+              className="m-0 mt-0.5"
+              style={{ fontSize: 13, color: "var(--color-text-secondary)" }}
+            >
+              {isEditMode
+                ? "Update role information"
+                : "Define a new role for your company"}
+            </p>
           </div>
-          <p className="text-sm text-slate-500 ml-11">
-            {isEditMode
-              ? "Update role information"
-              : "Define a new role for your organization"}
-          </p>
         </div>
-
-        <Form
-          form={form}
-          layout="vertical"
-          requiredMark={true}
-          autoComplete="off"
-          className="flex-1 space-y-1"
+        <button
+          onClick={handleClose}
+          aria-label="Close"
+          className="inline-flex items-center justify-center shrink-0 transition-colors hover:bg-(--color-surface-sunken)"
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 8,
+            border: "1px solid var(--color-line)",
+            color: "var(--color-text-secondary)",
+          }}
         >
-          {/* Role Details Section */}
-          <div className="mb-8">
-            <h3 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
-              <span className="w-1 h-5 bg-linear-to-b from-blue-500 to-indigo-500 rounded-full"></span>
-              Role Details
-            </h3>
+          <X className="w-[18px] h-[18px]" />
+        </button>
+      </div>
 
-            <Form.Item
-              label="Role Name"
-              name="roleName"
-              rules={[
-                { required: true, message: "Please enter role name" },
-                { min: 3, message: "Role name must be at least 3 characters" },
-                { max: 50, message: "Role name must not exceed 50 characters" },
-              ]}
-            >
-              <Input
-                placeholder="e.g., Branch Manager"
-                prefix={<Shield className="w-4 h-4 text-slate-400 mr-2" />}
-                className="h-11 rounded-xl text-sm"
-                size="large"
-              />
-            </Form.Item>
+      <Form form={form} layout="vertical" requiredMark autoComplete="off">
+        {/* Role details */}
+        <div>
+          <SectionLabel>Role details</SectionLabel>
 
-            <Form.Item
-              label="Description"
-              name="description"
-              rules={[
-                { required: true, message: "Please enter description" },
-                {
-                  min: 10,
-                  message: "Description must be at least 10 characters",
-                },
-              ]}
-            >
-              <TextArea
-                rows={4}
-                placeholder="Describe what this role can access and do"
-                className="rounded-xl text-sm"
-                showCount
-                maxLength={500}
-              />
-            </Form.Item>
-          </div>
-
-          <Divider className="my-6" />
-
-          {/* Status Section */}
-          <div className="mb-8">
-            <h3 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
-              <span className="w-1 h-5 bg-linear-to-b from-blue-500 to-indigo-500 rounded-full"></span>
-              Access Status
-            </h3>
-
-            <Form.Item
-              label="Status"
-              name="status"
-              initialValue="Active"
-              rules={[{ required: true, message: "Please select status" }]}
-            >
-              <Select
-                placeholder="Select status"
-                className="h-11 rounded-xl text-sm"
-                size="large"
-              >
-                <Option value="Active">
-                  <span className="flex items-center gap-2">
-                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                    Active
-                  </span>
-                </Option>
-                <Option value="Inactive">
-                  <span className="flex items-center gap-2">
-                    <span className="w-2 h-2 bg-slate-300 rounded-full"></span>
-                    Inactive
-                  </span>
-                </Option>
-              </Select>
-            </Form.Item>
-          </div>
-        </Form>
-
-        {/* Footer */}
-        <div
-          className="mt-8 pt-6 border-t border-slate-200 flex justify-end gap-3"
-          style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
-        >
-          <Button
-            onClick={handleClose}
-            className="h-11 px-6 rounded-xl font-medium text-slate-700 border-slate-200 hover:bg-slate-50"
-            size="large"
+          <Form.Item
+            label="Role name"
+            name="roleName"
+            rules={[
+              { required: true, message: "Please enter role name" },
+              { min: 3, message: "Role name must be at least 3 characters" },
+              { max: 50, message: "Role name must not exceed 50 characters" },
+            ]}
           >
-            Cancel
-          </Button>
-          <Tooltip title={saveDisabled ? "No changes to save yet" : undefined}>
-            <span>
-              <Button
-                type="primary"
-                onClick={handleSubmit}
-                disabled={saveDisabled}
-                loading={createMutation.isPending || updateMutation.isPending}
-                className="h-11 px-8 rounded-xl font-medium border-none text-white"
-                style={
-                  saveDisabled
-                    ? undefined
-                    : {
-                        background:
-                          "linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)",
-                      }
-                }
-                size="large"
-              >
-                {isEditMode ? "Update Role" : "Create Role"}
-              </Button>
-            </span>
-          </Tooltip>
+            <Input
+              placeholder="e.g., Branch Manager"
+              prefix={
+                <Shield
+                  className="w-4 h-4 mr-2"
+                  style={{ color: "var(--color-text-muted)" }}
+                />
+              }
+              size="large"
+            />
+          </Form.Item>
+
+          {/* Optional: `roles.description` is TEXT NULL and the API writes
+              `description || null`. Length is only checked once text is typed. */}
+          <Form.Item
+            label="Description"
+            name="description"
+            rules={[
+              {
+                min: 10,
+                message: "Description must be at least 10 characters",
+              },
+            ]}
+          >
+            <TextArea
+              rows={4}
+              placeholder="Describe what this role can access and do"
+              showCount
+              maxLength={500}
+            />
+          </Form.Item>
         </div>
+
+        {/* Access status */}
+        <div className="mt-7">
+          <SectionLabel>Access status</SectionLabel>
+
+          <Form.Item
+            label="Status"
+            name="status"
+            initialValue="Active"
+            rules={[{ required: true, message: "Please select status" }]}
+          >
+            <StatusToggle />
+          </Form.Item>
+        </div>
+      </Form>
+
+      {/* Footer */}
+      <div
+        className="mt-8 pt-5 flex justify-end gap-3"
+        style={{
+          borderTop: "1px solid var(--color-line)",
+          paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))",
+        }}
+      >
+        <Button onClick={handleClose} size="large">
+          Cancel
+        </Button>
+        <Tooltip title={saveDisabled ? "No changes to save yet" : undefined}>
+          <span>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={handleSubmit}
+              disabled={saveDisabled}
+              loading={createMutation.isPending || updateMutation.isPending}
+              size="large"
+            >
+              {isEditMode ? "Update Role" : "Create Role"}
+            </Button>
+          </span>
+        </Tooltip>
       </div>
     </Drawer>
   );

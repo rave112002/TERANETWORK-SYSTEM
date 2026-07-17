@@ -35,7 +35,7 @@ const BasicLayout = ({ navigations, store }) => {
   // On desktop `collapsed` = mini-rail; on mobile it = drawer-open.
   const [collapsed, setCollapsed] = useState(false);
   const { width } = useWindowSize();
-  const { organization, userData, reset } = store();
+  const { company, userData, reset } = store();
   const { hasPermission, isLoading } = usePermissions();
   const location = useLocation();
 
@@ -96,7 +96,7 @@ const BasicLayout = ({ navigations, store }) => {
         navigations={filteredNavigations}
         handleLogout={reset}
         userData={userData}
-        organization={organization}
+        company={company}
       />
 
       {/* Main area */}

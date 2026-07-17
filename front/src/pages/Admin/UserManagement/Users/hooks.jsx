@@ -1,27 +1,16 @@
 import { useState, useCallback, useMemo } from "react";
-import { Button, Dropdown, Tag, Avatar } from "antd";
+import { App, Button, Dropdown } from "antd";
+import { Eye, MoreVertical, Pencil, Trash2, UserCog } from "lucide-react";
 import { useDebounce } from "../../../../hooks/useDebounce";
 import { usePermissions } from "../../../../hooks/usePermissions";
-import {
-  User,
-  Mail,
-  Phone,
-  MapPin,
-  CheckCircle,
-  XCircle,
-  MoreVertical,
-  Edit,
-  Trash2,
-  Eye,
-  UserCog,
-  Shield,
-} from "lucide-react";
+import { decodeHTML } from "../../../../utils/decode-html";
 import {
   useGetUsers,
   useDeleteUser,
 } from "../../../../services/requests/admin/user";
 
 export const useUserHooks = () => {
+  const { modal } = App.useApp();
   const { hasPermission } = usePermissions();
   const canWrite = hasPermission("users", "list", "write");
 
@@ -88,6 +77,24 @@ export const useUserHooks = () => {
     [deleteUserMutation],
   );
 
+  // Destructive action gets an explicit confirm step.
+  const handleDeleteRequest = useCallback(
+    (record) => {
+      const label =
+        `${decodeHTML(record.firstName) || ""} ${decodeHTML(record.lastName) || ""}`.trim() ||
+        decodeHTML(record.email);
+      modal.confirm({
+        title: "Delete user",
+        content: `Delete "${label}"? This can't be undone.`,
+        okText: "Delete",
+        okButtonProps: { danger: true },
+        cancelText: "Cancel",
+        onOk: () => handleDelete(record),
+      });
+    },
+    [modal, handleDelete],
+  );
+
   const handleBulkDelete = useCallback(async () => {
     try {
       await Promise.all(
@@ -119,13 +126,13 @@ export const useUserHooks = () => {
     setIsCreateDrawerOpen(false);
   }, []);
 
-  // Dropdown menu items for actions
+  // ⋮ menu: primary action, Edit, divider, Delete (danger)
   const getActionItems = useCallback(
     (record) => {
       const items = [
         {
           key: "view",
-          label: "View Details",
+          label: "View details",
           icon: <Eye className="w-4 h-4" />,
           onClick: () => handleView(record),
         },
@@ -135,59 +142,125 @@ export const useUserHooks = () => {
         items.push(
           {
             key: "edit",
-            label: "Edit User",
-            icon: <Edit className="w-4 h-4" />,
+            label: "Edit user",
+            icon: <Pencil className="w-4 h-4" />,
             onClick: () => handleEdit(record),
           },
           {
             key: "permissions",
-            label: "Manage Permissions",
+            label: "Manage permissions",
             icon: <UserCog className="w-4 h-4" />,
             onClick: () => handleManagePermissions(record),
           },
           { type: "divider" },
           {
             key: "delete",
-            label: "Delete User",
+            label: "Delete user",
             icon: <Trash2 className="w-4 h-4" />,
             danger: true,
-            onClick: () => handleDelete(record),
+            onClick: () => handleDeleteRequest(record),
           },
         );
       }
 
       return items;
     },
-    [canWrite, handleView, handleEdit, handleManagePermissions, handleDelete],
+    [
+      canWrite,
+      handleView,
+      handleEdit,
+      handleManagePermissions,
+      handleDeleteRequest,
+    ],
   );
 
-  // Columns with optimized rendering
+  // # (mono) · initial-avatar + name · secondary text · status dot · ⋮
   const columns = useMemo(
     () => [
+      {
+        title: "#",
+        key: "index",
+        width: 56,
+        render: (_, __, index) => (
+          <span
+            className="font-mono"
+            style={{ fontSize: 12, color: "var(--color-text-muted)" }}
+          >
+            {String((currentPage - 1) * pageSize + index + 1).padStart(2, "0")}
+          </span>
+        ),
+      },
       {
         title: "User",
         dataIndex: "firstName",
         key: "user",
-        fixed: "left",
-        width: 250,
-        render: (text, record) => (
-          <div className="flex items-center gap-3">
-            <Avatar
-              src={record.imageUrl}
-              size={40}
-              className="shrink-0"
-              icon={<User className="w-5 h-5" />}
-            />
-            <div className="min-w-0">
-              <div className="font-semibold text-gray-900 truncate">
-                {record.firstName} {record.lastName}
-              </div>
-              <div className="text-sm text-gray-500 flex items-center gap-1">
-                <Mail className="w-3 h-3" />
-                <span className="truncate">{record.email}</span>
+        width: 260,
+        render: (_, record) => {
+          const name = `${decodeHTML(record.firstName) || ""} ${
+            decodeHTML(record.lastName) || ""
+          }`.trim();
+          const initial = (name.charAt(0) || "?").toUpperCase();
+          return (
+            <div className="flex items-center gap-3 min-w-0">
+              <span
+                className="overflow-hidden"
+                style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: 8,
+                  background: "var(--color-surface-sunken)",
+                  border: "1px solid var(--color-line)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flex: "none",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: "var(--color-text-secondary)",
+                }}
+              >
+                {record.imageUrl ? (
+                  <img
+                    src={record.imageUrl}
+                    alt=""
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  initial
+                )}
+              </span>
+              <div className="min-w-0">
+                <div
+                  className="truncate"
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 500,
+                    color: "var(--color-text-dark)",
+                  }}
+                >
+                  {name}
+                </div>
+                <div
+                  className="truncate"
+                  style={{ fontSize: 12.5, color: "var(--color-text-muted)" }}
+                >
+                  {decodeHTML(record.email)}
+                </div>
               </div>
             </div>
-          </div>
+          );
+        },
+      },
+      {
+        title: "Role",
+        dataIndex: "roleName",
+        key: "role",
+        width: 170,
+        ellipsis: true,
+        render: (roleName) => (
+          <span style={{ fontSize: 13.5, color: "var(--color-text-secondary)" }}>
+            {decodeHTML(roleName) || "No role"}
+          </span>
         ),
       },
       {
@@ -196,64 +269,60 @@ export const useUserHooks = () => {
         key: "phone",
         width: 150,
         render: (phone) => (
-          <div className="flex items-center gap-1 text-gray-700">
-            <Phone className="w-3 h-3 text-gray-400" />
-            <span>{phone || "-"}</span>
-          </div>
-        ),
-      },
-      {
-        title: "Role",
-        dataIndex: "roleName",
-        key: "role",
-        width: 150,
-        render: (roleName) => (
-          <div className="flex items-center gap-1">
-            <Shield className="w-3 h-3 text-gray-400" />
-            <span className="text-gray-700">{roleName || "No Role"}</span>
-          </div>
+          <span style={{ fontSize: 13.5, color: "var(--color-text-secondary)" }}>
+            {decodeHTML(phone) || "-"}
+          </span>
         ),
       },
       {
         title: "Status",
         dataIndex: "status",
         key: "status",
-        width: 120,
-        render: (status) => (
-          <Tag
-            icon={
-              status === "Active" ? (
-                <CheckCircle className="w-3 h-3" />
-              ) : (
-                <XCircle className="w-3 h-3" />
-              )
-            }
-            color={status === "Active" ? "success" : "default"}
-          >
-            {status}
-          </Tag>
-        ),
+        width: 130,
+        render: (status) => {
+          const active = status === "Active";
+          return (
+            <span
+              className="inline-flex items-center gap-2"
+              style={{ fontSize: 13, color: "var(--color-text-secondary)" }}
+            >
+              <span
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: "50%",
+                  background: active
+                    ? "var(--color-success)"
+                    : "var(--color-text-muted)",
+                  boxShadow: active ? "0 0 8px rgba(34,197,94,.5)" : "none",
+                }}
+              />
+              {status}
+            </span>
+          );
+        },
       },
       {
-        title: "Actions",
+        title: "",
         key: "actions",
-        fixed: "right",
-        width: 80,
+        width: 60,
+        align: "right",
         render: (_, record) => (
           <Dropdown
             menu={{ items: getActionItems(record) }}
             trigger={["click"]}
+            placement="bottomRight"
           >
             <Button
               type="text"
               icon={<MoreVertical className="w-4 h-4" />}
-              className="hover:bg-gray-100"
+              className="hover:bg-(--color-surface-sunken)"
             />
           </Dropdown>
         ),
       },
     ],
-    [getActionItems],
+    [getActionItems, currentPage, pageSize],
   );
 
   // Row selection configuration
@@ -274,17 +343,30 @@ export const useUserHooks = () => {
     setCurrentPage(1);
   }, []);
 
+  const handleSearch = useCallback((value) => {
+    setSearch(value);
+    setCurrentPage(1);
+  }, []);
+
+  const handleStatusFilter = useCallback((value) => {
+    setStatusFilter(value || "");
+    setCurrentPage(1);
+  }, []);
+
   // Check if search is being debounced
   const isSearching = search !== debouncedSearch;
+
+  const users = data?.data?.users || [];
 
   return {
     // Data
     data: {
-      users: data?.data?.users || [],
+      users,
       pagination: data?.data?.pagination || { total: 0, page: 1, pageSize: 10 },
     },
     isLoading,
     error,
+    refetch,
 
     // Permissions
     canWrite,
@@ -292,9 +374,12 @@ export const useUserHooks = () => {
     // Columns
     columns,
 
-    // Pagination
-    currentPage,
-    pageSize,
+    // Pagination — shaped for <PaginationFooter />
+    pagination: {
+      current: currentPage,
+      pageSize,
+      total: data?.data?.pagination?.total || 0,
+    },
     handleTableChange,
 
     // Row selection
@@ -319,8 +404,10 @@ export const useUserHooks = () => {
     // Filter state
     search,
     setSearch,
+    handleSearch,
     statusFilter,
     setStatusFilter,
+    handleStatusFilter,
     handleClearFilters,
     isSearching,
   };

@@ -78,7 +78,7 @@ function inferModule(url) {
  */
 function buildDescription(action, module, req) {
   const entityId =
-    req.params?.userId || req.params?.roleId || req.params?.brandId || req.params?.branchId || null;
+    req.params?.userId || req.params?.roleId || req.params?.companyId || req.params?.branchId || null;
 
   if (entityId) {
     return `${action} ${module} (${entityId})`;
@@ -124,8 +124,8 @@ function buildMetadata(req, responseBody) {
 
   // Include response data ID if available
   if (responseBody?.data) {
-    const { accountId, brandId, branchId, roleId } = responseBody.data;
-    const ids = { accountId, brandId, branchId, roleId };
+    const { accountId, companyId, branchId, roleId } = responseBody.data;
+    const ids = { accountId, companyId, branchId, roleId };
     const filtered = Object.fromEntries(Object.entries(ids).filter(([, v]) => v));
     if (Object.keys(filtered).length > 0) {
       metadata.createdIds = filtered;
@@ -140,18 +140,18 @@ function buildMetadata(req, responseBody) {
  */
 async function logAudit(req, { action, module, description, metadata }) {
   const now = getCurrentTimestampLocal();
-  const { accountId, brandId, branchId } = req.user;
+  const { accountId, companyId, branchId } = req.user;
 
   // Generate UUID
   const uuidResult = await req.db.query(`SELECT UUID() as id`);
   const auditId = uuidResult[0].id;
 
   await req.db.query(
-    `INSERT INTO audit_trail (auditId, brandId, branchId, accountId, action, module, description, metadata, ipAddress, userAgent, dateCreated)
+    `INSERT INTO audit_trail (auditId, companyId, branchId, accountId, action, module, description, metadata, ipAddress, userAgent, dateCreated)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       auditId,
-      brandId || null,
+      companyId || null,
       branchId || null,
       accountId,
       action,

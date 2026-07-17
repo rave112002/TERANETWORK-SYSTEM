@@ -6,19 +6,23 @@ const LandingPage = () => {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center"
-      style={{ background: "var(--gradient-background)" }}
+      className="min-h-screen flex items-center justify-center px-4"
+      style={{ background: "var(--color-canvas)" }}
     >
       <div className="text-center">
         <h1
-          className="text-5xl font-bold mb-4"
-          style={{ color: "var(--color-text-dark)" }}
+          className="m-0 font-semibold leading-tight"
+          style={{
+            fontSize: 42,
+            letterSpacing: "-1px",
+            color: "var(--color-text-dark)",
+          }}
         >
           {import.meta.env.VITE_APP_NAME}
         </h1>
         <p
-          className="text-xl mb-8"
-          style={{ color: "var(--color-text-secondary)" }}
+          className="m-0 mt-3 mb-8"
+          style={{ fontSize: 15, color: "var(--color-text-secondary)" }}
         >
           Your modern web application
         </p>

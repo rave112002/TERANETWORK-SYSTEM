@@ -1,11 +1,11 @@
 -- ============================================================================
 -- Database Schema
--- Run via: npm run db:setup | npm run db:setup:clean | npm run db:setup:data
+-- Run via: npm run db:setup | npm run db:setup:clean
 -- ============================================================================
 
-CREATE TABLE IF NOT EXISTS brands (
+CREATE TABLE IF NOT EXISTS companies (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
-  brandId VARCHAR(50) NOT NULL UNIQUE,
+  companyId VARCHAR(50) NOT NULL UNIQUE,
   name VARCHAR(100) NOT NULL,
   email VARCHAR(100) NOT NULL UNIQUE,
   website VARCHAR(255) NULL,
@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS brands (
 CREATE TABLE IF NOT EXISTS branches (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   branchId VARCHAR(50) NOT NULL UNIQUE,
-  brandId VARCHAR(50) NOT NULL,
+  companyId VARCHAR(50) NOT NULL,
   name VARCHAR(100) NOT NULL,
   email VARCHAR(100) NULL,
   phone VARCHAR(20) NULL,
@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS branches (
   status ENUM('Active','Inactive','Suspended','Deleted') NOT NULL DEFAULT 'Active',
   dateCreated DATETIME NOT NULL,
   dateUpdated DATETIME NOT NULL,
-  INDEX idx_branches_brandId (brandId)
+  INDEX idx_branches_companyId (companyId)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS superadmins (
@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS credentials (
 CREATE TABLE IF NOT EXISTS users (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   accountId VARCHAR(50) NOT NULL UNIQUE,
-  brandId VARCHAR(50) NOT NULL,
+  companyId VARCHAR(50) NOT NULL,
   branchId VARCHAR(50) NOT NULL,
   firstName VARCHAR(50) NOT NULL,
   lastName VARCHAR(50) NOT NULL,
@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS users (
   status ENUM('Active','Inactive','Suspended','Deleted') NOT NULL DEFAULT 'Active',
   dateCreated DATETIME NOT NULL,
   dateUpdated DATETIME NOT NULL,
-  INDEX idx_users_brandId (brandId),
+  INDEX idx_users_companyId (companyId),
   INDEX idx_users_branchId (branchId),
   INDEX idx_users_roleId (roleId)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -86,14 +86,14 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS roles (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   roleId VARCHAR(50) NOT NULL UNIQUE,
-  brandId VARCHAR(50) NOT NULL,
+  companyId VARCHAR(50) NOT NULL,
   branchId VARCHAR(50) NOT NULL,
   roleName VARCHAR(50) NOT NULL,
   description TEXT NULL,
   status ENUM('Active','Inactive') NOT NULL DEFAULT 'Active',
   dateCreated DATETIME NOT NULL,
   dateUpdated DATETIME NOT NULL,
-  INDEX idx_roles_brandId (brandId),
+  INDEX idx_roles_companyId (companyId),
   INDEX idx_roles_branchId (branchId)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -135,7 +135,7 @@ CREATE TABLE IF NOT EXISTS user_permissions (
 CREATE TABLE IF NOT EXISTS audit_trail (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   auditId VARCHAR(50) NOT NULL UNIQUE,
-  brandId VARCHAR(50) NOT NULL,
+  companyId VARCHAR(50) NOT NULL,
   branchId VARCHAR(50) NOT NULL,
   accountId VARCHAR(50) NOT NULL,
   action VARCHAR(100) NOT NULL,
@@ -145,7 +145,7 @@ CREATE TABLE IF NOT EXISTS audit_trail (
   ipAddress VARCHAR(45) NULL,
   userAgent TEXT NULL,
   dateCreated DATETIME NOT NULL,
-  INDEX idx_audit_trail_brandId (brandId),
+  INDEX idx_audit_trail_companyId (companyId),
   INDEX idx_audit_trail_branchId (branchId),
   INDEX idx_audit_trail_accountId (accountId),
   INDEX idx_audit_trail_dateCreated (dateCreated)

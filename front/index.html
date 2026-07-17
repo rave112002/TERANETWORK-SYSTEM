@@ -8,6 +8,15 @@
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
     <title>Template</title>
+    <!-- Fallback only: the real fonts are self-hosted via @fontsource-variable
+         (imported in main.jsx). This <link> keeps type rendering in dev without
+         a Vite restart. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Onest:wght@100..900&family=JetBrains+Mono:wght@100..800&display=swap"
+      rel="stylesheet"
+    />
     <!-- Apply the saved/system theme before paint to avoid a flash of the wrong mode -->
     <script>
       (function () {

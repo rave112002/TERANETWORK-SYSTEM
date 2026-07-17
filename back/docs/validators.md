@@ -95,7 +95,7 @@ export const createUserSchema = z.object({
   lastName: z.string().min(1, "Last name is required").max(50),
   email: z.string().email("Invalid email address").max(100),
   password: z.string().min(8, "Password must be at least 8 characters").max(255),
-  brandId: z.string().min(1, "Brand ID is required").max(50),
+  companyId: z.string().min(1, "Company ID is required").max(50),
   branchId: z.string().min(1, "Branch ID is required").max(50),
   roleId: z.string().min(1, "Role ID is required").max(50),
   phone: z.string().max(20).optional().nullable(),

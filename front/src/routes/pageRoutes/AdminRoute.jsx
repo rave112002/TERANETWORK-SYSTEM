@@ -111,6 +111,7 @@ const AdminRoute = () => {
       permission: { module: "settings", submodule: null, accessLevel: "read" },
       isFilter: true,
       isShow: true,
+      section: "system", // renders below the sidebar divider
     },
     {
       route: "/audit-trail",
@@ -131,6 +132,7 @@ const AdminRoute = () => {
       },
       isFilter: true,
       isShow: true,
+      section: "system", // renders below the sidebar divider
     },
   ].map((page) => {
     if (page.children) {

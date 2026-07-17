@@ -30,7 +30,7 @@ const configurePassport = (db) => {
 
       try {
         const rows = await db.query(
-          `SELECT u.accountId, u.firstName, u.lastName, u.brandId, u.branchId, u.roleId, u.status,
+          `SELECT u.accountId, u.firstName, u.lastName, u.companyId, u.branchId, u.roleId, u.status,
                   c.email, c.type
            FROM users u
            INNER JOIN credentials c ON c.accountId = u.accountId

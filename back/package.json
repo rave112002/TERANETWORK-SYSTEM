@@ -16,9 +16,9 @@
     "format:check": "prettier --check \"server/**/*.js\"",
     "db:setup": "node scripts/setup-database.js",
     "db:setup:clean": "node scripts/setup-database-clean.js",
-    "db:setup:data": "node scripts/setup-database-with-data.js",
     "db:reset": "node scripts/reset-database.js",
-    "db:check": "node scripts/check-database.js"
+    "db:check": "node scripts/check-database.js",
+    "keys": "node scripts/generate-keys.js"
   },
   "author": "Alfie Garing",
   "license": "ISC",

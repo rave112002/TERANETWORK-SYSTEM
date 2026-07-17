@@ -1,68 +1,35 @@
-import { Card, Row, Col, Typography } from "antd";
-import {
-  Users,
-  FileText,
-  TrendingUp,
-  LayoutDashboard,
-  Clock,
-} from "lucide-react";
-import StatCard from "../../../components/StatCard";
+import { Col, Row } from "antd";
+import { Clock, FileText, TrendingUp, Users } from "lucide-react";
 
-const { Title, Text } = Typography;
+import PageHeader from "../../../components/PageHeader";
+import StatCard from "../../../components/StatCard";
 
 const Dashboard = () => {
   const statCards = [
     {
-      title: "Total Users",
+      title: "Total users",
       value: 1234,
-      icon: <Users className="w-5 h-5" />,
-      color: "from-primary-color to-secondary-color",
-      bgColor: "bg-primary-pale",
-      textColor: "text-primary-color",
+      icon: <Users className="w-4.25 h-4.25" strokeWidth={1.8} />,
     },
     {
-      title: "Active Tasks",
+      title: "Active tasks",
       value: 28,
-      icon: <FileText className="w-5 h-5" />,
-      color: "from-emerald-400 to-emerald-600",
-      bgColor: "bg-emerald-100",
-      textColor: "text-emerald-600",
+      icon: <FileText className="w-4.25 h-4.25" strokeWidth={1.8} />,
     },
     {
-      title: "Revenue This Month",
+      title: "Revenue this month",
       value: "$45,678",
-      icon: <TrendingUp className="w-5 h-5" />,
-      color: "from-orange-400 to-orange-600",
-      bgColor: "bg-orange-100",
-      textColor: "text-orange-600",
+      icon: <TrendingUp className="w-4.25 h-4.25" strokeWidth={1.8} />,
     },
   ];
 
   return (
-    <div className="p-6 space-y-5">
-      {/* 1. PAGE HEADER */}
-      <div className="flex items-center justify-between">
-        <div>
-          <Title level={2} className="mb-1! flex items-center gap-3">
-            <div
-              className="inline-flex items-center justify-center w-10 h-10 rounded-xl shadow-md"
-              style={{ background: "var(--gradient-primary)" }}
-            >
-              <LayoutDashboard className="w-5 h-5 text-white" />
-            </div>
-            Dashboard
-          </Title>
-          <Text
-            style={{ color: "var(--color-text-secondary)" }}
-            className="text-sm"
-          >
-            Overview of your organization
-          </Text>
-        </div>
-      </div>
+    <div className="p-8 space-y-5">
+      {/* 1. HEADER */}
+      <PageHeader title="Dashboard" subtitle="Overview of your company" />
 
       {/* 2. STAT CARDS */}
-      <Row gutter={[16, 16]}>
+      <Row gutter={[14, 14]}>
         {statCards.map((card, i) => (
           <Col xs={24} sm={12} lg={8} key={i}>
             <StatCard {...card} />
@@ -71,19 +38,43 @@ const Dashboard = () => {
       </Row>
 
       {/* 3. RECENT ACTIVITY */}
-      <Card
-        title={
-          <div className="flex items-center gap-2">
-            <Clock className="w-5 h-5 text-primary-color" />
-            <span>Recent Activity</span>
-          </div>
-        }
-        className="shadow-lg border-0"
+      <div
+        className="overflow-hidden"
+        style={{
+          background: "var(--color-surface)",
+          border: "1px solid var(--color-line)",
+          borderRadius: "var(--radius-card)",
+        }}
       >
-        <p style={{ color: "var(--color-text-secondary)" }}>
-          No recent activity to display
-        </p>
-      </Card>
+        <div
+          className="flex items-center gap-2 px-[18px] py-3.5"
+          style={{ borderBottom: "1px solid var(--color-line)" }}
+        >
+          <Clock
+            className="w-4 h-4 shrink-0"
+            strokeWidth={1.8}
+            style={{ color: "var(--color-text-muted)" }}
+          />
+          <span
+            style={{
+              fontSize: 13.5,
+              fontWeight: 600,
+              color: "var(--color-text-dark)",
+            }}
+          >
+            Recent activity
+          </span>
+        </div>
+
+        <div className="px-[18px] py-14 text-center">
+          <p
+            className="m-0"
+            style={{ fontSize: 13, color: "var(--color-text-muted)" }}
+          >
+            No recent activity to display
+          </p>
+        </div>
+      </div>
     </div>
   );
 };
