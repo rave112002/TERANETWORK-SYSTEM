@@ -89,9 +89,10 @@ axiosInstance.interceptors.response.use(
 
       try {
         // Fetch a new CSRF token from the portal the failing request targeted
-        // (e.g. /api/v1/admin/... → /api/v1/admin/auth/csrf-token). The generic
-        // /api/v1/auth/csrf-token route does not exist on the backend and 404s
-        // with "API not found", which would break the retry.
+        // (e.g. /api/v1/admin/... → /api/v1/admin/auth/csrf-token). The token
+        // itself is portal-agnostic, but there is no portal-less
+        // /api/v1/auth/csrf-token route — it 404s "API not found" and breaks the
+        // retry — so always resolve a real portal, defaulting to admin.
         const portal =
           originalRequest.url?.match(/\/api\/v1\/(admin|superadmin)\//)?.[1] ||
           "admin";
@@ -190,10 +191,12 @@ export const createAxiosInstanceWithInterceptor = (
         originalRequest._retry = true;
 
         try {
-          // Fetch new CSRF token using the appropriate user type endpoint
+          // Fetch new CSRF token using the appropriate user type endpoint.
+          // Default to the admin endpoint — the token is portal-agnostic and
+          // there is no portal-less /api/v1/auth route.
           const csrfEndpoint = user
             ? `/api/v1/${user}/auth/csrf-token`
-            : "/api/v1/auth/csrf-token";
+            : "/api/v1/admin/auth/csrf-token";
           const response = await axiosInstance.get(csrfEndpoint);
           const newCsrfToken = response.data.csrfToken;
 
