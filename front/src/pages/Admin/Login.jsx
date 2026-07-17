@@ -10,12 +10,12 @@ const Login = () => {
   const { message } = App.useApp();
   const { mutate, isPending } = useLoginAdminAuth();
 
-  useEffect(() => {
-    form.setFieldsValue({
-      email: "admin@demo.com",
-      password: "admin123",
-    });
-  }, [form]);
+  // useEffect(() => {
+  //   form.setFieldsValue({
+  //     email: "admin@demo.com",
+  //     password: "admin123",
+  //   });
+  // }, [form]);
 
   const onFinish = (values) => {
     mutate(values, {
