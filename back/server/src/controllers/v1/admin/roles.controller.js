@@ -1,7 +1,13 @@
 import express from "express";
-import { catchAsync } from "../../../utils/catchAsync.js";
+import { catchAsync, validateBody, validateQuery } from "../../../utils/catchAsync.js";
 import { getCurrentTimestampLocal } from "../../../utils/dateUtils.js";
 import { checkPermission } from "../../../middlewares/checkPermission.middleware.js";
+import {
+  createRoleSchema,
+  updateRoleSchema,
+  assignPermissionsSchema,
+  listRolesQuerySchema,
+} from "../../../validators/roles.validator.js";
 
 const router = express.Router();
 
@@ -12,6 +18,7 @@ const router = express.Router();
 router.get(
   "/",
   checkPermission("users", "roles", "read"),
+  validateQuery(listRolesQuerySchema),
   catchAsync(async (req, res) => {
     const {
       page = 1,
@@ -107,6 +114,7 @@ router.get(
 router.post(
   "/",
   checkPermission("users", "roles", "write"),
+  validateBody(createRoleSchema),
   catchAsync(async (req, res) => {
     const { roleName, description } = req.body;
     const { companyId, branchId } = req.user;
@@ -156,6 +164,7 @@ router.post(
 router.put(
   "/:roleId",
   checkPermission("users", "roles", "write"),
+  validateBody(updateRoleSchema),
   catchAsync(async (req, res) => {
     const { roleId } = req.params;
     const { roleName, description, status } = req.body;
@@ -238,6 +247,7 @@ router.get(
 router.post(
   "/:roleId/permissions",
   checkPermission("users", "roles", "write"),
+  validateBody(assignPermissionsSchema),
   catchAsync(async (req, res) => {
     const { roleId } = req.params;
     const { permissions } = req.body;

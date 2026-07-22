@@ -1,7 +1,11 @@
 import express from "express";
-import { catchAsync } from "../../../utils/catchAsync.js";
+import { catchAsync, validateBody } from "../../../utils/catchAsync.js";
 import { getCurrentTimestampLocal } from "../../../utils/dateUtils.js";
 import { checkPermission } from "../../../middlewares/checkPermission.middleware.js";
+import {
+  setUserPermissionSchema,
+  bulkUserPermissionsSchema,
+} from "../../../validators/user-permissions.validator.js";
 
 const router = express.Router();
 
@@ -80,6 +84,7 @@ router.get(
 router.post(
   "/:accountId",
   checkPermission("users", "list", "write"),
+  validateBody(setUserPermissionSchema),
   catchAsync(async (req, res) => {
     const { accountId } = req.params;
     const { permissionId, accessLevel } = req.body;
@@ -161,6 +166,7 @@ router.delete(
 router.post(
   "/:accountId/bulk",
   checkPermission("users", "list", "write"),
+  validateBody(bulkUserPermissionsSchema),
   catchAsync(async (req, res) => {
     const { accountId } = req.params;
     const { permissions } = req.body;

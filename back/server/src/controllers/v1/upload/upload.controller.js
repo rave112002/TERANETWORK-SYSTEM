@@ -1,9 +1,10 @@
 import express from "express";
 import fs from "node:fs";
 import path from "node:path";
-import { catchAsync } from "../../../utils/catchAsync.js";
+import { catchAsync, validateBody } from "../../../utils/catchAsync.js";
 import { upload, compressImage } from "../../../utils/file/uploads.js";
 import APIError from "../../../utils/APIError.js";
+import { deleteFileSchema } from "../../../validators/upload.validator.js";
 
 const router = express.Router();
 
@@ -122,12 +123,9 @@ router.post(
  */
 router.delete(
   "/file",
+  validateBody(deleteFileSchema),
   catchAsync(async (req, res) => {
     const { path: filePath } = req.body;
-
-    if (!filePath) {
-      throw new APIError("File path is required", 400);
-    }
 
     // Security: prevent path traversal
     const normalizedPath = path.normalize(filePath).replace(/^\/+/, "");

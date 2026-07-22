@@ -1,6 +1,5 @@
 import { App, Button, Form, Input } from "antd";
 import { Eye, EyeOff, Lock, Mail, Shield } from "lucide-react";
-import { useEffect } from "react";
 import { NavLink } from "react-router";
 import { useLoginAdminAuth } from "../../services/requests/admin/auth";
 
@@ -9,13 +8,6 @@ const Login = () => {
   const [form] = Form.useForm();
   const { message } = App.useApp();
   const { mutate, isPending } = useLoginAdminAuth();
-
-  // useEffect(() => {
-  //   form.setFieldsValue({
-  //     email: "admin@demo.com",
-  //     password: "admin123",
-  //   });
-  // }, [form]);
 
   const onFinish = (values) => {
     mutate(values, {
@@ -158,7 +150,7 @@ const Login = () => {
 
             {/* Forgot password link */}
             <div className="flex justify-end mb-5">
-              <NavLink to="/forgot-password">
+              <NavLink to="/admin/forgot-password">
                 <span
                   className="hover:underline"
                   style={{ fontSize: 13, color: "var(--color-link)" }}

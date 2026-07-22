@@ -1,5 +1,6 @@
 import express from "express";
-import { catchAsync } from "../../../utils/catchAsync.js";
+import { catchAsync, validateBody } from "../../../utils/catchAsync.js";
+import { checkPermissionSchema } from "../../../validators/permissions.validator.js";
 
 const router = express.Router();
 
@@ -122,6 +123,7 @@ router.get(
  */
 router.post(
   "/check",
+  validateBody(checkPermissionSchema),
   catchAsync(async (req, res) => {
     const { module, submodule, accessLevel } = req.body;
     const accountId = req.user?.accountId;

@@ -3,17 +3,15 @@ import moment from "moment-timezone";
 /**
  * Date/Time Utility Functions
  *
- * TIMEZONE STRATEGY:
- * - All dates stored in database as UTC (YYYY-MM-DD HH:mm:ss format)
- * - All internal processing uses UTC
- * - API responses include ISO 8601 format with timezone (YYYY-MM-DDTHH:mm:ss.sssZ)
- * - User display timezone (Asia/Manila) applied at frontend
- *
- * MIGRATION GUIDE:
- * Replace all instances of:
- *   moment().tz("Asia/Manila").format("YYYY-MM-DD HH:mm:ss")
- * With:
- *   getCurrentTimestampUTC()
+ * TIMEZONE STRATEGY (Asia/Manila local storage):
+ * - All timestamps are stored in the database as Asia/Manila wall-clock time
+ *   (YYYY-MM-DD HH:mm:ss). Use getCurrentTimestampLocal() for every write.
+ * - `moment().tz("Asia/Manila")` is independent of the server's OS timezone, so
+ *   deploying anywhere still stores Manila time.
+ * - The pool uses timezone "+08:00" + dateStrings, so the driver performs no
+ *   conversion — stored values == API values == displayed values.
+ * - The UTC helpers below remain for any explicitly-UTC needs, but are NOT used
+ *   for storage.
  */
 
 const DEFAULT_TIMEZONE = process.env.TIMEZONE || "Asia/Manila";
@@ -48,6 +46,36 @@ export function getTodayDateLocal() {
 
 export function getTodayDateUTC() {
   return moment.utc().format("YYYY-MM-DD");
+}
+
+/**
+ * Format an arbitrary Date/timestamp as an Asia/Manila MySQL DATETIME string.
+ * Used to store a JWT's exp (a UTC instant) as Manila wall-clock for our own
+ * server-side expiry bookkeeping.
+ *
+ * @param {Date|string|number} date - Date to format
+ * @returns {string} Manila timestamp in MySQL DATETIME format (YYYY-MM-DD HH:mm:ss)
+ */
+export function toTimestampLocal(date) {
+  return moment(date).tz(DEFAULT_TIMEZONE).format("YYYY-MM-DD HH:mm:ss");
+}
+
+export function addMinutesLocal(minutes) {
+  return moment().tz(DEFAULT_TIMEZONE).add(minutes, "minutes").format("YYYY-MM-DD HH:mm:ss");
+}
+
+/**
+ * Format an arbitrary Date/timestamp as a UTC MySQL DATETIME string
+ *
+ * @param {Date|string|number} date - Date to format
+ * @returns {string} UTC timestamp in MySQL DATETIME format (YYYY-MM-DD HH:mm:ss)
+ */
+export function toTimestampUTC(date) {
+  return moment.utc(date).format("YYYY-MM-DD HH:mm:ss");
+}
+
+export function addMinutesUTC(minutes) {
+  return moment.utc().add(minutes, "minutes").format("YYYY-MM-DD HH:mm:ss");
 }
 
 export function addHoursUTC(hours) {

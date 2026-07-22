@@ -7,6 +7,11 @@ const router = Router();
 import adminRoute from "./v1/admin/index.js";
 import superAdminRoute from "./v1/superadmin/index.js";
 import uploadRoute from "../controllers/v1/upload/upload.controller.js";
+import { idempotencyMiddleware } from "../middlewares/idempotency.middleware.js";
+
+// Idempotent mutations: requests carrying an Idempotency-Key header get their
+// successful response cached and replayed on retry (opt-in, Stripe-style)
+router.use(idempotencyMiddleware());
 
 // Mount portal-based routes
 router.use("/v1/admin", adminRoute);

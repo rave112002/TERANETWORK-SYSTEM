@@ -63,8 +63,11 @@ axiosInstance.interceptors.request.use(
       }
     }
 
-    // Add Idempotency-Key header for POST, PATCH, PUT, DELETE requests
-    if (shouldApplyIdempotencyKey(config)) {
+    // Add Idempotency-Key header for POST, PATCH, PUT, DELETE requests.
+    // Never overwrite an existing key: interceptor retries (CSRF refetch)
+    // re-enter here, and the retry must present the SAME key so the backend
+    // treats it as the same logical request.
+    if (shouldApplyIdempotencyKey(config) && !config.headers["Idempotency-Key"]) {
       config.headers["Idempotency-Key"] = generateIdempotencyKey();
     }
 
@@ -121,6 +124,64 @@ axiosInstance.interceptors.response.use(
   },
 );
 
+// ─── Token refresh (rotation-aware) ──────────────────────────────────
+// One in-flight refresh per portal; concurrent 401s await the same promise
+// instead of each firing their own /refresh (which would invalidate each
+// other under rotation).
+const refreshPromises = {
+  [userTypeAuth.admin]: null,
+  [userTypeAuth.superadmin]: null,
+};
+
+const performTokenRefresh = async (user) => {
+  const store = tokens[user];
+  const refreshToken = store?.getState()?.refreshToken;
+  if (!refreshToken) {
+    throw new Error("No refresh token available");
+  }
+
+  // Use axiosInstance: it attaches the CSRF token and retries on CSRF failure
+  const response = await axiosInstance.post(`/api/v1/${user}/auth/refresh`, {
+    refreshToken,
+  });
+
+  const data = response.data?.data;
+  const newAccessToken = data?.token || data?.accessToken?.token;
+  const newRefreshToken = data?.refreshToken?.token;
+  if (!newAccessToken) {
+    throw new Error("Refresh response did not include a token");
+  }
+
+  store.getState().setToken(newAccessToken);
+  if (newRefreshToken) {
+    store.getState().setRefreshToken(newRefreshToken);
+  }
+
+  return newAccessToken;
+};
+
+const getRefreshedToken = (user) => {
+  if (!refreshPromises[user]) {
+    refreshPromises[user] = performTokenRefresh(user).finally(() => {
+      refreshPromises[user] = null;
+    });
+  }
+  return refreshPromises[user];
+};
+
+// Reset the portal's auth store — the <Auth> route guard reacts to the token
+// clearing and redirects to that portal's login.
+const handleSessionExpired = (user) => {
+  const store = tokens[user];
+  if (!store) return;
+  const hadToken = !!store.getState().token;
+  store.getState().reset();
+  useCsrfStore?.getState()?.clearCsrfToken?.();
+  if (hadToken) {
+    message.warning("Your session has expired. Please log in again.");
+  }
+};
+
 // Cache for authenticated axios instances
 const instanceCache = new Map();
 
@@ -165,8 +226,14 @@ export const createAxiosInstanceWithInterceptor = (
         }
       }
 
-      // Add Idempotency-Key header
-      if (shouldApplyIdempotencyKey(config)) {
+      // Add Idempotency-Key header. Never overwrite an existing key —
+      // interceptor retries (CSRF refetch, post-refresh 401 retry) re-enter
+      // here and must present the SAME key so the backend treats them as the
+      // same logical request.
+      if (
+        shouldApplyIdempotencyKey(config) &&
+        !config.headers["Idempotency-Key"]
+      ) {
         config.headers["Idempotency-Key"] = generateIdempotencyKey();
       }
 
@@ -216,21 +283,25 @@ export const createAxiosInstanceWithInterceptor = (
         }
       }
 
-      // Handle authentication errors
-      const authErrorMessages = [
-        "Invalid or expired token.",
-        "Invalid token.",
-        "No token provided",
-        "Token expired",
-      ];
+      // Handle expired/invalid access tokens: try one refresh, then retry.
+      // Concurrent 401s share the same in-flight refresh via getRefreshedToken.
+      if (error.response?.status === 401 && user) {
+        if (originalRequest._authRetry) {
+          // The request already retried with a fresh token and still got 401
+          handleSessionExpired(user);
+          return Promise.reject(error);
+        }
+        originalRequest._authRetry = true;
 
-      if (
-        authErrorMessages.includes(errMessage?.message) ||
-        errMessage?.code === 300
-      ) {
-        message.warning(
-          "Unable to process transaction. You have to login again.",
-        );
+        try {
+          const newToken = await getRefreshedToken(user);
+          originalRequest.headers.Authorization = `Bearer ${newToken}`;
+          return instance(originalRequest);
+        } catch {
+          // Refresh failed (missing/expired/revoked refresh token)
+          handleSessionExpired(user);
+          return Promise.reject(error);
+        }
       }
 
       return Promise.reject(error);

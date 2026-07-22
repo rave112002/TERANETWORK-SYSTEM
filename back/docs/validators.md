@@ -14,11 +14,17 @@ server/src/validators/
 └── auth.validator.js        # validators for auth.controller.js
 ```
 
-> **Current state:** only `auth.validator.js` exists (wired into `auth.controller.js`). The admin and
-> superadmin controllers are not validated yet. As you add validation to a controller, create a
-> sibling `<name>.validator.js` in this directory (e.g. `users.validator.js` for
-> `users.controller.js`). If two portals share a controller base name, disambiguate the file
-> (e.g. `admin-users.validator.js`).
+> **Current state:** every mutating controller is validated. Validator files:
+> `auth`, `admin-users`, `roles`, `permissions`, `user-permissions`, `audit-trail`,
+> `companies`, `branches`, `superadmin-users`, `upload`, plus shared helpers in
+> `_helpers.js` (`emptyToUndefined` / `optionalString` / `optionalEmail` — Ant Design
+> forms and multipart both send `""` for cleared optional fields). When you add a new
+> controller, create a sibling `<name>.validator.js`. If two portals share a controller
+> base name, disambiguate the file (e.g. `admin-users.validator.js`).
+>
+> **Multipart routes** (company create/update, uploads): place `validateBody` **after**
+> the multer middleware (`upload.single()` / `compressImage`) so `req.body` is populated.
+> Validation errors return `400` with `{ success, message, code: "VALIDATION_FAILED", errors }`.
 
 **Rule:** The validator file name matches the controller file name — replace `.controller.js` with `.validator.js`.
 

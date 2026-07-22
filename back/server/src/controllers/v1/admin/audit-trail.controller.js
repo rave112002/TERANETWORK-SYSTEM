@@ -1,6 +1,7 @@
 import express from "express";
-import { catchAsync } from "../../../utils/catchAsync.js";
+import { catchAsync, validateQuery } from "../../../utils/catchAsync.js";
 import { checkPermission } from "../../../middlewares/checkPermission.middleware.js";
+import { listAuditQuerySchema } from "../../../validators/audit-trail.validator.js";
 
 const router = express.Router();
 
@@ -11,6 +12,7 @@ const router = express.Router();
 router.get(
   "/",
   checkPermission("audit_trail", null, "read"),
+  validateQuery(listAuditQuerySchema),
   catchAsync(async (req, res) => {
     const { companyId, branchId } = req.user;
     const {

@@ -4,11 +4,14 @@ import { Suspense, lazy } from "react";
 import { Route, Routes } from "react-router";
 import BasicLayout from "../../components/layout/BasicLayout";
 import { ComponentLoader } from "../../components/LoadingFallback";
+import NotFound from "../../components/NotFound";
 import { useAdminAuthStore } from "../../store/authStore";
 import { Auth, UnAuth } from "../ValidateAuth";
 import { ProtectedRoute } from "../../components/ProtectedRoute";
 
 const Login = lazy(() => import("../../pages/Admin/Login"));
+const ForgotPassword = lazy(() => import("../../pages/Auth/ForgotPassword"));
+const ResetPassword = lazy(() => import("../../pages/Auth/ResetPassword"));
 const Dashboard = lazy(() => import("../../pages/Admin/Dashboard"));
 const Users = lazy(() => import("../../pages/Admin/UserManagement/Users"));
 const Roles = lazy(() => import("../../pages/Admin/UserManagement/Roles"));
@@ -163,6 +166,22 @@ const AdminRoute = () => {
             </Suspense>
           }
         />
+        <Route
+          path="forgot-password"
+          element={
+            <Suspense fallback={<ComponentLoader />}>
+              <ForgotPassword portal="admin" />
+            </Suspense>
+          }
+        />
+        <Route
+          path="reset-password"
+          element={
+            <Suspense fallback={<ComponentLoader />}>
+              <ResetPassword portal="admin" />
+            </Suspense>
+          }
+        />
       </Route>
 
       <Route element={<Auth store={useAdminAuthStore} redirect="/admin" />}>
@@ -207,7 +226,7 @@ const AdminRoute = () => {
             }
           />
 
-          <Route path="*" element={<div>Page Not Found</div>} />
+          <Route path="*" element={<NotFound homePath="/admin/dashboard" />} />
         </Route>
       </Route>
     </Routes>

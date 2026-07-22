@@ -1,7 +1,12 @@
 import express from "express";
-import { catchAsync } from "../../../utils/catchAsync.js";
-import { getCurrentTimestampLocal } from "../../../utils/dateUtils.js";
+import { catchAsync, validateBody, validateQuery } from "../../../utils/catchAsync.js";
+import { getCurrentTimestampLocal, getTodayDateLocal } from "../../../utils/dateUtils.js";
 import { upload, compressImage } from "../../../utils/file/uploads.js";
+import {
+  createCompanySchema,
+  updateCompanySchema,
+  listCompaniesQuerySchema,
+} from "../../../validators/companies.validator.js";
 
 const router = express.Router();
 
@@ -21,6 +26,7 @@ const logoUpload = upload({
  */
 router.get(
   "/",
+  validateQuery(listCompaniesQuerySchema),
   catchAsync(async (req, res) => {
     const {
       page = 1,
@@ -146,9 +152,11 @@ router.post(
   "/",
   logoUpload.single("logo"),
   compressImage,
+  validateBody(createCompanySchema),
   catchAsync(async (req, res) => {
-    const { name, email, phone, website, subscriptionPlan } = req.body;
+    const { name, email, website, subscriptionPlan } = req.body;
     const now = getCurrentTimestampLocal();
+    const today = getTodayDateLocal(); // Manila date, server-timezone-independent
 
     let conn;
     try {
@@ -186,8 +194,8 @@ router.post(
       // Create company
       await conn.execute(
         `INSERT INTO companies (companyId, name, email, website, logoUrl, subscriptionPlan, subscriptionStartDate, status, dateCreated, dateUpdated)
-         VALUES (?, ?, ?, ?, ?, ?, CURDATE(), 'Active', ?, ?)`,
-        [companyId, name, email, website || null, logoUrl, subscriptionPlan || "Basic", now, now]
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'Active', ?, ?)`,
+        [companyId, name, email, website || null, logoUrl, subscriptionPlan || "Basic", today, now, now]
       );
 
       await req.db.commit(conn);
@@ -208,6 +216,7 @@ router.put(
   "/:companyId",
   logoUpload.single("logo"),
   compressImage,
+  validateBody(updateCompanySchema),
   catchAsync(async (req, res) => {
     const { companyId } = req.params;
     const {

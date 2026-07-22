@@ -1,6 +1,5 @@
 import { App, Button, Form, Input } from "antd";
 import { Eye, EyeOff, Lock, Mail, ShieldCheck } from "lucide-react";
-import { useEffect } from "react";
 import { NavLink } from "react-router";
 import { useLoginSuperAdminAuth } from "../../services/requests/superadmin/auth";
 
@@ -9,13 +8,6 @@ const Login = () => {
   const [form] = Form.useForm();
   const { message } = App.useApp();
   const { mutate, isPending } = useLoginSuperAdminAuth();
-
-  useEffect(() => {
-    form.setFieldsValue({
-      email: "superadmin@template.com",
-      password: "superadmin123",
-    });
-  }, [form]);
 
   const onFinish = (values) => {
     mutate(values, {

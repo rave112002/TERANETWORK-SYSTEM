@@ -4,11 +4,13 @@ import { useMemo, useState } from "react";
 import PasswordStrengthIndicator from "../../../../components/PasswordStrengthIndicator";
 import SectionLabel from "../../../../components/SectionLabel";
 import { validationRules } from "../../../../utils/validation";
+import { useChangePassword } from "../../../../services/requests/account";
 
-const PasswordSection = () => {
+const PasswordSection = ({ portal = "admin" }) => {
   const [form] = Form.useForm();
   const { message } = App.useApp();
   const [newPassword, setNewPassword] = useState("");
+  const { mutate, isPending } = useChangePassword(portal);
 
   // Enable Save only once the user has started entering values.
   const watchedValues = Form.useWatch([], form);
@@ -18,10 +20,21 @@ const PasswordSection = () => {
   }, [watchedValues]);
 
   const handleSubmit = async () => {
-    // TODO: Call change password API
-    message.success("Password changed successfully");
-    form.resetFields();
-    setNewPassword("");
+    const values = form.getFieldsValue();
+    mutate(
+      { currentPassword: values.currentPassword, newPassword: values.newPassword },
+      {
+        onSuccess: () => {
+          message.success("Password changed successfully");
+          form.resetFields();
+          setNewPassword("");
+        },
+        onError: (error) =>
+          message.error(
+            error.response?.data?.message || "Failed to change password",
+          ),
+      },
+    );
   };
 
   const lockPrefix = (
@@ -112,6 +125,7 @@ const PasswordSection = () => {
               type="primary"
               htmlType="submit"
               disabled={!isDirty}
+              loading={isPending}
               size="large"
             >
               Change Password

@@ -315,6 +315,13 @@ export const updateItemApi = async (itemId, data) => {
 3. Both instances share the same auth token, CSRF token, and idempotency key interceptors
 4. The `"multipart"` instance is cached — creating it multiple times returns the same instance
 
+### Idempotency keys
+
+Every mutating request automatically carries an `Idempotency-Key` header. The backend caches
+the successful response per key (24h TTL), so the interceptors' internal retries (CSRF refetch,
+post-refresh replay) cannot double-apply a write. The key is generated once per logical request
+and **reused** on retries — never overwrite an existing `Idempotency-Key` header manually.
+
 ### Query key conventions
 
 | Pattern         | Example                            |

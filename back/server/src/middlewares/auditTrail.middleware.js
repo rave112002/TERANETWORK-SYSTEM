@@ -1,3 +1,4 @@
+import { logger } from "../../config/logger.js";
 import { getCurrentTimestampLocal } from "../utils/dateUtils.js";
 
 /**
@@ -48,7 +49,9 @@ export const auditTrail = (moduleName) => {
           description: buildDescription(action, module, req),
           metadata: buildMetadata(req, body),
         }).catch((err) => {
-          console.error("Audit trail logging failed:", err.message);
+          (req.logger || logger).error("Audit trail logging failed", {
+            error: err.message,
+          });
         });
       }
 

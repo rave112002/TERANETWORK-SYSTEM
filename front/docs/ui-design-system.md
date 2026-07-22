@@ -2,7 +2,7 @@
 
 When building or editing any page component, follow this system.
 
-> The canonical, copy-paste reference is **`modern-module-pattern.md`** (repo root), and
+> The canonical, copy-paste reference is **`modern-module-pattern.md`** (this directory), and
 > **`src/pages/Admin/UserManagement/Roles/`** is the reference implementation. This doc is
 > the rules; that folder is the shape.
 

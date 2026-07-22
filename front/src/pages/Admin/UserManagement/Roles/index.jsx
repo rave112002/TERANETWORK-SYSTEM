@@ -3,7 +3,7 @@ import {
   PlusOutlined,
   ReloadOutlined,
 } from "@ant-design/icons";
-import { Alert, App, Button, Col, Empty, Input, Row, Select, Spin, Table } from "antd";
+import { Alert, Button, Col, Empty, Input, Row, Select, Spin, Table } from "antd";
 import { useState } from "react";
 import { CheckCircle, Key, Search, Shield } from "lucide-react";
 import { useRolesData } from "./hooks";
@@ -22,68 +22,20 @@ const RolesPage = () => {
     error,
     refetch,
     canWrite,
+    columns,
     handleTableChange,
     handleSearch,
     handleStatusFilter,
-    handleDelete,
-    getColumns,
+    handleClearFilters,
+    drawerOpen,
+    permissionsDrawerOpen,
+    selectedRole,
+    handleCreate,
+    handleDrawerClose,
+    handlePermissionsDrawerClose,
   } = useRolesData();
 
-  const { modal } = App.useApp();
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [permissionsDrawerOpen, setPermissionsDrawerOpen] = useState(false);
-  const [selectedRole, setSelectedRole] = useState(null);
   const [isFilterVisible, setIsFilterVisible] = useState(false);
-
-  const handleCreate = () => {
-    setSelectedRole(null);
-    setDrawerOpen(true);
-  };
-
-  const handleEdit = (record) => {
-    setSelectedRole(record);
-    setDrawerOpen(true);
-  };
-
-  const handleManagePermissions = (record) => {
-    setSelectedRole(record);
-    setPermissionsDrawerOpen(true);
-  };
-
-  const handleDrawerClose = () => {
-    setDrawerOpen(false);
-    setSelectedRole(null);
-    refetch?.();
-  };
-
-  const handlePermissionsDrawerClose = () => {
-    setPermissionsDrawerOpen(false);
-    setSelectedRole(null);
-    refetch?.();
-  };
-
-  const handleClearFilters = () => {
-    handleSearch("");
-    handleStatusFilter("");
-  };
-
-  // Destructive action gets an explicit confirm step.
-  const handleDeleteRequest = (record) => {
-    modal.confirm({
-      title: "Delete role",
-      content: `Delete "${record.roleName}"? This can't be undone.`,
-      okText: "Delete",
-      okButtonProps: { danger: true },
-      cancelText: "Cancel",
-      onOk: () => handleDelete(record.roleId),
-    });
-  };
-
-  const columns = getColumns(
-    handleEdit,
-    handleManagePermissions,
-    handleDeleteRequest,
-  );
 
   const totalRoles = pagination?.total || 0;
   const activeRoles = data?.filter((r) => r.status === "Active").length || 0;

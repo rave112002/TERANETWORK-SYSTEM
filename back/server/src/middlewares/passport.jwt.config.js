@@ -3,6 +3,8 @@ import passport from "passport";
 import { ExtractJwt, Strategy as JwtStrategy } from "passport-jwt";
 import path from "path";
 
+import { JWT_AUDIENCE, JWT_ISSUER } from "../utils/jwt.js";
+
 // Function to configure Passport with JWT strategy
 const configurePassport = (db) => {
   // Reading the public key from the file system for verifying JWT signature
@@ -12,8 +14,10 @@ const configurePassport = (db) => {
   const opts = {};
   opts.jwtFromRequest = ExtractJwt.fromAuthHeaderAsBearerToken(); // Extract JWT from the Bearer token in the Authorization header
   opts.secretOrKey = publicKey; // Using the public key to verify the JWT
-  opts.issuer = process.env.ISSUER; // Setting the expected issuer of the JWT
-  opts.audience = process.env.AUDIENCE; // Setting the expected audience of the JWT
+  // Same constants token signing uses (utils/jwt.js) — a mismatch here would
+  // make every token fail verification
+  opts.issuer = JWT_ISSUER;
+  opts.audience = JWT_AUDIENCE;
   opts.algorithms = ["RS256"]; // Only accept RS256 algorithm tokens
 
   // Using the JWT strategy with Passport

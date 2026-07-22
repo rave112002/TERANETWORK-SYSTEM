@@ -93,15 +93,31 @@ const roleId = `role_${Date.now()}`; // ❌ Wrong
 
 ---
 
-## Timestamp Convention (reinforced from timestamp-convention.md)
+## Timestamp Convention
 
-All timestamps must use `getCurrentTimestampLocal()` from the project's dateUtils:
+**Storage is Asia/Manila local time.** Use `getCurrentTimestampLocal()` from the
+project's dateUtils for every write. `moment().tz("Asia/Manila")` ignores the
+server's OS timezone, so timestamps stay Manila no matter where the backend is
+deployed. The pool is configured with `timezone: '+08:00'` and `dateStrings: true`,
+so the driver performs **no** conversion — the value you store is exactly the value
+the API returns and the frontend displays.
 
 ```js
 import { getCurrentTimestampLocal } from "../../../utils/dateUtils.js";
 
 const now = getCurrentTimestampLocal();
 ```
+
+- For a "today" date (e.g. a subscription start), use `getTodayDateLocal()` — never
+  SQL `CURDATE()`/`UTC_DATE()` (server-clock dependent).
+- To store an inherently-UTC instant (like a JWT's `exp`), convert it with
+  `toTimestampLocal(date)`.
+- Because reads come back as naive `"YYYY-MM-DD HH:mm:ss"` Manila strings, TTL
+  checks can compare them **lexicographically** (`stored.expiresAt <= now`).
+
+> The `*UTC` helpers still exist in dateUtils for explicitly-UTC needs, but are
+> **not** used for storage. If you ever need multi-timezone support, switch the
+> pool to `timezone: 'Z'` + `dateStrings: false` and use the UTC helpers instead.
 
 ### On INSERT — always set both:
 
@@ -133,15 +149,24 @@ await req.db.query(
 
 ## Foreign Key References
 
-Foreign keys reference the **business ID column** (not the auto-increment `id`):
+Foreign keys reference the **business ID column** (not the auto-increment `id`).
+They are declared on the tenant hierarchy + permission mappings (see
+`database/migrations/002_hardening.sql`):
 
 ```sql
--- users.companyId references companies.companyId
--- users.branchId references branches.branchId
--- users.roleId references roles.roleId
--- role_permissions.roleId references roles.roleId
--- role_permissions.permissionId references permissions.permissionId
+-- branches.companyId          → companies.companyId
+-- roles.companyId / branchId  → companies.companyId / branches.branchId
+-- users.companyId / branchId / roleId → companies / branches / roles
+-- role_permissions.roleId / permissionId → roles / permissions
+-- user_permissions.accountId / permissionId → users / permissions
 ```
+
+`ON DELETE RESTRICT` is intentional: rows are soft-deleted (`status = 'Deleted'`),
+never physically removed, so a RESTRICT never fires in normal operation.
+
+**Deliberately unconstrained** (polymorphic accountId): `credentials.accountId`,
+`superadmins/users.accountId`, `refresh_tokens.accountId`, and all of
+`audit_trail` (audit rows must outlive their referents).
 
 ---
 
@@ -163,9 +188,26 @@ await req.db.query(
 
 ---
 
+## Migrations
+
+The schema is defined by ordered SQL files in `database/migrations/`, applied by a
+tracking runner (`scripts/migrate.js`, `_migrations` table) so each runs once:
+
+- `npm run db:migrate` — apply pending migrations
+- `npm run db:setup` — migrate **then** seed (additive, re-runnable)
+- `npm run db:setup:clean` — drop everything, re-migrate from scratch, seed
+
+**To change the schema, add a new numbered migration** (e.g. `003_*.sql`) — never
+edit an applied one. Keep `database/schema.sql` (a full end-state snapshot for
+reading) in sync. MySQL DDL auto-commits per statement, so keep each migration
+focused.
+
+---
+
 ## Schema Reference
 
-Refer to `database/schema.sql` for the full table definitions. Key tables:
+`database/schema.sql` is a human-readable snapshot of the **end state**; the source
+of truth is `database/migrations/`. Key tables:
 
 | Table              | Business ID        | Purpose                                             |
 | ------------------ | ------------------ | --------------------------------------------------- |
@@ -178,15 +220,19 @@ Refer to `database/schema.sql` for the full table definitions. Key tables:
 | `permissions`      | `permissionId`     | Master permission definitions                       |
 | `role_permissions` | (composite)        | Maps roles → permissions                            |
 | `user_permissions` | `userPermissionId` | Per-user permission overrides                       |
+| `refresh_tokens`   | `jti`              | Issued refresh tokens (rotation/revocation)         |
+| `idempotency_keys` | `idempotencyKey`   | Cached responses for idempotent mutations           |
 
 ---
 
 ## Checklist for New Tables
 
+- [ ] Added as a new numbered migration in `database/migrations/` (never edit an applied one)
 - [ ] Has `id BIGINT PRIMARY KEY AUTO_INCREMENT`
 - [ ] Has a business ID column (`varchar(50) UNIQUE NOT NULL`)
 - [ ] Business ID is generated via `SELECT UUID()` in application code
 - [ ] Has `dateCreated DATETIME NOT NULL` and `dateUpdated DATETIME NOT NULL`
-- [ ] Timestamps use `getCurrentTimestampLocal()` from `utils/dateUtils.js`
+- [ ] Timestamps use `getCurrentTimestampLocal()` from `utils/dateUtils.js` (Asia/Manila storage)
 - [ ] Uses `status` enum with `'Deleted'` for soft deletes (where applicable)
 - [ ] Foreign keys reference business ID columns, not auto-increment `id`
+- [ ] Updated the `database/schema.sql` end-state snapshot to match

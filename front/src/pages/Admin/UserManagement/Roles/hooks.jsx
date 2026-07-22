@@ -1,11 +1,11 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import {
   keepPreviousData,
   useQuery,
   useMutation,
   useQueryClient,
 } from "@tanstack/react-query";
-import { message, Button, Dropdown } from "antd";
+import { message, App, Button, Dropdown } from "antd";
 import { Key, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { getRoles, deleteRole } from "../../../../services/api/admin/roles";
 import { usePermissions } from "../../../../hooks/usePermissions";
@@ -13,6 +13,7 @@ import { decodeHTML } from "../../../../utils/decode-html";
 
 export const useRolesData = () => {
   const queryClient = useQueryClient();
+  const { modal } = App.useApp();
   const { hasPermission } = usePermissions();
   const canWrite = hasPermission("users", "roles", "write");
 
@@ -24,6 +25,11 @@ export const useRolesData = () => {
     search: "",
     status: "",
   });
+
+  // ─── Drawer/Selection State ────────────────────────────────────────
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [permissionsDrawerOpen, setPermissionsDrawerOpen] = useState(false);
+  const [selectedRole, setSelectedRole] = useState(null);
 
   // Fetch roles
   const { data, isLoading, error, refetch } = useQuery({
@@ -74,9 +80,57 @@ export const useRolesData = () => {
     [deleteMutation],
   );
 
+  const handleClearFilters = useCallback(() => {
+    setFilters({ search: "", status: "" });
+    setPagination((prev) => ({ ...prev, current: 1 }));
+  }, []);
+
+  // ─── Drawer Handlers ───────────────────────────────────────────────
+  const handleCreate = useCallback(() => {
+    setSelectedRole(null);
+    setDrawerOpen(true);
+  }, []);
+
+  const handleEdit = useCallback((record) => {
+    setSelectedRole(record);
+    setDrawerOpen(true);
+  }, []);
+
+  const handleManagePermissions = useCallback((record) => {
+    setSelectedRole(record);
+    setPermissionsDrawerOpen(true);
+  }, []);
+
+  const handleDrawerClose = useCallback(() => {
+    setDrawerOpen(false);
+    setSelectedRole(null);
+    refetch?.();
+  }, [refetch]);
+
+  const handlePermissionsDrawerClose = useCallback(() => {
+    setPermissionsDrawerOpen(false);
+    setSelectedRole(null);
+    refetch?.();
+  }, [refetch]);
+
+  // Destructive action gets an explicit confirm step.
+  const handleDeleteRequest = useCallback(
+    (record) => {
+      modal.confirm({
+        title: "Delete role",
+        content: `Delete "${record.roleName}"? This can't be undone.`,
+        okText: "Delete",
+        okButtonProps: { danger: true },
+        cancelText: "Cancel",
+        onOk: () => handleDelete(record.roleId),
+      });
+    },
+    [modal, handleDelete],
+  );
+
   // ⋮ menu: primary action, Edit, divider, Delete (danger)
   const getActionItems = useCallback(
-    (record, onEdit, onManagePermissions, onDelete) => {
+    (record) => {
       const items = [];
 
       if (canWrite) {
@@ -85,13 +139,13 @@ export const useRolesData = () => {
             key: "permissions",
             label: "Manage permissions",
             icon: <Key className="w-4 h-4" />,
-            onClick: () => onManagePermissions(record),
+            onClick: () => handleManagePermissions(record),
           },
           {
             key: "edit",
             label: "Edit role",
             icon: <Pencil className="w-4 h-4" />,
-            onClick: () => onEdit(record),
+            onClick: () => handleEdit(record),
           },
           { type: "divider" },
           {
@@ -99,19 +153,19 @@ export const useRolesData = () => {
             label: "Delete role",
             icon: <Trash2 className="w-4 h-4" />,
             danger: true,
-            onClick: () => onDelete(record),
+            onClick: () => handleDeleteRequest(record),
           },
         );
       }
 
       return items;
     },
-    [canWrite],
+    [canWrite, handleManagePermissions, handleEdit, handleDeleteRequest],
   );
 
   // # (mono) · initial-avatar + name · secondary text · status dot · ⋮
-  const getColumns = useCallback(
-    (onEdit, onManagePermissions, onDelete) => [
+  const columns = useMemo(
+    () => [
       {
         title: "#",
         key: "index",
@@ -215,14 +269,7 @@ export const useRolesData = () => {
         align: "right",
         render: (_, record) => (
           <Dropdown
-            menu={{
-              items: getActionItems(
-                record,
-                onEdit,
-                onManagePermissions,
-                onDelete,
-              ),
-            }}
+            menu={{ items: getActionItems(record) }}
             trigger={["click"]}
             placement="bottomRight"
           >
@@ -249,11 +296,18 @@ export const useRolesData = () => {
     error,
     refetch,
     canWrite,
+    columns,
     handleTableChange,
     handleSearch,
     handleStatusFilter,
-    handleDelete,
-    getActionItems,
-    getColumns,
+    handleClearFilters,
+
+    // Drawers
+    drawerOpen,
+    permissionsDrawerOpen,
+    selectedRole,
+    handleCreate,
+    handleDrawerClose,
+    handlePermissionsDrawerClose,
   };
 };

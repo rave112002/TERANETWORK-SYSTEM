@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { ERROR_CODES } from "./APIError.js";
+
 // Validate request body
 // Note: Declared as async for middleware consistency and future-proofing
 // even though schema.parse() is currently synchronous
@@ -16,6 +18,7 @@ export const validateBody = (schema) => {
         return res.status(400).json({
           success: false,
           message: "Validation failed",
+          code: ERROR_CODES.VALIDATION_FAILED,
           errors: issues.map((e) => ({
             field: e.path.join("."),
             message: e.message,
@@ -48,6 +51,7 @@ export const validateQuery = (schema) => {
         return res.status(400).json({
           success: false,
           message: "Invalid query parameters",
+          code: ERROR_CODES.VALIDATION_FAILED,
           errors: errorList.map((err) => ({
             field: err.path.join("."),
             message: err.message,
@@ -73,6 +77,7 @@ export const validateParams = (schema) => {
         return res.status(400).json({
           success: false,
           message: "Invalid parameters",
+          code: ERROR_CODES.VALIDATION_FAILED,
           errors: issues.map((e) => ({
             field: e.path.join("."),
             message: e.message,

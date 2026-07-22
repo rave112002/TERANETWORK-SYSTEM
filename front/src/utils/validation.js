@@ -4,7 +4,7 @@
 export const patterns = {
   email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
   phone: /^09\d{9}$/,
-  url: /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/,
+  url: /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?$/,
   alphanumeric: /^[a-zA-Z0-9]+$/,
   alphabetic: /^[a-zA-Z]+$/,
   numeric: /^\d+$/,

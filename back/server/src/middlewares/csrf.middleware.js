@@ -1,5 +1,6 @@
 import { doubleCsrf } from "csrf-csrf";
 import crypto from "node:crypto";
+import { logger } from "../../config/logger.js";
 import APIError from "../utils/APIError.js";
 /**
  * Double CSRF Protection
@@ -71,9 +72,9 @@ const getCookieConfig = () => {
   // Cross-site requests (Scenario 2: frontend HTTP, backend HTTPS)
   if (allowCrossSite) {
     if (!forceSecure && !isProduction) {
-      console.warn(
-        "⚠️  ALLOW_CROSS_SITE_CSRF=true requires COOKIE_SECURE=true or HTTPS backend. " +
-        "Cross-origin cookies will NOT work over HTTP. Use DISABLE_CSRF=true for local HTTP dev."
+      logger.warn(
+        "ALLOW_CROSS_SITE_CSRF=true requires COOKIE_SECURE=true or HTTPS backend. " +
+          "Cross-origin cookies will NOT work over HTTP. Use DISABLE_CSRF=true for local HTTP dev."
       );
     }
     return {
@@ -110,9 +111,9 @@ const {
     // Use session ID if available, otherwise use a combination of user agent and IP
     if (req.session?.id || req.sessionID) {
       const sessionId = req.session?.id || req.sessionID;
-      if (!isProduction) {
-        console.log("CSRF session identifier (session):", sessionId.substring(0, 10) + "...");
-      }
+      logger.debug("CSRF session identifier (session)", {
+        sessionId: sessionId.substring(0, 10) + "...",
+      });
       return sessionId;
     }
 
@@ -124,13 +125,11 @@ const {
 
     // Hash the identifier for privacy and consistent length
     const hash = crypto.createHash("sha256").update(identifier).digest("hex");
-    if (!isProduction) {
-      console.log("CSRF session identifier (fallback):", {
-        ip,
-        uaStart: userAgent.substring(0, 30),
-        hash: hash.substring(0, 10),
-      });
-    }
+    logger.debug("CSRF session identifier (fallback)", {
+      ip,
+      uaStart: userAgent.substring(0, 30),
+      hash: hash.substring(0, 10),
+    });
     return hash;
   },
   cookieName,
@@ -149,9 +148,9 @@ const {
       req.headers["x-xsrf-token"] ||
       req.body?._csrf ||
       req.query?._csrf;
-    if (!isProduction) {
-      console.log("CSRF token from request:", token ? token.substring(0, 20) + "..." : "none");
-    }
+    logger.debug("CSRF token from request", {
+      token: token ? token.substring(0, 20) + "..." : "none",
+    });
     return token;
   },
 });
@@ -200,7 +199,7 @@ export const csrfProtection = (req, res, next) => {
   // Add debugging for CSRF failures in development
   const wrappedNext = (err) => {
     if (err && !isProduction) {
-      const debugInfo = {
+      logger.debug("CSRF validation error details", {
         error: err.message,
         code: err.code,
         hasToken: !!req.headers["x-csrf-token"],
@@ -212,8 +211,7 @@ export const csrfProtection = (req, res, next) => {
         method: req.method,
         url: req.originalUrl,
         sessionId: req.session?.id || req.sessionID || "no-session",
-      };
-      console.log("CSRF validation error details:", debugInfo);
+      });
     }
     next(err);
   };
@@ -252,12 +250,13 @@ export const csrfErrorHandler = (err, req, res, next) => {
     err.code === "EBADCSRFTOKEN" ||
     err.message?.toLowerCase().includes("csrf") ||
     err.message?.toLowerCase().includes("invalid csrf token");
-    
-  console.log("=== CSRF Error Handler ===");
-  console.log("isCsrfError:", isCsrfError);
-  console.log("err.code:", err.code);
-  console.log("err.message:", err.message);
-  console.log("res.headersSent:", res.headersSent); // Check if headers already sent
+
+  logger.debug("CSRF error handler", {
+    isCsrfError,
+    code: err.code,
+    message: err.message,
+    headersSent: res.headersSent,
+  });
 
   if (isCsrfError) {
     req.logger?.warn("CSRF validation failed", {
@@ -269,11 +268,9 @@ export const csrfErrorHandler = (err, req, res, next) => {
 
     // Make sure response hasn't been sent already
     if (res.headersSent) {
-      console.error("ERROR: Headers already sent, cannot send 403 response");
+      logger.error("Headers already sent, cannot send 403 CSRF response");
       return next(err);
     }
-
-    console.log("Sending 403 CSRF error response...");
 
     try {
       res.status(403).json({
@@ -281,18 +278,17 @@ export const csrfErrorHandler = (err, req, res, next) => {
         message: "Invalid or expired CSRF token. Please refresh and try again.",
         code: "CSRF_VALIDATION_FAILED",
       });
-      console.log("✓ 403 response sent successfully");
       return;
     } catch (responseError) {
-      console.error("✗ ERROR: Failed to send 403 response:", responseError);
-      console.error("Response error stack:", responseError.stack);
+      logger.error("Failed to send 403 CSRF response", {
+        error: responseError.message,
+        stack: responseError.stack,
+      });
       // If sending 403 fails, pass error to next handler (will become 500)
       return next(responseError);
     }
   }
 
-  console.log("Not a CSRF error, passing to next handler...");
-  console.log("=== CSRF Error Handler ===");
   next(err);
 };
 

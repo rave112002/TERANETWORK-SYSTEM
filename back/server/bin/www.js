@@ -7,10 +7,7 @@ import os from "os";
 import path from "path";
 import app, { db } from "../config/express.js";
 import { logger } from "../config/logger.js";
-import {
-  close as closeRateLimiter,
-  getStats as getRateLimiterStats,
-} from "../src/utils/rateLimiterService.js";
+import { close as closeRateLimiter } from "../src/utils/rateLimiterService.js";
 
 const debug = debugLib("wb:server");
 
@@ -91,21 +88,6 @@ async function startupHealthChecks() {
   logger.info("All startup health checks passed ✓");
 }
 
-// Email worker - only import if Redis is configured
-// let emailWorker = null;
-// try {
-//   if (process.env.REDIS_HOST || process.env.ENABLE_EMAIL_WORKER === "true") {
-//     const emailWorkerModule = await import("../src/workers/email.worker.js");
-//     emailWorker = emailWorkerModule.emailWorker;
-//     logger.info("Email worker initialized successfully");
-//   } else {
-//     logger.info("Email worker disabled - Redis not configured");
-//   }
-// } catch (error) {
-//   logger.warn("Failed to initialize email worker:", error.message);
-//   logger.warn("Continuing without email worker - emails will not be processed");
-// }
-
 /**
  * Get port from environment and store in Express.
  */
@@ -166,17 +148,7 @@ async function gracefulShutdown(signal) {
     // Close resources in order
     const shutdownTasks = [];
 
-    // 1. Close email worker
-    if (emailWorker) {
-      shutdownTasks.push(
-        emailWorker
-          .close()
-          .then(() => logger.info("✓ Email worker closed"))
-          .catch((err) => logger.error("Email worker close error", err))
-      );
-    }
-
-    // 2. Close database connections
+    // 1. Close database connections
     shutdownTasks.push(
       db
         .close()
@@ -184,7 +156,7 @@ async function gracefulShutdown(signal) {
         .catch((err) => logger.error("Database close error", err))
     );
 
-    // 3. Close rate limiter connections (Redis/MySQL if used)
+    // 2. Close rate limiter connections (Redis/MySQL if used)
     shutdownTasks.push(
       closeRateLimiter()
         .then(() => logger.info("✓ Rate limiter connections closed"))
@@ -292,16 +264,6 @@ function onListening() {
   console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
   console.log("---------------------------");
   console.log("\x1b[0m");
-
-  // Log pool statistics periodically (every 5 minutes)
-  // setInterval(() => {
-  //   const dbStats = db.getPoolStats();
-  //   const rateLimiterStats = getRateLimiterStats();
-  //   logger.info('Pool statistics', {
-  //     database: dbStats,
-  //     rateLimiter: rateLimiterStats
-  //   });
-  // }, 5 * 60 * 1000);
 }
 
 /**

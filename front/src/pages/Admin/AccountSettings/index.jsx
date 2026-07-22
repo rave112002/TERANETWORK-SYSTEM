@@ -44,7 +44,14 @@ const SettingsPanel = ({ title, description, icon, className = "", children }) =
   </div>
 );
 
+// This page is shared by both portals. Derive which one from the URL so the
+// right auth store + API endpoint are used.
+const currentPortal = () =>
+  window.location.pathname.startsWith("/superadmin") ? "superadmin" : "admin";
+
 const AccountSettings = () => {
+  const portal = currentPortal();
+
   return (
     <div className="p-8 space-y-5">
       {/* 1. HEADER */}
@@ -62,7 +69,7 @@ const AccountSettings = () => {
               description="Your name and how we reach you."
               icon={<User className="w-4.25 h-4.25" strokeWidth={1.8} />}
             >
-              <ProfileSection />
+              <ProfileSection portal={portal} />
             </SettingsPanel>
 
             <SettingsPanel
@@ -70,7 +77,7 @@ const AccountSettings = () => {
               description="Update the password you use to sign in."
               icon={<Lock className="w-4.25 h-4.25" strokeWidth={1.8} />}
             >
-              <PasswordSection />
+              <PasswordSection portal={portal} />
             </SettingsPanel>
           </div>
         </Col>
@@ -82,7 +89,7 @@ const AccountSettings = () => {
             icon={<Bell className="w-4.25 h-4.25" strokeWidth={1.8} />}
             className="h-full"
           >
-            <NotificationSection />
+            <NotificationSection portal={portal} />
           </SettingsPanel>
         </Col>
       </Row>

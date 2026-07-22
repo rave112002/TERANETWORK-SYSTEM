@@ -1,6 +1,11 @@
 import express from "express";
-import { catchAsync } from "../../../utils/catchAsync.js";
+import { catchAsync, validateBody, validateQuery } from "../../../utils/catchAsync.js";
 import { getCurrentTimestampLocal } from "../../../utils/dateUtils.js";
+import {
+  createBranchSchema,
+  updateBranchSchema,
+  listBranchesQuerySchema,
+} from "../../../validators/branches.validator.js";
 
 const router = express.Router();
 
@@ -10,6 +15,7 @@ const router = express.Router();
  */
 router.get(
   "/",
+  validateQuery(listBranchesQuerySchema),
   catchAsync(async (req, res) => {
     const {
       page = 1,
@@ -124,6 +130,7 @@ router.get(
  */
 router.post(
   "/",
+  validateBody(createBranchSchema),
   catchAsync(async (req, res) => {
     const { companyId, name, email, phone, address } = req.body;
     const now = getCurrentTimestampLocal();
@@ -199,6 +206,7 @@ router.post(
  */
 router.put(
   "/:branchId",
+  validateBody(updateBranchSchema),
   catchAsync(async (req, res) => {
     const { branchId } = req.params;
     const { name, email, phone, address, status } = req.body;

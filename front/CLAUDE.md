@@ -16,7 +16,7 @@ Monochrome surfaces + hairline borders + **one green accent used sparingly**. St
 borders, **not shadows**; the primary button is **inverted monochrome** (never the accent, never a
 gradient). Every color is a token in `src/index.css` — **never hardcode a hex**.
 
-- **`../modern-module-pattern.md`** (repo root) — the canonical, copy-paste spec for a module's
+- **`docs/modern-module-pattern.md`** — the canonical, copy-paste spec for a module's
   list page + create/edit drawer. Read it before building either.
 - **`src/pages/Admin/UserManagement/Roles/`** — the reference implementation. Copy its shape.
 - Shared building blocks: `components/PageHeader.jsx`, `StatCard.jsx`, `PaginationFooter.jsx`,

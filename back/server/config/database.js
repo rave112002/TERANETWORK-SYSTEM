@@ -8,7 +8,7 @@ import { logger } from "./logger.js";
  * - UTF-8 MB4 character set for full Unicode support (including emoji)
  * - Connection pooling with health checks and monitoring
  * - Timeout and keep-alive configuration
- * - UTC timezone enforcement
+ * - Asia/Manila local time storage (timezone +08:00, dateStrings)
  * - Transaction support with automatic rollback
  * - Slow query logging and performance monitoring
  */
@@ -38,8 +38,11 @@ class Database {
         // Character encoding - CRITICAL for Unicode/Emoji support
         charset: "utf8mb4",
 
-        // Timezone - Store all dates in UTC
-        timezone: "Z",
+        // Timezone — the app stores all timestamps as Asia/Manila local time
+        // (via getCurrentTimestampLocal). Combined with dateStrings below, the
+        // driver performs no timezone conversion, so stored values == displayed
+        // values regardless of the server's or viewer's timezone.
+        timezone: "+08:00",
 
         // Security settings
         multipleStatements: false, // Prevent SQL injection
@@ -64,7 +67,7 @@ class Database {
 
         // Data type handling
         decimalNumbers: true, // Return decimals as numbers
-        dateStrings: false, // Return dates as Date objects
+        dateStrings: true, // Return DATE/DATETIME as naive strings (no tz conversion)
 
         // Named placeholders support (optional but useful)
         namedPlaceholders: true,

@@ -7,6 +7,7 @@ import rolesController from "../../../controllers/v1/admin/roles.controller.js";
 import permissionsController from "../../../controllers/v1/admin/permissions.controller.js";
 import userPermissionsController from "../../../controllers/v1/admin/user-permissions.controller.js";
 import auditTrailController from "../../../controllers/v1/admin/audit-trail.controller.js";
+import settingsController from "../../../controllers/v1/admin/settings.controller.js";
 import { auditTrail } from "../../../middlewares/auditTrail.middleware.js";
 
 const router = Router();
@@ -26,5 +27,6 @@ router.use(
   userPermissionsController
 );
 router.use("/audit-trail", requireAuth, auditTrailController);
+router.use("/settings", requireAuth, auditTrail("settings"), settingsController);
 
 export default router;

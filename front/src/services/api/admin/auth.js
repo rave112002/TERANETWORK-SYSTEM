@@ -1,4 +1,4 @@
-import { axiosInstance } from "../axios";
+import { axiosInstance, getUserToken, userTypeAuth } from "../axios";
 
 export const loginAdminApi = async (payload) => {
   const response = await axiosInstance.post(
@@ -9,13 +9,18 @@ export const loginAdminApi = async (payload) => {
 };
 
 export const logoutAdminApi = async () => {
-  const response = await axiosInstance.post("/api/v1/admin/auth/logout");
+  // Send the refresh token so the backend can revoke it server-side
+  const refreshToken = getUserToken(userTypeAuth.admin)?.refreshToken;
+  const response = await axiosInstance.post(
+    "/api/v1/admin/auth/logout",
+    refreshToken ? { refreshToken } : {},
+  );
   return response.data;
 };
 
-export const refreshTokenApi = async (token) => {
+export const refreshTokenApi = async (refreshToken) => {
   const response = await axiosInstance.post("/api/v1/admin/auth/refresh", {
-    token,
+    refreshToken,
   });
   return response.data;
 };

@@ -200,9 +200,10 @@ const total = data?.pagination?.total ?? 0;
 ## Console Usage
 
 - `console.error` — for caught errors in handlers (keep for debugging)
-- `console.log` — for socket connection status (keep in dev)
+- `console.warn` — only in the axios interceptors (`services/api/axios.js`) for
+  missing-token/CSRF diagnostics; nowhere else
 - Never leave `console.log` for debugging in committed code
-- Never use `console.warn` — use Sentry for production warnings
+- For production warnings, use Sentry
 
 ---
 

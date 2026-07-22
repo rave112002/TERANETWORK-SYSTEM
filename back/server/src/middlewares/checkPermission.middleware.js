@@ -1,3 +1,6 @@
+import { logger } from "../../config/logger.js";
+import { ERROR_CODES } from "../utils/APIError.js";
+
 /**
  * Permission check middleware for RBAC
  * Checks if user has required permission based on module, submodule, and access level
@@ -12,6 +15,7 @@ export const checkPermission = (module, submodule = null, accessLevel = "read") 
         return res.status(401).json({
           success: false,
           message: "User not authenticated",
+          code: ERROR_CODES.TOKEN_INVALID,
         });
       }
 
@@ -43,9 +47,9 @@ export const checkPermission = (module, submodule = null, accessLevel = "read") 
         }
       } catch (userPermError) {
         // If user_permissions check fails, fall back to role permissions
-        console.warn(
-          "User permissions check failed, falling back to role permissions:",
-          userPermError.message
+        (req.logger || logger).warn(
+          "User permissions check failed, falling back to role permissions",
+          { error: userPermError.message }
         );
       }
 
@@ -59,6 +63,7 @@ export const checkPermission = (module, submodule = null, accessLevel = "read") 
           return res.status(403).json({
             success: false,
             message: "No role assigned to user",
+            code: ERROR_CODES.FORBIDDEN,
           });
         }
 
@@ -83,6 +88,7 @@ export const checkPermission = (module, submodule = null, accessLevel = "read") 
           return res.status(403).json({
             success: false,
             message: "Insufficient permissions",
+            code: ERROR_CODES.FORBIDDEN,
             required: submodule
               ? `${module}.${submodule} (${accessLevel})`
               : `${module} (${accessLevel})`,
@@ -100,6 +106,7 @@ export const checkPermission = (module, submodule = null, accessLevel = "read") 
         return res.status(403).json({
           success: false,
           message: "Insufficient access level",
+          code: ERROR_CODES.FORBIDDEN,
           required: accessLevel,
           current: userAccessLevel,
         });
@@ -115,10 +122,14 @@ export const checkPermission = (module, submodule = null, accessLevel = "read") 
 
       next();
     } catch (err) {
-      console.error("Permission check error:", err);
+      (req.logger || logger).error("Permission check error", {
+        error: err.message,
+        stack: err.stack,
+      });
       return res.status(500).json({
         success: false,
         message: "Failed to check permissions",
+        code: ERROR_CODES.INTERNAL_ERROR,
       });
     }
   };

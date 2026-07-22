@@ -1,8 +1,28 @@
+import crypto from "node:crypto";
+
+import { logger } from "../../config/logger.js";
 import APIError, { ERROR_CODES } from "../utils/APIError.js";
-import { getCurrentTimestampLocal } from "../utils/dateUtils.js";
+import { getCurrentTimestampLocal, toTimestampLocal } from "../utils/dateUtils.js";
+
+const MUTATION_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 /**
- * Create idempotency middleware
+ * Idempotency middleware (Stripe-style, opt-in per request)
+ *
+ * When a mutation request carries an `Idempotency-Key` header, its successful
+ * (2xx) JSON response is cached in the `idempotency_keys` table. Replaying the
+ * same key within the TTL returns the cached response without re-executing the
+ * handler; replaying the same key with a DIFFERENT body is rejected with 409.
+ *
+ * Requests without the header are processed normally — external API consumers
+ * (curl, Postman) are not forced to supply one. The frontend axios layer sends
+ * a key on every mutation and reuses it on its internal retries, so retried
+ * writes cannot double-apply.
+ *
+ * Skipped entirely for multipart requests: the body is parsed later (multer),
+ * so a meaningful request hash cannot be computed here.
+ *
+ * All timestamps in `idempotency_keys` are Asia/Manila local.
  *
  * @param {Object} options - Configuration options
  * @param {number} options.ttlHours - Time to live for idempotency keys in hours (default: 24)
@@ -13,108 +33,98 @@ export const idempotencyMiddleware = (options = {}) => {
 
   return async (req, res, next) => {
     try {
-      // Extract idempotency key from headers (case-insensitive)
-      const idempotencyKey = req.headers["idempotency-key"] || req.headers["Idempotency-Key"];
-
-      if (!idempotencyKey) {
-        throw new APIError("Idempotency-Key header is required", 400, ERROR_CODES.INVALID_INPUT);
+      if (!MUTATION_METHODS.has(req.method)) {
+        return next();
       }
 
-      // Create hash of request body for additional verification
-      const crypto = await import("crypto");
-      const requestHash = crypto
+      const idempotencyKey = req.headers["idempotency-key"];
+      if (!idempotencyKey) {
+        return next();
+      }
+
+      if (req.is("multipart/form-data")) {
+        return next();
+      }
+
+      // Scope the stored key by the caller's Authorization header: this
+      // middleware runs before passport, and an unscoped client-chosen key
+      // could otherwise replay another user's cached response.
+      const scopedKey = crypto
         .createHash("sha256")
-        .update(JSON.stringify(req.body))
+        .update(`${req.headers.authorization || ""}:${idempotencyKey}`)
         .digest("hex");
 
-      // Check if this idempotency key exists
+      // Hash the body so the same key cannot be reused with a different payload
+      const requestHash = crypto
+        .createHash("sha256")
+        .update(JSON.stringify(req.body ?? {}))
+        .digest("hex");
+
+      const now = getCurrentTimestampLocal();
+
       const existing = await req.db.query(
-        `SELECT
-          idempotency_key,
-          request_hash,
-          response_code,
-          response_body,
-          expires_at
-        FROM idempotency_keys
-        WHERE idempotency_key = ?
-        LIMIT 1`,
-        [idempotencyKey]
+        `SELECT idempotencyKey, requestHash, responseCode, responseBody, expiresAt
+         FROM idempotency_keys
+         WHERE idempotencyKey = ?
+         LIMIT 1`,
+        [scopedKey]
       );
 
       if (existing.length > 0) {
         const record = existing[0];
 
-        // Check if the key has expired
-        if (new Date(record.expires_at) < new Date()) {
-          // Expired - delete and allow new request
-          await req.db.query("DELETE FROM idempotency_keys WHERE idempotency_key = ?", [
-            idempotencyKey,
+        if (record.expiresAt < now) {
+          // Expired — delete and process as a fresh request (Manila strings)
+          await req.db.query(`DELETE FROM idempotency_keys WHERE idempotencyKey = ?`, [
+            scopedKey,
           ]);
-
-          req.logger.info("Expired idempotency key deleted", {
-            idempotencyKey,
-            expiredAt: record.expires_at,
-          });
         } else {
-          // Key is still valid
-
-          // Verify request hash matches (prevents same key with different body)
-          if (record.request_hash !== requestHash) {
+          if (record.requestHash !== requestHash) {
             throw new APIError(
-              "Idempotency key already used with different request body",
+              "Idempotency key already used with a different request body",
               409,
               ERROR_CODES.DUPLICATE_ENTRY
             );
           }
 
-          // Return cached response
-          req.logger.info("Idempotent request detected - returning cached response", {
+          req.logger?.info("Idempotent replay — returning cached response", {
             idempotencyKey,
-            requestHash: requestHash.substring(0, 8),
           });
 
-          return res.status(record.response_code).json(record.response_body);
+          const body =
+            typeof record.responseBody === "string"
+              ? JSON.parse(record.responseBody)
+              : record.responseBody;
+          return res.status(record.responseCode).json(body);
         }
       }
 
-      // Store original res.json to intercept response
+      // Intercept res.json to cache the successful response
       const originalJson = res.json.bind(res);
-
-      // Override res.json to cache the response
-      res.json = async function (data) {
+      res.json = function (data) {
         const responseCode = res.statusCode || 200;
 
-        // Only cache successful responses (2xx)
         if (responseCode >= 200 && responseCode < 300) {
-          try {
-            const now = getCurrentTimestampLocal();
-            const expiresAt = new Date(Date.now() + ttlHours * 60 * 60 * 1000)
-              .toISOString()
-              .slice(0, 19)
-              .replace("T", " ");
+          const storedAt = getCurrentTimestampLocal();
+          const expiresAt = toTimestampLocal(Date.now() + ttlHours * 60 * 60 * 1000);
 
-            await req.db.query(
+          // Fire-and-forget: caching failures (e.g. a concurrent duplicate
+          // key) must not fail the request that already succeeded
+          req.db
+            .query(
               `INSERT INTO idempotency_keys
-              (idempotency_key, request_hash, response_code, response_body, created_at, expires_at)
-              VALUES (?, ?, ?, ?, ?, ?)`,
-              [idempotencyKey, requestHash, responseCode, JSON.stringify(data), now, expiresAt]
-            );
-
-            req.logger.info("Idempotency key stored", {
-              idempotencyKey,
-              requestHash: requestHash.substring(0, 8),
-              expiresAt,
+               (idempotencyKey, requestHash, responseCode, responseBody, dateCreated, expiresAt)
+               VALUES (?, ?, ?, ?, ?, ?)`,
+              [scopedKey, requestHash, responseCode, JSON.stringify(data), storedAt, expiresAt]
+            )
+            .catch((error) => {
+              req.logger?.warn("Failed to store idempotency key", {
+                error: error.message,
+                idempotencyKey,
+              });
             });
-          } catch (error) {
-            // Log but don't fail the request if caching fails
-            req.logger.error("Failed to store idempotency key", {
-              error: error.message,
-              idempotencyKey,
-            });
-          }
         }
 
-        // Call original res.json
         return originalJson(data);
       };
 
@@ -126,24 +136,25 @@ export const idempotencyMiddleware = (options = {}) => {
 };
 
 /**
- * Cleanup expired idempotency keys (should be run periodically via cron/worker)
+ * Cleanup expired idempotency keys (run periodically via cron/worker)
  *
  * @param {Object} db - Database instance
  * @returns {Promise<number>} Number of deleted records
  */
 export const cleanupExpiredKeys = async (db) => {
   try {
-    const result = await db.query("DELETE FROM idempotency_keys WHERE expires_at < NOW()");
+    const result = await db.query(`DELETE FROM idempotency_keys WHERE expiresAt < ?`, [
+      getCurrentTimestampLocal(),
+    ]);
 
     const deletedCount = result.affectedRows || 0;
-
     if (deletedCount > 0) {
-      console.log(`Cleaned up ${deletedCount} expired idempotency keys`);
+      logger.info(`Cleaned up ${deletedCount} expired idempotency keys`);
     }
 
     return deletedCount;
   } catch (error) {
-    console.error("Failed to cleanup expired idempotency keys:", error);
+    logger.error("Failed to cleanup expired idempotency keys", { error: error.message });
     throw error;
   }
 };

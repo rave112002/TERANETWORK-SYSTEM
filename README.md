@@ -296,7 +296,7 @@ keep-alive, slow-query logging) and is injected as `req.db`:
   structure comes from borders, not shadows, and the primary button is inverted monochrome (never the
   accent, never a gradient). Every color is a token in `src/index.css` (light/dark); type is **Onest**
   + **JetBrains Mono** (micro-data only), Ant Design v5, Tailwind v4, `lucide-react` icons. The
-  copy-paste spec is [`modern-module-pattern.md`](modern-module-pattern.md) and
+  copy-paste spec is [`front/docs/modern-module-pattern.md`](front/docs/modern-module-pattern.md) and
   `front/src/pages/Admin/UserManagement/Roles/` is the reference implementation. See
   [`front/docs/ui-design-system.md`](front/docs/ui-design-system.md) and [`front/docs/ui-form-design.md`](front/docs/ui-form-design.md).
 
@@ -353,7 +353,7 @@ not the numeric `id`. See [`back/docs/schema-conventions.md`](back/docs/schema-c
 The detailed, enforced coding patterns live next to the code:
 
 - **Project map (for AI agents):** [`CLAUDE.md`](CLAUDE.md)
-- **Design spec:** [`modern-module-pattern.md`](modern-module-pattern.md) — the canonical, copy-paste
+- **Design spec:** [`front/docs/modern-module-pattern.md`](front/docs/modern-module-pattern.md) — the canonical, copy-paste
   reference for a module's list page + create/edit drawer.
 - **Frontend:** [`front/CLAUDE.md`](front/CLAUDE.md) → [`front/docs/`](front/docs/) — code conventions, folder
   structure, the table-page hook pattern, API/React-Query usage, auth & state, the UI design system,

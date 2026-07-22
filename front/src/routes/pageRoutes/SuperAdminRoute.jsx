@@ -4,10 +4,13 @@ import { Suspense, lazy } from "react";
 import { Route, Routes } from "react-router";
 import BasicLayout from "../../components/layout/BasicLayout";
 import { ComponentLoader } from "../../components/LoadingFallback";
+import NotFound from "../../components/NotFound";
 import { useSuperAdminAuthStore } from "../../store/authStore";
 import { Auth, UnAuth } from "../ValidateAuth";
 
 const Login = lazy(() => import("../../pages/SuperAdmin/Login"));
+const ForgotPassword = lazy(() => import("../../pages/Auth/ForgotPassword"));
+const ResetPassword = lazy(() => import("../../pages/Auth/ResetPassword"));
 const Dashboard = lazy(() => import("../../pages/SuperAdmin/Dashboard"));
 const Companies = lazy(
   () => import("../../pages/SuperAdmin/Companies"),
@@ -16,6 +19,7 @@ const Branches = lazy(
   () => import("../../pages/SuperAdmin/CompanyManagement/Branches"),
 );
 const SuperAdminUsers = lazy(() => import("../../pages/SuperAdmin/Users"));
+const SystemSettings = lazy(() => import("../../pages/SuperAdmin/Settings"));
 const AccountSettings = lazy(() => import("../../pages/Admin/AccountSettings"));
 
 const SuperAdminRoute = () => {
@@ -88,20 +92,7 @@ const SuperAdminRoute = () => {
       icon: <Settings className="h-5 w-5" />,
       component: (
         <Suspense fallback={<ComponentLoader />}>
-          <div className="p-8">
-            <h1
-              className="font-semibold"
-              style={{ fontSize: 26, letterSpacing: "-0.5px" }}
-            >
-              System Settings
-            </h1>
-            <p
-              className="mt-2"
-              style={{ fontSize: 13.5, color: "var(--color-text-secondary)" }}
-            >
-              Configure system settings
-            </p>
-          </div>
+          <SystemSettings />
         </Suspense>
       ),
       isFilter: true,
@@ -138,6 +129,22 @@ const SuperAdminRoute = () => {
           element={
             <Suspense fallback={<ComponentLoader />}>
               <Login />
+            </Suspense>
+          }
+        />
+        <Route
+          path="forgot-password"
+          element={
+            <Suspense fallback={<ComponentLoader />}>
+              <ForgotPassword portal="superadmin" />
+            </Suspense>
+          }
+        />
+        <Route
+          path="reset-password"
+          element={
+            <Suspense fallback={<ComponentLoader />}>
+              <ResetPassword portal="superadmin" />
             </Suspense>
           }
         />
@@ -192,7 +199,10 @@ const SuperAdminRoute = () => {
               </Suspense>
             }
           />
-          <Route path="*" element={<div>Page Not Found</div>} />
+          <Route
+            path="*"
+            element={<NotFound homePath="/superadmin/dashboard" />}
+          />
         </Route>
       </Route>
     </Routes>

@@ -18,7 +18,6 @@ import APIError from "../src/utils/APIError.js"; // your custom error class
 import { error } from "../src/utils/responses.js"; // your custom error handling function
 import Database from "./database.js";
 import { httpLogger, logger, maskSensitiveData } from "./logger.js"; // your winston logger setup
-// import { apiLimiter } from "../src/middlewares/rateLimiter.js"; // Rate limiter middleware
 import { loggerMiddleware } from "../src/middlewares/logger.middleware.js"; // Global logger middleware
 
 const app = express();
@@ -186,13 +185,25 @@ app.use(responseWrapper);
 // Attach DevLogger globally to all requests
 app.use(loggerMiddleware);
 
-// app.use('/api/', apiLimiter);
 //Routes
 app.use((req, res, next) => {
   req.db = db;
 
   next();
 });
+
+// Health check — used by orchestrators/load balancers. No auth, no CSRF.
+// The rate limiter already whitelists paths ending in /health, /ready, /live.
+app.get("/health", async (req, res) => {
+  const dbHealthy = await db.healthCheck().catch(() => false);
+  return res.status(dbHealthy ? 200 : 503).json({
+    status: dbHealthy ? "ok" : "degraded",
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+    checks: { database: dbHealthy ? "up" : "down" },
+  });
+});
+
 app.use(api);
 
 // CSRF Error Handler - Must be before global error handlers

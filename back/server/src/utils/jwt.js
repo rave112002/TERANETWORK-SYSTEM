@@ -47,6 +47,11 @@ const getPublicKey = () => {
   return publicKey;
 };
 
+// Issuer/audience — exported so the passport verify config uses the exact
+// same values as token signing (a mismatch makes every token fail verification)
+export const JWT_ISSUER = process.env.ISSUER || "template-api";
+export const JWT_AUDIENCE = process.env.AUDIENCE || "template-client";
+
 // Token configuration
 const TOKEN_CONFIG = {
   access: {
@@ -95,8 +100,8 @@ export const generateAccessToken = (payload) => {
   const token = jwt.sign(tokenPayload, getPrivateKey(), {
     algorithm: TOKEN_CONFIG.access.algorithm,
     expiresIn: TOKEN_CONFIG.access.expiresIn,
-    issuer: process.env.ISSUER || "rotary-discon-api",
-    audience: process.env.AUDIENCE || "rotary-discon-client",
+    issuer: JWT_ISSUER,
+    audience: JWT_AUDIENCE,
   });
 
   // Calculate expiration time
@@ -134,8 +139,8 @@ export const generateRefreshToken = (payload) => {
   const token = jwt.sign(tokenPayload, getPrivateKey(), {
     algorithm: TOKEN_CONFIG.refresh.algorithm,
     expiresIn: TOKEN_CONFIG.refresh.expiresIn,
-    issuer: process.env.ISSUER || "rotary-discon-api",
-    audience: process.env.AUDIENCE || "rotary-discon-client",
+    issuer: JWT_ISSUER,
+    audience: JWT_AUDIENCE,
   });
 
   // Calculate expiration time
@@ -184,8 +189,8 @@ export const verifyAccessToken = (token) => {
   try {
     const decoded = jwt.verify(token, getPublicKey(), {
       algorithms: [TOKEN_CONFIG.access.algorithm],
-      issuer: process.env.ISSUER || "rotary-discon-api",
-      audience: process.env.AUDIENCE || "rotary-discon-client",
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
     });
 
     if (decoded.type !== "access") {
@@ -227,8 +232,8 @@ export const verifyRefreshToken = (token) => {
   try {
     const decoded = jwt.verify(token, getPublicKey(), {
       algorithms: [TOKEN_CONFIG.refresh.algorithm],
-      issuer: process.env.ISSUER || "rotary-discon-api",
-      audience: process.env.AUDIENCE || "rotary-discon-client",
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
     });
 
     if (decoded.type !== "refresh") {

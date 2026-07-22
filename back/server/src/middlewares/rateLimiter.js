@@ -11,6 +11,7 @@
  * @module middlewares/rateLimiter
  */
 
+import { logger } from "../../config/logger.js";
 import {
   createLimiter,
   getClientKey,
@@ -101,7 +102,7 @@ export function createRateLimiterMiddleware(profileName, options = {}) {
 
     // Log in development
     if (process.env.NODE_ENV === "development") {
-      console.log(`[Rate Limit: ${profileName}] Client: ${key}`);
+      logger.debug(`[Rate Limit: ${profileName}] Client: ${key}`);
     }
 
     try {
@@ -142,16 +143,11 @@ export function createRateLimiterMiddleware(profileName, options = {}) {
 
       // Log rate limit hit
       if (process.env.NODE_ENV !== "test") {
-        const logger = req.logger || console;
-        if (typeof logger.warn === "function") {
-          logger.warn(`Rate limit exceeded: ${profileName}`, {
-            key,
-            profile: profileName,
-            retryAfter,
-          });
-        } else {
-          console.warn(`Rate limit exceeded: ${profileName} - ${key}`);
-        }
+        (req.logger || logger).warn(`Rate limit exceeded: ${profileName}`, {
+          key,
+          profile: profileName,
+          retryAfter,
+        });
       }
 
       return res.status(429).json(createRateLimitResponse(message, retryAfter));

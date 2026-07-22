@@ -1,7 +1,11 @@
 import express from "express";
-import { catchAsync } from "../../../utils/catchAsync.js";
+import { catchAsync, validateBody, validateQuery } from "../../../utils/catchAsync.js";
 import { getCurrentTimestampLocal } from "../../../utils/dateUtils.js";
 import { hashPassword } from "../../../utils/hashing/argonHash.js";
+import {
+  createOwnerSchema,
+  listUsersQuerySchema,
+} from "../../../validators/superadmin-users.validator.js";
 
 const router = express.Router();
 
@@ -11,6 +15,7 @@ const router = express.Router();
  */
 router.get(
   "/",
+  validateQuery(listUsersQuerySchema),
   catchAsync(async (req, res) => {
     const {
       page = 1,
@@ -116,6 +121,7 @@ router.get(
  */
 router.post(
   "/",
+  validateBody(createOwnerSchema),
   catchAsync(async (req, res) => {
     const { firstName, lastName, email, password, phone, companyId, branchId } = req.body;
     const now = getCurrentTimestampLocal();
@@ -192,13 +198,13 @@ router.post(
         [accountId, companyId, branchId, firstName, lastName, phone || null, roleId, now, now]
       );
 
-      // 7. Create credential
-      const { hash, salt } = await hashPassword(password);
+      // 7. Create credential (Argon2 embeds the salt in the encoded hash)
+      const hash = await hashPassword(password);
 
       await conn.execute(
-        `INSERT INTO credentials (accountId, email, password, salt, type, status, dateCreated, dateUpdated)
-         VALUES (?, ?, ?, ?, 'ADMIN', 'Active', ?, ?)`,
-        [accountId, email, hash, salt, now, now]
+        `INSERT INTO credentials (accountId, email, password, type, status, dateCreated, dateUpdated)
+         VALUES (?, ?, ?, 'ADMIN', 'Active', ?, ?)`,
+        [accountId, email, hash, now, now]
       );
 
       await req.db.commit(conn);

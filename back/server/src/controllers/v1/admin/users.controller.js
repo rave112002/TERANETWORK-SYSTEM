@@ -1,8 +1,13 @@
 import express from "express";
-import { catchAsync } from "../../../utils/catchAsync.js";
+import { catchAsync, validateBody, validateQuery } from "../../../utils/catchAsync.js";
 import { getCurrentTimestampLocal } from "../../../utils/dateUtils.js";
 import { hashPassword } from "../../../utils/hashing/argonHash.js";
 import { checkPermission } from "../../../middlewares/checkPermission.middleware.js";
+import {
+  createUserSchema,
+  updateUserSchema,
+  listUsersQuerySchema,
+} from "../../../validators/admin-users.validator.js";
 
 const router = express.Router();
 
@@ -14,6 +19,7 @@ const router = express.Router();
 router.get(
   "/",
   checkPermission("users", "list", "read"),
+  validateQuery(listUsersQuerySchema),
   catchAsync(async (req, res) => {
     const {
       page = 1,
@@ -142,6 +148,7 @@ router.get(
 router.post(
   "/",
   checkPermission("users", "list", "write"),
+  validateBody(createUserSchema),
   catchAsync(async (req, res) => {
     const { firstName, lastName, email, password, phone, roleId } = req.body;
     const { companyId, branchId } = req.user;
@@ -175,13 +182,13 @@ router.post(
         [accountId, companyId, branchId, firstName, lastName, phone || null, roleId, now, now]
       );
 
-      // Create credential
-      const { hash, salt } = await hashPassword(password);
+      // Create credential (Argon2 embeds the salt in the encoded hash)
+      const hash = await hashPassword(password);
 
       await conn.execute(
-        `INSERT INTO credentials (accountId, email, password, salt, type, status, dateCreated, dateUpdated)
-         VALUES (?, ?, ?, ?, 'ADMIN', 'Active', ?, ?)`,
-        [accountId, email, hash, salt, now, now]
+        `INSERT INTO credentials (accountId, email, password, type, status, dateCreated, dateUpdated)
+         VALUES (?, ?, ?, 'ADMIN', 'Active', ?, ?)`,
+        [accountId, email, hash, now, now]
       );
 
       await req.db.commit(conn);
@@ -201,6 +208,7 @@ router.post(
 router.put(
   "/:userId",
   checkPermission("users", "list", "write"),
+  validateBody(updateUserSchema),
   catchAsync(async (req, res) => {
     const { userId } = req.params;
     const { firstName, lastName, phone, roleId, status } = req.body;

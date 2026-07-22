@@ -19,9 +19,7 @@
     "@fontsource-variable/jetbrains-mono": "^5.2.8",
     "@fontsource-variable/onest": "^5.2.11",
     "@sentry/react": "^10.52.0",
-    "@tailwindcss/vite": "^4.2.4",
     "@tanstack/react-query": "^5.100.9",
-    "@vitejs/plugin-react": "^4.7.0",
     "antd": "^5.29.3",
     "axios": "^1.16.0",
     "clsx": "^2.1.1",
@@ -29,21 +27,20 @@
     "lucide-react": "^0.577.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
-    "react-error-boundary": "^6.1.1",
     "react-router": "^7.15.0",
-    "socket.io-client": "^4.8.3",
-    "tailwindcss": "^4.2.4",
     "zustand": "^5.0.13"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
+    "@tailwindcss/vite": "^4.2.4",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react-swc": "^3.11.0",
+    "@vitejs/plugin-react": "^4.7.0",
     "eslint": "^9.39.4",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^16.5.0",
+    "tailwindcss": "^4.2.4",
     "vite": "^7.3.3"
   }
 }

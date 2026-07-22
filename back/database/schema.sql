@@ -1,6 +1,14 @@
 -- ============================================================================
--- Database Schema
--- Run via: npm run db:setup | npm run db:setup:clean
+-- Database Schema — FULL REFERENCE SNAPSHOT (end state)
+--
+-- ⚠️  NOT the source of truth and NOT applied by any script. The authoritative
+--     schema is the ordered migration set in database/migrations/, applied by
+--     `npm run db:migrate` (or db:setup / db:setup:clean, which run migrations
+--     then seed). This file is a human-readable snapshot of the resulting
+--     schema — keep it in sync when you add a migration.
+--
+-- Conventions: every table has a surrogate `id` + a business ID (varchar, the
+-- value used in the API/URLs/FKs); timestamps are DATETIME stored in Asia/Manila local time.
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS companies (
@@ -15,7 +23,9 @@ CREATE TABLE IF NOT EXISTS companies (
   subscriptionEndDate DATE NULL,
   status ENUM('Active','Inactive','Suspended','Pending','Deleted') NOT NULL DEFAULT 'Pending',
   dateCreated DATETIME NOT NULL,
-  dateUpdated DATETIME NOT NULL
+  dateUpdated DATETIME NOT NULL,
+  INDEX idx_companies_status (status),
+  INDEX idx_companies_subscriptionPlan (subscriptionPlan)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS branches (
@@ -37,7 +47,9 @@ CREATE TABLE IF NOT EXISTS branches (
   status ENUM('Active','Inactive','Suspended','Deleted') NOT NULL DEFAULT 'Active',
   dateCreated DATETIME NOT NULL,
   dateUpdated DATETIME NOT NULL,
-  INDEX idx_branches_companyId (companyId)
+  INDEX idx_branches_companyId (companyId),
+  INDEX idx_branches_tenant (companyId, status),
+  CONSTRAINT fk_branches_company FOREIGN KEY (companyId) REFERENCES companies(companyId)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS superadmins (
@@ -52,16 +64,48 @@ CREATE TABLE IF NOT EXISTS superadmins (
   dateUpdated DATETIME NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Shared auth table for superadmins + users (keyed by accountId, polymorphic —
+-- hence no FK on accountId). Argon2 embeds the salt in the password hash, so
+-- there is no separate salt column.
 CREATE TABLE IF NOT EXISTS credentials (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   accountId VARCHAR(50) NOT NULL UNIQUE,
   email VARCHAR(100) NOT NULL UNIQUE,
   password VARCHAR(255) NOT NULL,
-  salt VARCHAR(100) NOT NULL,
   type ENUM('SUPERADMIN','ADMIN','USER') NOT NULL,
   status ENUM('Active','Inactive','Suspended','Deleted') NOT NULL DEFAULT 'Active',
   dateCreated DATETIME NOT NULL,
   dateUpdated DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Cached responses for mutation requests carrying an Idempotency-Key header
+-- (see middlewares/idempotency.middleware.js). Rows are immutable and TTL'd.
+-- All DATETIME values in this table are Asia/Manila local.
+CREATE TABLE IF NOT EXISTS idempotency_keys (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  idempotencyKey VARCHAR(100) NOT NULL UNIQUE,
+  requestHash VARCHAR(64) NOT NULL,
+  responseCode INT NOT NULL,
+  responseBody JSON NULL,
+  dateCreated DATETIME NOT NULL,
+  expiresAt DATETIME NOT NULL,
+  INDEX idx_idempotency_keys_expiresAt (expiresAt)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Issued refresh tokens, keyed by the JWT's jti claim. Enables rotation
+-- (every /refresh revokes the presented token), reuse detection, and logout
+-- revocation. accountId is polymorphic (superadmin OR user) — no FK. Asia/Manila local.
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  jti VARCHAR(64) NOT NULL UNIQUE,
+  accountId VARCHAR(50) NOT NULL,
+  expiresAt DATETIME NOT NULL,
+  revokedAt DATETIME NULL,
+  replacedByJti VARCHAR(64) NULL,
+  dateCreated DATETIME NOT NULL,
+  dateUpdated DATETIME NOT NULL,
+  INDEX idx_refresh_tokens_accountId (accountId),
+  INDEX idx_refresh_tokens_expiresAt (expiresAt)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS users (
@@ -80,7 +124,11 @@ CREATE TABLE IF NOT EXISTS users (
   dateUpdated DATETIME NOT NULL,
   INDEX idx_users_companyId (companyId),
   INDEX idx_users_branchId (branchId),
-  INDEX idx_users_roleId (roleId)
+  INDEX idx_users_roleId (roleId),
+  INDEX idx_users_tenant (companyId, branchId, status),
+  CONSTRAINT fk_users_company FOREIGN KEY (companyId) REFERENCES companies(companyId),
+  CONSTRAINT fk_users_branch  FOREIGN KEY (branchId)  REFERENCES branches(branchId),
+  CONSTRAINT fk_users_role    FOREIGN KEY (roleId)    REFERENCES roles(roleId)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS roles (
@@ -94,7 +142,11 @@ CREATE TABLE IF NOT EXISTS roles (
   dateCreated DATETIME NOT NULL,
   dateUpdated DATETIME NOT NULL,
   INDEX idx_roles_companyId (companyId),
-  INDEX idx_roles_branchId (branchId)
+  INDEX idx_roles_branchId (branchId),
+  INDEX idx_roles_roleName (roleName),
+  INDEX idx_roles_tenant (companyId, branchId, status),
+  CONSTRAINT fk_roles_company FOREIGN KEY (companyId) REFERENCES companies(companyId),
+  CONSTRAINT fk_roles_branch  FOREIGN KEY (branchId)  REFERENCES branches(branchId)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS permissions (
@@ -116,7 +168,9 @@ CREATE TABLE IF NOT EXISTS role_permissions (
   accessLevel ENUM('read','write') NOT NULL,
   dateCreated DATETIME NOT NULL,
   INDEX idx_role_permissions_roleId (roleId),
-  INDEX idx_role_permissions_permissionId (permissionId)
+  INDEX idx_role_permissions_permissionId (permissionId),
+  CONSTRAINT fk_rp_role       FOREIGN KEY (roleId)       REFERENCES roles(roleId),
+  CONSTRAINT fk_rp_permission FOREIGN KEY (permissionId) REFERENCES permissions(permissionId)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS user_permissions (
@@ -127,11 +181,13 @@ CREATE TABLE IF NOT EXISTS user_permissions (
   accessLevel ENUM('none','read','write') NOT NULL DEFAULT 'read',
   dateCreated DATETIME NOT NULL,
   INDEX idx_user_permissions_accountId (accountId),
-  INDEX idx_user_permissions_permissionId (permissionId)
+  INDEX idx_user_permissions_permissionId (permissionId),
+  CONSTRAINT fk_up_user       FOREIGN KEY (accountId)    REFERENCES users(accountId),
+  CONSTRAINT fk_up_permission FOREIGN KEY (permissionId) REFERENCES permissions(permissionId)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-
-
+-- Audit rows must outlive their referents and accountId is polymorphic, so this
+-- table intentionally has no foreign keys.
 CREATE TABLE IF NOT EXISTS audit_trail (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   auditId VARCHAR(50) NOT NULL UNIQUE,

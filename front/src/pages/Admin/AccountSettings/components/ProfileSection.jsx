@@ -2,7 +2,11 @@ import { App, Button, Form, Input, Tooltip } from "antd";
 import { Mail, Phone, User } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 import SectionLabel from "../../../../components/SectionLabel";
-import { useAdminAuthStore } from "../../../../store/authStore";
+import {
+  useAdminAuthStore,
+  useSuperAdminAuthStore,
+} from "../../../../store/authStore";
+import { useUpdateProfile } from "../../../../services/requests/account";
 
 // Dependency-free value compare for the dirty check.
 const isFormEqual = (a = {}, b = {}) => {
@@ -13,11 +17,19 @@ const isFormEqual = (a = {}, b = {}) => {
   return true;
 };
 
-const ProfileSection = () => {
+const ProfileSection = ({ portal = "admin" }) => {
   const [form] = Form.useForm();
   const { message } = App.useApp();
-  const { userData } = useAdminAuthStore();
+  // Both hooks always run (rules-of-hooks); pick by portal.
+  const adminUser = useAdminAuthStore((s) => s.userData);
+  const superUser = useSuperAdminAuthStore((s) => s.userData);
+  const userData = portal === "superadmin" ? superUser : adminUser;
+  const setUserData =
+    portal === "superadmin"
+      ? useSuperAdminAuthStore.getState().setUserData
+      : useAdminAuthStore.getState().setUserData;
   const initialValuesRef = useRef({});
+  const { mutate, isPending } = useUpdateProfile(portal);
 
   useEffect(() => {
     if (userData) {
@@ -48,9 +60,26 @@ const ProfileSection = () => {
       message.info("No changes to save");
       return;
     }
-    // TODO: Call update profile API
-    message.success("Profile updated successfully");
-    initialValuesRef.current = form.getFieldsValue(); // new baseline after save
+    const values = form.getFieldsValue();
+    mutate(
+      {
+        firstName: values.firstName,
+        lastName: values.lastName,
+        phone: values.phone || null,
+      },
+      {
+        onSuccess: (response) => {
+          const updated = response?.data?.user;
+          if (updated) setUserData(updated); // keep the store (and header) in sync
+          message.success("Profile updated successfully");
+          initialValuesRef.current = form.getFieldsValue(); // new baseline
+        },
+        onError: (error) =>
+          message.error(
+            error.response?.data?.message || "Failed to update profile",
+          ),
+      },
+    );
   };
 
   return (
@@ -153,6 +182,7 @@ const ProfileSection = () => {
               type="primary"
               htmlType="submit"
               disabled={!isDirty}
+              loading={isPending}
               size="large"
             >
               Save Changes
