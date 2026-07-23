@@ -2,7 +2,6 @@ import {
   DeleteOutlined,
   FilterOutlined,
   PlusOutlined,
-  ReloadOutlined,
 } from "@ant-design/icons";
 import {
   Alert,
@@ -24,11 +23,13 @@ import ViewCompanyModal from "./components/ViewCompanyModal";
 import PageHeader from "../../../components/PageHeader";
 import PaginationFooter from "../../../components/PaginationFooter";
 import StatCard from "../../../components/StatCard";
+import RefreshButton from "../../../components/RefreshButton";
 
 const Companies = () => {
   const {
     data,
     isLoading,
+    isFetching,
     error,
     refetch,
     columns,
@@ -63,7 +64,9 @@ const Companies = () => {
   const inactiveCompanies = companies.length - activeCompanies;
 
   const hasSelectedRows = selectedRowKeys.length > 0;
-  const hasActiveFilters = Boolean(search || statusFilter || subscriptionFilter);
+  const hasActiveFilters = Boolean(
+    search || statusFilter || subscriptionFilter,
+  );
   const isEmpty = !isLoading && companies.length === 0;
 
   if (error) {
@@ -169,13 +172,7 @@ const Companies = () => {
                 </Button>
               </Popconfirm>
             )}
-            <Button
-              icon={<ReloadOutlined />}
-              onClick={() => refetch?.()}
-              loading={isLoading}
-            >
-              Refresh
-            </Button>
+            <RefreshButton onRefresh={refetch} isFetching={isFetching} />
             <Button
               icon={<FilterOutlined />}
               onClick={() => setIsFilterVisible(!isFilterVisible)}

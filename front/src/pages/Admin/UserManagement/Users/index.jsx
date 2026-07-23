@@ -2,7 +2,6 @@ import {
   DeleteOutlined,
   FilterOutlined,
   PlusOutlined,
-  ReloadOutlined,
 } from "@ant-design/icons";
 import {
   Alert,
@@ -25,11 +24,13 @@ import UserPermissionsDrawer from "./components/UserPermissionsDrawer";
 import PageHeader from "../../../../components/PageHeader";
 import PaginationFooter from "../../../../components/PaginationFooter";
 import StatCard from "../../../../components/StatCard";
+import RefreshButton from "../../../../components/RefreshButton";
 
 const UsersPage = () => {
   const {
     data,
     isLoading,
+    isFetching,
     error,
     refetch,
     canWrite,
@@ -171,13 +172,7 @@ const UsersPage = () => {
                 </Button>
               </Popconfirm>
             )}
-            <Button
-              icon={<ReloadOutlined />}
-              onClick={() => refetch?.()}
-              loading={isLoading}
-            >
-              Refresh
-            </Button>
+            <RefreshButton onRefresh={refetch} isFetching={isFetching} />
             <Button
               icon={<FilterOutlined />}
               onClick={() => setIsFilterVisible(!isFilterVisible)}

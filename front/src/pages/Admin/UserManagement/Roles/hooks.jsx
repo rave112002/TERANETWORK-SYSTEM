@@ -32,7 +32,7 @@ export const useRolesData = () => {
   const [selectedRole, setSelectedRole] = useState(null);
 
   // Fetch roles
-  const { data, isLoading, error, refetch } = useQuery({
+  const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: ["roles", pagination.current, pagination.pageSize, filters],
     queryFn: () =>
       getRoles({
@@ -229,7 +229,9 @@ export const useRolesData = () => {
         key: "description",
         ellipsis: true,
         render: (d) => (
-          <span style={{ fontSize: 13.5, color: "var(--color-text-secondary)" }}>
+          <span
+            style={{ fontSize: 13.5, color: "var(--color-text-secondary)" }}
+          >
             {decodeHTML(d)}
           </span>
         ),
@@ -293,6 +295,7 @@ export const useRolesData = () => {
     },
     filters,
     isLoading,
+    isFetching,
     error,
     refetch,
     canWrite,

@@ -1,4 +1,3 @@
-import { ReloadOutlined } from "@ant-design/icons";
 import { Alert, Button, Col, Row, Spin } from "antd";
 import dayjs from "dayjs";
 import { Clock } from "lucide-react";
@@ -9,6 +8,7 @@ import ChartCard from "../../../components/charts/ChartCard";
 import TrendAreaChart from "../../../components/charts/TrendAreaChart";
 import { decodeHTML } from "../../../utils/decode-html";
 import { useDashboardHooks } from "./hooks";
+import RefreshButton from "../../../components/RefreshButton";
 
 const RecentActivity = ({ items }) => (
   <div
@@ -29,7 +29,11 @@ const RecentActivity = ({ items }) => (
         style={{ color: "var(--color-text-muted)" }}
       />
       <span
-        style={{ fontSize: 13.5, fontWeight: 600, color: "var(--color-text-dark)" }}
+        style={{
+          fontSize: 13.5,
+          fontWeight: 600,
+          color: "var(--color-text-dark)",
+        }}
       >
         Recent activity
       </span>
@@ -37,7 +41,10 @@ const RecentActivity = ({ items }) => (
 
     {items.length === 0 ? (
       <div className="px-[18px] py-14 text-center">
-        <p className="m-0" style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+        <p
+          className="m-0"
+          style={{ fontSize: 13, color: "var(--color-text-muted)" }}
+        >
           No recent activity to display
         </p>
       </div>
@@ -48,7 +55,9 @@ const RecentActivity = ({ items }) => (
             key={item.auditId}
             className="flex items-start justify-between gap-4 px-[18px] py-3"
             style={
-              i === 0 ? undefined : { borderTop: "1px solid var(--color-line-soft)" }
+              i === 0
+                ? undefined
+                : { borderTop: "1px solid var(--color-line-soft)" }
             }
           >
             <div className="min-w-0">
@@ -62,7 +71,10 @@ const RecentActivity = ({ items }) => (
                 className="m-0 mt-0.5 truncate"
                 style={{ fontSize: 12, color: "var(--color-text-muted)" }}
               >
-                {[item.module, [item.firstName, item.lastName].filter(Boolean).join(" ")]
+                {[
+                  item.module,
+                  [item.firstName, item.lastName].filter(Boolean).join(" "),
+                ]
                   .filter(Boolean)
                   .join(" · ")}
               </p>
@@ -112,11 +124,7 @@ const Dashboard = () => {
       <PageHeader
         title="Dashboard"
         subtitle="Overview of your branch."
-        actions={
-          <Button icon={<ReloadOutlined />} onClick={() => refetch()} loading={isFetching}>
-            Refresh
-          </Button>
-        }
+        actions={<RefreshButton onRefresh={refetch} isFetching={isFetching} />}
       />
 
       {isLoading ? (

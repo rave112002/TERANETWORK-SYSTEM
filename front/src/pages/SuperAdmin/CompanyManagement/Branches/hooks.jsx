@@ -32,6 +32,7 @@ export const useBranchHooks = () => {
   const {
     data: apiData,
     isLoading,
+    isFetching,
     error,
     refetch,
   } = useGetBranches({
@@ -351,6 +352,7 @@ export const useBranchHooks = () => {
   return {
     data: transformedData,
     isLoading,
+    isFetching,
     error,
     refetch,
     columns,

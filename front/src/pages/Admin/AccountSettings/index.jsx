@@ -9,7 +9,13 @@ import NotificationSection from "./components/NotificationSection";
  * Flat settings panel — hairline border, radius 14, no shadow. The heading row
  * is separated from the body by a hairline rule (same chrome as the list card).
  */
-const SettingsPanel = ({ title, description, icon, className = "", children }) => (
+const SettingsPanel = ({
+  title,
+  description,
+  icon,
+  className = "",
+  children,
+}) => (
   <div
     className={className}
     style={{

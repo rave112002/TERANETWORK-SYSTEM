@@ -34,7 +34,7 @@ export const useUserHooks = () => {
   const debouncedSearch = useDebounce(search, 500);
 
   // Fetch users from API
-  const { data, isLoading, error, refetch } = useGetUsers({
+  const { data, isLoading, isFetching, error, refetch } = useGetUsers({
     page: currentPage,
     pageSize,
     search: debouncedSearch,
@@ -225,11 +225,11 @@ export const useUserHooks = () => {
                     src={record.imageUrl}
                     alt=""
                     className="w-full h-full object-cover"
-                                      width={30}
+                    width={30}
                     height={30}
                     loading="lazy"
                     decoding="async"
-/>
+                  />
                 ) : (
                   initial
                 )}
@@ -263,7 +263,9 @@ export const useUserHooks = () => {
         width: 170,
         ellipsis: true,
         render: (roleName) => (
-          <span style={{ fontSize: 13.5, color: "var(--color-text-secondary)" }}>
+          <span
+            style={{ fontSize: 13.5, color: "var(--color-text-secondary)" }}
+          >
             {decodeHTML(roleName) || "No role"}
           </span>
         ),
@@ -274,7 +276,9 @@ export const useUserHooks = () => {
         key: "phone",
         width: 150,
         render: (phone) => (
-          <span style={{ fontSize: 13.5, color: "var(--color-text-secondary)" }}>
+          <span
+            style={{ fontSize: 13.5, color: "var(--color-text-secondary)" }}
+          >
             {formatPhoneDisplay(decodeHTML(phone)) || "-"}
           </span>
         ),
@@ -370,6 +374,7 @@ export const useUserHooks = () => {
       pagination: data?.data?.pagination || { total: 0, page: 1, pageSize: 10 },
     },
     isLoading,
+    isFetching,
     error,
     refetch,
 

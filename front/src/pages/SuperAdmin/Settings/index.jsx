@@ -1,12 +1,5 @@
 import { Alert, Spin } from "antd";
-import {
-  Boxes,
-  Clock,
-  Database,
-  GitBranch,
-  Server,
-  Timer,
-} from "lucide-react";
+import { Boxes, Clock, Database, GitBranch, Server, Timer } from "lucide-react";
 import PageHeader from "../../../components/PageHeader";
 import { useGetSystemInfo } from "../../../services/requests/superadmin/system";
 

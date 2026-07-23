@@ -32,6 +32,7 @@ export const useUserHooks = () => {
   const {
     data: apiData,
     isLoading,
+    isFetching,
     error,
     refetch,
   } = useGetSuperAdminUsers({
@@ -209,7 +210,9 @@ export const useUserHooks = () => {
         width: 150,
         ellipsis: true,
         render: (roleName) => (
-          <span style={{ fontSize: 13.5, color: "var(--color-text-secondary)" }}>
+          <span
+            style={{ fontSize: 13.5, color: "var(--color-text-secondary)" }}
+          >
             {decodeHTML(roleName) || "—"}
           </span>
         ),
@@ -289,6 +292,7 @@ export const useUserHooks = () => {
       total: transformedData.pagination?.total || 0,
     },
     isLoading,
+    isFetching,
     error,
     refetch,
     columns,

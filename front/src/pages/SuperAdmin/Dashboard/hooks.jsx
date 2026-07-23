@@ -3,7 +3,8 @@ import { Building2, CheckCircle, MapPin, Users } from "lucide-react";
 import { useGetDashboardStats } from "../../../services/requests/superadmin/dashboard";
 
 export const useDashboardHooks = () => {
-  const { data, isLoading, error, refetch, isFetching } = useGetDashboardStats();
+  const { data, isLoading, error, refetch, isFetching } =
+    useGetDashboardStats();
 
   const payload = data?.data;
   const stats = payload?.stats;

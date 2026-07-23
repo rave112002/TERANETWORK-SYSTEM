@@ -3,7 +3,8 @@ import { Activity, ShieldCheck, UserCheck, Users } from "lucide-react";
 import { useGetDashboardStats } from "../../../services/requests/admin/dashboard";
 
 export const useDashboardHooks = () => {
-  const { data, isLoading, error, refetch, isFetching } = useGetDashboardStats();
+  const { data, isLoading, error, refetch, isFetching } =
+    useGetDashboardStats();
 
   const payload = data?.data;
   const stats = payload?.stats;

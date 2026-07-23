@@ -43,6 +43,7 @@ export const useCompanyHooks = () => {
   const {
     data: apiData,
     isLoading,
+    isFetching,
     error,
     refetch,
   } = useGetCompanies({
@@ -415,6 +416,7 @@ export const useCompanyHooks = () => {
     // Data
     data: transformedData,
     isLoading,
+    isFetching,
     error,
     refetch,
 

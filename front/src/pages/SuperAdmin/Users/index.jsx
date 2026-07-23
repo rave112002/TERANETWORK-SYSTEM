@@ -1,9 +1,15 @@
+import { FilterOutlined, PlusOutlined } from "@ant-design/icons";
 import {
-  FilterOutlined,
-  PlusOutlined,
-  ReloadOutlined,
-} from "@ant-design/icons";
-import { Alert, Button, Col, Empty, Input, Row, Select, Spin, Table } from "antd";
+  Alert,
+  Button,
+  Col,
+  Empty,
+  Input,
+  Row,
+  Select,
+  Spin,
+  Table,
+} from "antd";
 import { useState } from "react";
 import { Building2, Search, UserCheck, Users } from "lucide-react";
 import { useUserHooks } from "./hooks";
@@ -11,12 +17,14 @@ import CreateUserDrawer from "./components/CreateUserDrawer";
 import PageHeader from "../../../components/PageHeader";
 import PaginationFooter from "../../../components/PaginationFooter";
 import StatCard from "../../../components/StatCard";
+import RefreshButton from "../../../components/RefreshButton";
 
 const SuperAdminUsers = () => {
   const {
     data,
     pagination,
     isLoading,
+    isFetching,
     error,
     refetch,
     columns,
@@ -134,13 +142,7 @@ const SuperAdminUsers = () => {
             style={{ width: 280 }}
           />
           <div className="flex items-center gap-2">
-            <Button
-              icon={<ReloadOutlined />}
-              onClick={() => refetch?.()}
-              loading={isLoading}
-            >
-              Refresh
-            </Button>
+            <RefreshButton onRefresh={refetch} isFetching={isFetching} />
             <Button
               icon={<FilterOutlined />}
               onClick={() => setIsFilterVisible(!isFilterVisible)}

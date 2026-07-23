@@ -1,4 +1,4 @@
-import { DownloadOutlined, FilterOutlined, ReloadOutlined } from "@ant-design/icons";
+import { DownloadOutlined, FilterOutlined } from "@ant-design/icons";
 import {
   Alert,
   Button,
@@ -18,6 +18,7 @@ import AuditDetailModal from "./components/AuditDetailModal";
 import PageHeader from "../../../components/PageHeader";
 import PaginationFooter from "../../../components/PaginationFooter";
 import StatCard from "../../../components/StatCard";
+import RefreshButton from "../../../components/RefreshButton";
 
 const { RangePicker } = DatePicker;
 
@@ -73,7 +74,8 @@ const AuditTrailPage = () => {
   const isEmpty = !isLoading && logs.length === 0;
 
   const totalEvents = pagination?.total || 0;
-  const uniqueUsers = new Set(logs.map((l) => l.accountId).filter(Boolean)).size;
+  const uniqueUsers = new Set(logs.map((l) => l.accountId).filter(Boolean))
+    .size;
   const deletions = logs.filter((l) => l.action === "DELETE").length;
 
   if (error) {
@@ -161,13 +163,7 @@ const AuditTrailPage = () => {
             >
               Export CSV
             </Button>
-            <Button
-              icon={<ReloadOutlined />}
-              onClick={() => refetch()}
-              loading={isFetching}
-            >
-              Refresh
-            </Button>
+            <RefreshButton onRefresh={refetch} isFetching={isFetching} />
             <Button
               icon={<FilterOutlined />}
               onClick={() => setIsFilterVisible(!isFilterVisible)}
@@ -238,7 +234,11 @@ const AuditTrailPage = () => {
               className="border-none"
             />
             <PaginationFooter
-              pagination={{ current: currentPage, pageSize, total: totalEvents }}
+              pagination={{
+                current: currentPage,
+                pageSize,
+                total: totalEvents,
+              }}
               onChange={handleTableChange}
               noun="event"
             />

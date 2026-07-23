@@ -1,9 +1,15 @@
+import { FilterOutlined, PlusOutlined } from "@ant-design/icons";
 import {
-  FilterOutlined,
-  PlusOutlined,
-  ReloadOutlined,
-} from "@ant-design/icons";
-import { Alert, Button, Col, Empty, Input, Row, Select, Spin, Table } from "antd";
+  Alert,
+  Button,
+  Col,
+  Empty,
+  Input,
+  Row,
+  Select,
+  Spin,
+  Table,
+} from "antd";
 import { useState } from "react";
 import { CheckCircle, Key, Search, Shield } from "lucide-react";
 import { useRolesData } from "./hooks";
@@ -12,6 +18,7 @@ import PermissionsDrawer from "./components/PermissionsDrawer";
 import PageHeader from "../../../../components/PageHeader";
 import PaginationFooter from "../../../../components/PaginationFooter";
 import StatCard from "../../../../components/StatCard";
+import RefreshButton from "../../../../components/RefreshButton";
 
 const RolesPage = () => {
   const {
@@ -19,6 +26,7 @@ const RolesPage = () => {
     pagination,
     filters,
     isLoading,
+    isFetching,
     error,
     refetch,
     canWrite,
@@ -68,7 +76,11 @@ const RolesPage = () => {
         subtitle="Manage roles and the permissions attached to them."
         actions={
           canWrite && (
-            <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={handleCreate}
+            >
               New role
             </Button>
           )
@@ -130,13 +142,7 @@ const RolesPage = () => {
             style={{ width: 280 }}
           />
           <div className="flex items-center gap-2">
-            <Button
-              icon={<ReloadOutlined />}
-              onClick={() => refetch?.()}
-              loading={isLoading}
-            >
-              Refresh
-            </Button>
+            <RefreshButton onRefresh={refetch} isFetching={isFetching} />
             <Button
               icon={<FilterOutlined />}
               onClick={() => setIsFilterVisible(!isFilterVisible)}

@@ -79,7 +79,9 @@ export const useAuditTrailHooks = () => {
     setIsExporting(true);
     try {
       const response = await exportAuditTrailApi(activeFilters);
-      const url = URL.createObjectURL(new Blob([response.data], { type: "text/csv" }));
+      const url = URL.createObjectURL(
+        new Blob([response.data], { type: "text/csv" }),
+      );
       // Prefer the server's filename when it sends one
       const match = /filename="?([^"]+)"?/.exec(
         response.headers?.["content-disposition"] || "",
@@ -93,7 +95,9 @@ export const useAuditTrailHooks = () => {
       URL.revokeObjectURL(url);
       message.success("Audit trail exported");
     } catch (err) {
-      message.error(err.response?.data?.message || "Failed to export audit trail");
+      message.error(
+        err.response?.data?.message || "Failed to export audit trail",
+      );
     } finally {
       setIsExporting(false);
     }
@@ -227,7 +231,9 @@ export const useAuditTrailHooks = () => {
         key: "module",
         width: 160,
         render: (module) => (
-          <span style={{ fontSize: 13.5, color: "var(--color-text-secondary)" }}>
+          <span
+            style={{ fontSize: 13.5, color: "var(--color-text-secondary)" }}
+          >
             {module || "—"}
           </span>
         ),
@@ -238,7 +244,9 @@ export const useAuditTrailHooks = () => {
         key: "description",
         ellipsis: true,
         render: (description) => (
-          <span style={{ fontSize: 13.5, color: "var(--color-text-secondary)" }}>
+          <span
+            style={{ fontSize: 13.5, color: "var(--color-text-secondary)" }}
+          >
             {decodeHTML(description) || "—"}
           </span>
         ),

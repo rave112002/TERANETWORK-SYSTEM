@@ -48,7 +48,11 @@ const SettingsPage = () => {
 
   const watchedValues = Form.useWatch([], form);
   const isDirty = useMemo(
-    () => !isFormEqual(watchedValues ?? form.getFieldsValue(), initialValuesRef.current),
+    () =>
+      !isFormEqual(
+        watchedValues ?? form.getFieldsValue(),
+        initialValuesRef.current,
+      ),
     [watchedValues, form],
   );
 
@@ -115,7 +119,9 @@ const SettingsPage = () => {
                 <Form.Item
                   name="companyDisplayName"
                   label="Company display name"
-                  rules={[{ max: 100, message: "Must be 100 characters or fewer" }]}
+                  rules={[
+                    { max: 100, message: "Must be 100 characters or fewer" },
+                  ]}
                 >
                   <Input
                     prefix={
@@ -132,7 +138,9 @@ const SettingsPage = () => {
                 <Form.Item
                   name="supportEmail"
                   label="Support email"
-                  rules={[{ type: "email", message: "Please enter a valid email" }]}
+                  rules={[
+                    { type: "email", message: "Please enter a valid email" },
+                  ]}
                 >
                   <Input
                     prefix={
@@ -191,7 +199,9 @@ const SettingsPage = () => {
                   >
                     Applies to your current branch.
                   </span>
-                  <Tooltip title={!isDirty ? "No changes to save yet" : undefined}>
+                  <Tooltip
+                    title={!isDirty ? "No changes to save yet" : undefined}
+                  >
                     <span>
                       <Button
                         type="primary"

@@ -1,4 +1,3 @@
-import { ReloadOutlined } from "@ant-design/icons";
 import { Alert, Button, Col, Row, Spin } from "antd";
 
 import PageHeader from "../../../components/PageHeader";
@@ -8,6 +7,7 @@ import CategoryBarChart from "../../../components/charts/CategoryBarChart";
 import TrendAreaChart from "../../../components/charts/TrendAreaChart";
 import RecentCompanies from "./components/RecentCompanies";
 import { useDashboardHooks } from "./hooks";
+import RefreshButton from "../../../components/RefreshButton";
 
 const Dashboard = () => {
   const {
@@ -41,11 +41,7 @@ const Dashboard = () => {
       <PageHeader
         title="Dashboard"
         subtitle="Platform overview across all companies."
-        actions={
-          <Button icon={<ReloadOutlined />} onClick={() => refetch()} loading={isFetching}>
-            Refresh
-          </Button>
-        }
+        actions={<RefreshButton onRefresh={refetch} isFetching={isFetching} />}
       />
 
       {isLoading ? (
@@ -74,7 +70,10 @@ const Dashboard = () => {
               </ChartCard>
             </Col>
             <Col xs={24} lg={10}>
-              <ChartCard title="Companies by plan" subtitle="Current subscription mix">
+              <ChartCard
+                title="Companies by plan"
+                subtitle="Current subscription mix"
+              >
                 <CategoryBarChart data={planBreakdown} valueLabel="companies" />
               </ChartCard>
             </Col>
