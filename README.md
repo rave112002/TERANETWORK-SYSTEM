@@ -106,7 +106,7 @@ The repository is a **monorepo of two independent apps**:
 └── back/                      ← Express API
     ├── CLAUDE.md  · docs/     ← backend conventions (6 topic docs)
     ├── .env.example
-    ├── database/schema.sql    ← full DDL (10 tables)
+    ├── database/              ← schema.sql (the baseline) + migrations/ (empty until needed)
     ├── scripts/               ← keys / db:setup / db:reset / db:check
     ├── auth-keys/             ← RS256 JWT keypair (generate with `npm run keys`; gitignored)
     └── server/
@@ -327,24 +327,31 @@ applicable) and return `{ items, pagination }` inside the response envelope.
 
 ## Database schema
 
-Full DDL: [`back/database/schema.sql`](back/database/schema.sql). Ten tables:
+Full DDL: [`back/database/schema.sql`](back/database/schema.sql) — the baseline, applied by
+`npm run db:migrate`. [`back/database/migrations/`](back/database/migrations/) is empty until you
+need an incremental change on top of it. Fourteen tables:
 
-| Table              | Business ID        | Purpose                                             |
-| ------------------ | ------------------ | --------------------------------------------------- |
-| `companies`           | `companyId`          | Company (the tenant)                           |
-| `branches`         | `branchId`         | Physical location under a company                     |
-| `superadmins`      | `accountId`        | Platform-level admins                               |
-| `credentials`      | `accountId`        | Auth credentials (shared across portals via `type`) |
-| `users`            | `accountId`        | Admin/staff users (belong to a company + branch)      |
-| `roles`            | `roleId`           | Permission roles (scoped to company + branch)         |
-| `permissions`      | `permissionId`     | Master permission definitions                       |
-| `role_permissions` | —                  | Maps roles → permissions                            |
-| `user_permissions` | `userPermissionId` | Per-user permission overrides                       |
-| `audit_trail`      | `auditId`          | Activity log                                        |
+| Table                   | Business ID        | Purpose                                             |
+| ----------------------- | ------------------ | --------------------------------------------------- |
+| `companies`             | `companyId`        | Company (the tenant)                                |
+| `branches`              | `branchId`         | Physical location under a company                   |
+| `superadmins`           | `accountId`        | Platform-level admins                               |
+| `credentials`           | `accountId`        | Auth credentials (shared across portals via `type`) |
+| `users`                 | `accountId`        | Admin/staff users (belong to a company + branch)    |
+| `roles`                 | `roleId`           | Permission roles (scoped to company + branch)       |
+| `permissions`           | `permissionId`     | Master permission definitions                       |
+| `role_permissions`      | —                  | Maps roles → permissions                            |
+| `user_permissions`      | `userPermissionId` | Per-user permission overrides                       |
+| `refresh_tokens`        | `jti`              | Issued refresh tokens (rotation/revocation)         |
+| `password_reset_tokens` | `tokenHash`        | Single-use forgot/reset-password tokens             |
+| `settings`              | —                  | Key/value store scoped to a company + branch        |
+| `audit_trail`           | `auditId`          | Activity log                                        |
+| `idempotency_keys`      | `idempotencyKey`   | Cached responses for idempotent mutations           |
 
-Every table has `id BIGINT AUTO_INCREMENT` (internal), `dateCreated` / `dateUpdated` (`DATETIME`, UTC),
-and — where applicable — a `status` enum used for soft deletes. Foreign keys reference business IDs,
-not the numeric `id`. See [`back/docs/schema-conventions.md`](back/docs/schema-conventions.md).
+Every table has `id BIGINT AUTO_INCREMENT` (internal), `dateCreated` / `dateUpdated`
+(`DATETIME`, Asia/Manila local), and — where applicable — a `status` enum used for soft deletes.
+Foreign keys reference business IDs, not the numeric `id`.
+See [`back/docs/schema-conventions.md`](back/docs/schema-conventions.md).
 
 ---
 

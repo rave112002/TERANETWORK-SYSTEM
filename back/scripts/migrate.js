@@ -1,17 +1,21 @@
 /**
  * Database Migration Runner (ESM)
  *
- * Applies every pending SQL file in database/migrations/ in filename order,
- * tracking applied files in a `_migrations` table so each runs exactly once.
- * Safe to re-run: already-applied migrations are skipped.
+ * Applies database/schema.sql (the baseline — the whole schema), then every
+ * pending SQL file in database/migrations/ in filename order. Applied files are
+ * tracked in a `_migrations` table so each runs exactly once; the baseline is
+ * recorded under the name `schema.sql`. Safe to re-run.
+ *
+ * database/migrations/ is empty in a fresh template — it exists for incremental
+ * changes made after the baseline has been applied somewhere.
  *
  * Usage: node scripts/migrate.js   (or: npm run db:migrate)
  *
  * Also exports runMigrations() so the setup scripts can apply migrations
  * before seeding, sharing a single connection.
  *
- * Note: MySQL DDL auto-commits per statement, so a migration file that fails
- * partway cannot be rolled back — keep each file focused and idempotent-safe.
+ * Note: MySQL DDL auto-commits per statement, so a file that fails partway
+ * cannot be rolled back — keep each migration focused and idempotent-safe.
  */
 
 import "dotenv/config";
@@ -22,15 +26,20 @@ import mysql from "mysql2/promise";
 import moment from "moment-timezone";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const BASELINE_FILE = path.resolve(__dirname, "../database/schema.sql");
 const MIGRATIONS_DIR = path.resolve(__dirname, "../database/migrations");
 
 /**
- * Apply all pending migrations on an existing connection (database already selected).
+ * Apply the baseline + all pending migrations on an existing connection
+ * (database already selected).
  * @param {import("mysql2/promise").Connection} connection
- * @param {{ migrationsDir?: string }} [options]
- * @returns {Promise<string[]>} names of migrations applied this run
+ * @param {{ baselineFile?: string, migrationsDir?: string }} [options]
+ * @returns {Promise<string[]>} names of files applied this run
  */
-export async function runMigrations(connection, { migrationsDir = MIGRATIONS_DIR } = {}) {
+export async function runMigrations(
+  connection,
+  { baselineFile = BASELINE_FILE, migrationsDir = MIGRATIONS_DIR } = {}
+) {
   await connection.query(
     `CREATE TABLE IF NOT EXISTS _migrations (
       id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -42,26 +51,43 @@ export async function runMigrations(connection, { migrationsDir = MIGRATIONS_DIR
   const [appliedRows] = await connection.query(`SELECT name FROM _migrations`);
   const applied = new Set(appliedRows.map((r) => r.name));
 
-  const files = fs
-    .readdirSync(migrationsDir)
-    .filter((f) => f.endsWith(".sql"))
-    .sort();
+  const now = () =>
+    moment().tz(process.env.TIMEZONE || "Asia/Manila").format("YYYY-MM-DD HH:mm:ss");
+
+  const apply = async (name, sql) => {
+    console.log(`   ⏳ ${name} ...`);
+    await connection.query(sql);
+    await connection.query(`INSERT INTO _migrations (name, appliedAt) VALUES (?, ?)`, [
+      name,
+      now(),
+    ]);
+    console.log(`   ✅ ${name}`);
+  };
 
   const ranNow = [];
+
+  // 1. Baseline — the full schema. Every statement is CREATE TABLE IF NOT
+  //    EXISTS, so applying it to an already-provisioned database is a no-op.
+  const baselineName = path.basename(baselineFile);
+  if (applied.has(baselineName)) {
+    console.log(`   ⏭️  ${baselineName} (already applied)`);
+  } else {
+    await apply(baselineName, fs.readFileSync(baselineFile, "utf-8"));
+    ranNow.push(baselineName);
+  }
+
+  // 2. Incremental migrations on top. The directory is empty in a fresh
+  //    template and may not exist at all if it was never committed.
+  const files = fs.existsSync(migrationsDir)
+    ? fs.readdirSync(migrationsDir).filter((f) => f.endsWith(".sql")).sort()
+    : [];
+
   for (const file of files) {
     if (applied.has(file)) {
       console.log(`   ⏭️  ${file} (already applied)`);
       continue;
     }
-
-    const sql = fs.readFileSync(path.join(migrationsDir, file), "utf-8");
-    console.log(`   ⏳ ${file} ...`);
-    await connection.query(sql);
-    await connection.query(`INSERT INTO _migrations (name, appliedAt) VALUES (?, ?)`, [
-      file,
-      moment().tz(process.env.TIMEZONE || "Asia/Manila").format("YYYY-MM-DD HH:mm:ss"),
-    ]);
-    console.log(`   ✅ ${file}`);
+    await apply(file, fs.readFileSync(path.join(migrationsDir, file), "utf-8"));
     ranNow.push(file);
   }
 

@@ -170,8 +170,8 @@ canonical form before the handler runs, so the DB can only ever hold one shape. 
 ## Foreign Key References
 
 Foreign keys reference the **business ID column** (not the auto-increment `id`).
-They are declared on the tenant hierarchy + permission mappings (see
-`database/migrations/002_hardening.sql`):
+They are declared inline on the tenant hierarchy + permission mappings (see
+`database/schema.sql`):
 
 ```sql
 -- branches.companyId          → companies.companyId
@@ -210,24 +210,31 @@ await req.db.query(
 
 ## Migrations
 
-The schema is defined by ordered SQL files in `database/migrations/`, applied by a
-tracking runner (`scripts/migrate.js`, `_migrations` table) so each runs once:
+`database/schema.sql` is the **baseline** — the whole schema in one file, and it is
+applied, not just documentation. The tracking runner (`scripts/migrate.js`,
+`_migrations` table) runs it first (recorded as `schema.sql`), then applies any
+numbered files in `database/migrations/` on top. Each runs exactly once:
 
-- `npm run db:migrate` — apply pending migrations
+- `npm run db:migrate` — apply the baseline + pending migrations
 - `npm run db:setup` — migrate **then** seed (additive, re-runnable)
 - `npm run db:setup:clean` — drop everything, re-migrate from scratch, seed
 
-**To change the schema, add a new numbered migration** (e.g. `003_*.sql`) — never
-edit an applied one. Keep `database/schema.sql` (a full end-state snapshot for
-reading) in sync. MySQL DDL auto-commits per statement, so keep each migration
-focused.
+`database/migrations/` is **empty** in a fresh template. It exists for incremental
+changes made after the baseline has been applied somewhere.
+
+**To change the schema, edit `schema.sql` _and_ add a numbered migration**
+(`001_*.sql`, `002_*.sql`, …) with the equivalent `ALTER`. The edit covers
+databases provisioned from scratch; the migration covers databases that already
+recorded the baseline as applied and will never re-run it. Never edit a migration
+that has been applied. MySQL DDL auto-commits per statement, so keep each
+migration focused.
 
 ---
 
 ## Schema Reference
 
-`database/schema.sql` is a human-readable snapshot of the **end state**; the source
-of truth is `database/migrations/`. Key tables:
+`database/schema.sql` is the baseline and is written to be read top-to-bottom.
+Key tables:
 
 | Table              | Business ID        | Purpose                                             |
 | ------------------ | ------------------ | --------------------------------------------------- |
@@ -241,13 +248,17 @@ of truth is `database/migrations/`. Key tables:
 | `role_permissions` | (composite)        | Maps roles → permissions                            |
 | `user_permissions` | `userPermissionId` | Per-user permission overrides                       |
 | `refresh_tokens`   | `jti`              | Issued refresh tokens (rotation/revocation)         |
+| `password_reset_tokens` | `tokenHash`   | Single-use forgot/reset-password tokens             |
+| `settings`         | (composite)        | Key/value store scoped to a company + branch        |
+| `audit_trail`      | `auditId`          | Append-only action log (no FKs by design)           |
 | `idempotency_keys` | `idempotencyKey`   | Cached responses for idempotent mutations           |
 
 ---
 
 ## Checklist for New Tables
 
-- [ ] Added as a new numbered migration in `database/migrations/` (never edit an applied one)
+- [ ] Added to `database/schema.sql` (the baseline) **and** as a new numbered
+      migration in `database/migrations/` (never edit an applied migration)
 - [ ] Has `id BIGINT PRIMARY KEY AUTO_INCREMENT`
 - [ ] Has a business ID column (`varchar(50) UNIQUE NOT NULL`)
 - [ ] Business ID is generated via `SELECT UUID()` in application code
@@ -255,4 +266,4 @@ of truth is `database/migrations/`. Key tables:
 - [ ] Timestamps use `getCurrentTimestampLocal()` from `utils/dateUtils.js` (Asia/Manila storage)
 - [ ] Uses `status` enum with `'Deleted'` for soft deletes (where applicable)
 - [ ] Foreign keys reference business ID columns, not auto-increment `id`
-- [ ] Updated the `database/schema.sql` end-state snapshot to match
+- [ ] `schema.sql` and the migration describe the same end state (no drift)
