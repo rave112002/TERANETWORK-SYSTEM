@@ -27,3 +27,16 @@ apply — read them before writing code. They are the source of truth for the pr
   filter with `status != 'Deleted'`.
 - **Business IDs, not numeric IDs:** APIs, URLs, and FKs use the `varchar` business ID
   (`accountId`, `companyId`, `roleId`, …), never the internal auto-increment `id`.
+- **Phone number format:** every phone is stored and sent as **`09XX XXXX XXX`** — a
+  Philippine mobile number, 11 digits grouped **4-4-3** with single spaces (e.g.
+  `0912 3456 789`). In the UI the placeholder/hint is the concrete example
+  **`0912 3456 789`**, never the `09XX…` mask.
+  - **Frontend:** use the shared helpers in `front/src/utils/phoneFormat.js` —
+    `PHONE_PLACEHOLDER` for the placeholder, `phoneValidator` in the field's `rules`, and
+    `handlePhoneInput` on `onChange` so the spaces are typed in for the user. Render stored
+    values with `formatPhoneDisplay()`.
+  - **Backend:** use `phone: optionalPhone()` from `server/src/validators/_helpers.js`. It
+    accepts the grouped form, bare `09XXXXXXXXX`, and `+63`/`63`/`9…` variants, then
+    **normalises to `09XX XXXX XXX` before it reaches the controller** — so the DB only ever
+    holds the canonical form. Phone columns are `VARCHAR(20) NULL`; phone is optional
+    everywhere, so `""`/`null`/omitted all mean "no number".

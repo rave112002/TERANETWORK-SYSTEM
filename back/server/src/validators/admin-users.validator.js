@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { optionalPhone, queryEnum, queryEnumDefault, queryInt } from "./_helpers.js";
 
 // POST / — create an admin user (+ credential)
 export const createUserSchema = z.object({
@@ -6,7 +7,7 @@ export const createUserSchema = z.object({
   lastName: z.string().min(1, "Last name is required").max(50),
   email: z.string().min(1, "Email is required").email("Invalid email address").max(100),
   password: z.string().min(8, "Password must be at least 8 characters").max(255),
-  phone: z.string().max(20).optional().nullable(),
+  phone: optionalPhone(),
   roleId: z.string().min(1, "Role is required").max(50),
 });
 
@@ -14,17 +15,20 @@ export const createUserSchema = z.object({
 export const updateUserSchema = z.object({
   firstName: z.string().min(1, "First name is required").max(50),
   lastName: z.string().min(1, "Last name is required").max(50),
-  phone: z.string().max(20).optional().nullable(),
+  phone: optionalPhone(),
   roleId: z.string().min(1, "Role is required").max(50),
   status: z.enum(["Active", "Inactive", "Suspended"]).optional(),
 });
 
-// GET / — list query params
+// GET / — list query params (unset filters arrive as "", see _helpers.js)
 export const listUsersQuerySchema = z.object({
-  page: z.coerce.number().int().positive().default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(10),
+  page: queryInt(1),
+  pageSize: queryInt(10, { max: 100 }),
   search: z.string().max(100).optional().default(""),
-  status: z.enum(["Active", "Inactive", "Suspended", "Deleted"]).optional(),
-  sortBy: z.enum(["dateCreated", "dateUpdated", "firstName", "lastName"]).default("dateCreated"),
-  sortOrder: z.enum(["ASC", "DESC"]).default("DESC"),
+  status: queryEnum(["Active", "Inactive", "Suspended", "Deleted"]),
+  sortBy: queryEnumDefault(
+    ["dateCreated", "dateUpdated", "firstName", "lastName"],
+    "dateCreated",
+  ),
+  sortOrder: queryEnumDefault(["ASC", "DESC"], "DESC"),
 });

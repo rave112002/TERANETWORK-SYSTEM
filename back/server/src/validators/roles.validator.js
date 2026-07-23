@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { queryEnum, queryEnumDefault, queryInt } from "./_helpers.js";
 
 // POST / — create a role
 export const createRoleSchema = z.object({
@@ -25,12 +26,12 @@ export const assignPermissionsSchema = z.object({
     .max(500),
 });
 
-// GET / — list query params
+// GET / — list query params (unset filters arrive as "", see _helpers.js)
 export const listRolesQuerySchema = z.object({
-  page: z.coerce.number().int().positive().default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(10),
+  page: queryInt(1),
+  pageSize: queryInt(10, { max: 100 }),
   search: z.string().max(100).optional().default(""),
-  status: z.enum(["Active", "Inactive"]).optional(),
-  sortBy: z.enum(["dateCreated", "dateUpdated", "roleName"]).default("dateCreated"),
-  sortOrder: z.enum(["ASC", "DESC"]).default("DESC"),
+  status: queryEnum(["Active", "Inactive"]),
+  sortBy: queryEnumDefault(["dateCreated", "dateUpdated", "roleName"], "dateCreated"),
+  sortOrder: queryEnumDefault(["ASC", "DESC"], "DESC"),
 });

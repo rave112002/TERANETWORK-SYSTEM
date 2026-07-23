@@ -2,8 +2,61 @@ import express from "express";
 import { catchAsync, validateQuery } from "../../../utils/catchAsync.js";
 import { checkPermission } from "../../../middlewares/checkPermission.middleware.js";
 import { listAuditQuerySchema } from "../../../validators/audit-trail.validator.js";
+import { getCurrentTimestampLocal } from "../../../utils/dateUtils.js";
 
 const router = express.Router();
+
+// Spreadsheet apps evaluate a cell starting with =, +, -, @, TAB or CR as a
+// formula. RFC4180 quoting does NOT prevent this — Excel strips the quotes and
+// still evaluates the leading character. Audit rows carry user-controlled text
+// (firstName/lastName, description, metadata), so a crafted value could run a
+// formula on whoever opens the export. Neutralise it with a leading apostrophe,
+// which spreadsheets consume as a "treat as text" marker.
+const FORMULA_TRIGGER = /^[=+\-@\t\r]/;
+
+// RFC4180-ish CSV escaping: neutralise formulas, wrap in quotes, double any
+// embedded quotes.
+const csvCell = (value) => {
+  if (value === null || value === undefined) return "";
+  const str = typeof value === "object" ? JSON.stringify(value) : String(value);
+  const safe = FORMULA_TRIGGER.test(str) ? `'${str}` : str;
+  return `"${safe.replace(/"/g, '""')}"`;
+};
+
+/**
+ * Build the tenant-scoped WHERE clause + params shared by list and export.
+ * @returns {{ whereClause: string, params: Array }}
+ */
+const buildAuditFilter = (req) => {
+  const { companyId, branchId } = req.user;
+  const { search = "", module, accountId, startDate, endDate } = req.query;
+
+  const params = [companyId, branchId];
+  let whereClause = "WHERE a.companyId = ? AND a.branchId = ?";
+
+  if (search) {
+    whereClause += ` AND (a.action LIKE ? OR a.description LIKE ?)`;
+    params.push(`%${search}%`, `%${search}%`);
+  }
+  if (module) {
+    whereClause += ` AND a.module = ?`;
+    params.push(module);
+  }
+  if (accountId) {
+    whereClause += ` AND a.accountId = ?`;
+    params.push(accountId);
+  }
+  if (startDate) {
+    whereClause += ` AND a.dateCreated >= ?`;
+    params.push(startDate);
+  }
+  if (endDate) {
+    whereClause += ` AND a.dateCreated <= ?`;
+    params.push(`${endDate} 23:59:59`);
+  }
+
+  return { whereClause, params };
+};
 
 /**
  * GET /
@@ -14,46 +67,10 @@ router.get(
   checkPermission("audit_trail", null, "read"),
   validateQuery(listAuditQuerySchema),
   catchAsync(async (req, res) => {
-    const { companyId, branchId } = req.user;
-    const {
-      page = 1,
-      pageSize = 20,
-      search = "",
-      module,
-      accountId,
-      startDate,
-      endDate,
-      sortOrder = "DESC",
-    } = req.query;
+    const { page = 1, pageSize = 20, sortOrder = "DESC" } = req.query;
 
     const offset = (page - 1) * pageSize;
-    const params = [companyId, branchId];
-    let whereClause = "WHERE a.companyId = ? AND a.branchId = ?";
-
-    if (search) {
-      whereClause += ` AND (a.action LIKE ? OR a.description LIKE ?)`;
-      params.push(`%${search}%`, `%${search}%`);
-    }
-
-    if (module) {
-      whereClause += ` AND a.module = ?`;
-      params.push(module);
-    }
-
-    if (accountId) {
-      whereClause += ` AND a.accountId = ?`;
-      params.push(accountId);
-    }
-
-    if (startDate) {
-      whereClause += ` AND a.dateCreated >= ?`;
-      params.push(startDate);
-    }
-
-    if (endDate) {
-      whereClause += ` AND a.dateCreated <= ?`;
-      params.push(`${endDate} 23:59:59`);
-    }
+    const { whereClause, params } = buildAuditFilter(req);
 
     const safeSortOrder = sortOrder.toUpperCase() === "ASC" ? "ASC" : "DESC";
 
@@ -93,6 +110,102 @@ router.get(
         totalPages: Math.ceil(total / pageSize),
       },
     });
+  })
+);
+
+/**
+ * GET /export
+ * Export the current filter selection as CSV.
+ * NOTE: must be declared before `/:auditId` or it would match that param route.
+ */
+router.get(
+  "/export",
+  checkPermission("audit_trail", null, "read"),
+  validateQuery(listAuditQuerySchema),
+  catchAsync(async (req, res) => {
+    const { sortOrder = "DESC" } = req.query;
+    const { whereClause, params } = buildAuditFilter(req);
+    const safeSortOrder = sortOrder.toUpperCase() === "ASC" ? "ASC" : "DESC";
+
+    // Hard cap so a huge tenant can't stream an unbounded response
+    const MAX_ROWS = 10000;
+
+    const logs = await req.db.query(
+      `SELECT
+        a.dateCreated, a.action, a.module, a.description,
+        a.accountId, u.firstName, u.lastName, a.ipAddress, a.metadata
+      FROM audit_trail a
+      LEFT JOIN users u ON u.accountId = a.accountId
+      ${whereClause}
+      ORDER BY a.dateCreated ${safeSortOrder}
+      LIMIT ?`,
+      [...params, MAX_ROWS]
+    );
+
+    const header = [
+      "Date",
+      "Action",
+      "Module",
+      "Description",
+      "User",
+      "Account ID",
+      "IP Address",
+      "Metadata",
+    ];
+
+    const rows = logs.map((l) =>
+      [
+        l.dateCreated,
+        l.action,
+        l.module,
+        l.description,
+        [l.firstName, l.lastName].filter(Boolean).join(" "),
+        l.accountId,
+        l.ipAddress,
+        l.metadata,
+      ]
+        .map(csvCell)
+        .join(",")
+    );
+
+    // BOM so Excel opens UTF-8 correctly
+    const csv = `﻿${header.map(csvCell).join(",")}\n${rows.join("\n")}\n`;
+    const filename = `audit-trail-${getCurrentTimestampLocal().replace(/[: ]/g, "-")}.csv`;
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    return res.status(200).send(csv);
+  })
+);
+
+/**
+ * GET /:auditId
+ * Full detail for a single audit event (includes userAgent, which the list omits).
+ */
+router.get(
+  "/:auditId",
+  checkPermission("audit_trail", null, "read"),
+  catchAsync(async (req, res) => {
+    const { companyId, branchId } = req.user;
+    const { auditId } = req.params;
+
+    const rows = await req.db.query(
+      `SELECT
+        a.auditId, a.accountId, a.action, a.module, a.description, a.metadata,
+        a.ipAddress, a.userAgent, a.dateCreated,
+        u.firstName, u.lastName
+      FROM audit_trail a
+      LEFT JOIN users u ON u.accountId = a.accountId
+      WHERE a.auditId = ? AND a.companyId = ? AND a.branchId = ?
+      LIMIT 1`,
+      [auditId, companyId, branchId]
+    );
+
+    if (rows.length === 0) {
+      return res.sendError("Audit event not found", 404);
+    }
+
+    return res.sendSuccess("Audit event retrieved successfully", { log: rows[0] });
   })
 );
 

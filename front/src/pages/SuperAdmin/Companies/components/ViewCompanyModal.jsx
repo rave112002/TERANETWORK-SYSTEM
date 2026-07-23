@@ -3,6 +3,7 @@ import { Building2, Pencil, X } from "lucide-react";
 import dayjs from "dayjs";
 import SectionLabel from "../../../../components/SectionLabel";
 import { decodeHTML } from "../../../../utils/decode-html";
+import { formatPhoneDisplay } from "../../../../utils/phoneFormat";
 
 // Status → dot colour. Mirrors the list table's status column.
 const STATUS_DOT = {
@@ -115,6 +116,10 @@ const ViewCompanyModal = ({ open, onClose, company, onEdit }) => {
                 src={company.logo}
                 alt=""
                 className="w-full h-full object-cover"
+                width={56}
+                height={56}
+                loading="lazy"
+                decoding="async"
               />
             </span>
           ) : (
@@ -180,9 +185,8 @@ const ViewCompanyModal = ({ open, onClose, company, onEdit }) => {
       <div>
         <SectionLabel>Company details</SectionLabel>
         <DetailRow label="Company name" value={name} />
-        <DetailRow label="Address" value={decodeHTML(company.address)} />
         <DetailRow label="Email" value={company.email} />
-        <DetailRow label="Phone" value={company.phone} />
+        <DetailRow label="Phone" value={formatPhoneDisplay(company.phone)} />
         <DetailRow
           label="Website"
           value={

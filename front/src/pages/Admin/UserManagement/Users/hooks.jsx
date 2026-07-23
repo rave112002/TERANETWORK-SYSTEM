@@ -4,6 +4,7 @@ import { Eye, MoreVertical, Pencil, Trash2, UserCog } from "lucide-react";
 import { useDebounce } from "../../../../hooks/useDebounce";
 import { usePermissions } from "../../../../hooks/usePermissions";
 import { decodeHTML } from "../../../../utils/decode-html";
+import { formatPhoneDisplay } from "../../../../utils/phoneFormat";
 import {
   useGetUsers,
   useDeleteUser,
@@ -224,7 +225,11 @@ export const useUserHooks = () => {
                     src={record.imageUrl}
                     alt=""
                     className="w-full h-full object-cover"
-                  />
+                                      width={30}
+                    height={30}
+                    loading="lazy"
+                    decoding="async"
+/>
                 ) : (
                   initial
                 )}
@@ -270,7 +275,7 @@ export const useUserHooks = () => {
         width: 150,
         render: (phone) => (
           <span style={{ fontSize: 13.5, color: "var(--color-text-secondary)" }}>
-            {decodeHTML(phone) || "-"}
+            {formatPhoneDisplay(decodeHTML(phone)) || "-"}
           </span>
         ),
       },

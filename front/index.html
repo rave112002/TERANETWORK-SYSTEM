@@ -14,15 +14,9 @@
     <meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#09090b" media="(prefers-color-scheme: dark)" />
     <title>Multi-Tenant Admin Template</title>
-    <!-- Fallback only: the real fonts are self-hosted via @fontsource-variable
-         (imported in main.jsx). This <link> keeps type rendering in dev without
-         a Vite restart. -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Onest:wght@100..900&family=JetBrains+Mono:wght@100..800&display=swap"
-      rel="stylesheet"
-    />
+    <!-- Fonts are self-hosted via @fontsource-variable (imported in main.jsx).
+         No Google Fonts <link> here: it double-loaded the same families and made
+         every production page hit an external origin. -->
     <!-- Apply the saved/system theme before paint to avoid a flash of the wrong mode -->
     <script>
       (function () {

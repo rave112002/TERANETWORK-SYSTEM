@@ -130,6 +130,43 @@ Validate **shape, not presence**, on optional fields — the rule only fires onc
 (async-validator skips `min`/`max`/`pattern`/`type` on an empty value when the rule isn't
 `required`, so an untouched optional field passes.)
 
+### 3c. Phone fields use the shared helpers — never a hand-rolled placeholder
+
+Every phone in the app is a PH mobile stored as **`09XX XXXX XXX`** (11 digits, grouped 4-4-3).
+The hint the user sees is always the concrete example **`0912 3456 789`** — never the `09XX…`
+mask. All four pieces come from `src/utils/phoneFormat.js`, so a phone field is always:
+
+```jsx
+import {
+  PHONE_MAX_LENGTH,
+  PHONE_PLACEHOLDER,
+  handlePhoneInput,
+  phoneValidator,
+} from "../../../../utils/phoneFormat";
+
+<Form.Item name="phone" label="Phone" rules={[{ validator: phoneValidator }]}>
+  <Input
+    prefix={<Phone className="w-4 h-4 mr-2" style={{ color: "var(--color-text-muted)" }} />}
+    placeholder={PHONE_PLACEHOLDER}
+    size="large"
+    maxLength={PHONE_MAX_LENGTH}
+    onChange={(e) => handlePhoneInput(e, form)}
+  />
+</Form.Item>;
+```
+
+- `handlePhoneInput` types the spaces in as the user goes, so the value is already canonical by
+  the time it's submitted — no `onBlur` reformat needed.
+- `PHONE_MAX_LENGTH` is 13 (11 digits + 2 spaces), so paste-in of a longer string is truncated.
+- `phoneValidator` checks **shape only** and passes on empty — phone is optional everywhere
+  (see the table above). If a form ever needs it mandatory, add a separate `{ required: true }`
+  rule so Ant still draws the `*` (per §3b).
+- **Displaying** a stored value (table cell, view modal) goes through `formatPhoneDisplay()` from
+  the same module, so legacy rows written before the convention still render grouped.
+
+The backend's `optionalPhone()` normalises whatever it receives to the same canonical form, so
+the two sides can't drift.
+
 ### 3b. If a field IS required, declare it — or you get an error with no `*`
 
 Ant only renders the required asterisk when a rule declares `required: true` (or the `Form.Item`

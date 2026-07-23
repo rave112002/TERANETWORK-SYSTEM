@@ -1,9 +1,13 @@
 import { useState, useCallback, useMemo } from "react";
-import { Button, Dropdown } from "antd";
+import { App, Button, Dropdown } from "antd";
 import dayjs from "dayjs";
 import { Eye, MoreVertical } from "lucide-react";
 import { useDebounce } from "../../../hooks/useDebounce";
-import { useGetAuditTrail } from "../../../services/requests/admin/audit-trail";
+import {
+  useGetAuditTrail,
+  useGetAuditDetail,
+} from "../../../services/requests/admin/audit-trail";
+import { exportAuditTrailApi } from "../../../services/api/admin/audit-trail";
 import { decodeHTML } from "../../../utils/decode-html";
 
 // Action verb → status-dot token. Tokens only, never a hardcoded hex.
@@ -21,9 +25,12 @@ const MODULE_OPTIONS = [
 ];
 
 export const useAuditTrailHooks = () => {
+  const { message } = App.useApp();
+
   // ─── Pagination ───────────────────────────────────────────────────
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [isExporting, setIsExporting] = useState(false);
 
   // ─── Filters ──────────────────────────────────────────────────────
   const [search, setSearch] = useState("");
@@ -37,18 +44,60 @@ export const useAuditTrailHooks = () => {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
   // ─── Data ─────────────────────────────────────────────────────────
+  // Filters shared by the list query and the CSV export, so an export always
+  // reflects exactly what the user is looking at.
+  const activeFilters = useMemo(
+    () => ({
+      search: debouncedSearch,
+      module: moduleFilter,
+      startDate: dateRange?.[0]
+        ? dayjs(dateRange[0]).format("YYYY-MM-DD")
+        : undefined,
+      endDate: dateRange?.[1]
+        ? dayjs(dateRange[1]).format("YYYY-MM-DD")
+        : undefined,
+    }),
+    [debouncedSearch, moduleFilter, dateRange],
+  );
+
   const { data, isLoading, isFetching, error, refetch } = useGetAuditTrail({
     page: currentPage,
     pageSize,
-    search: debouncedSearch,
-    module: moduleFilter,
-    startDate: dateRange?.[0]
-      ? dayjs(dateRange[0]).format("YYYY-MM-DD")
-      : undefined,
-    endDate: dateRange?.[1]
-      ? dayjs(dateRange[1]).format("YYYY-MM-DD")
-      : undefined,
+    ...activeFilters,
   });
+
+  // Full detail (adds userAgent, which the list query omits) for the open row
+  const { data: detailData, isLoading: isDetailLoading } = useGetAuditDetail(
+    isDetailOpen ? selectedLog?.auditId : null,
+  );
+  // Show the row immediately, then enrich it once the detail lands
+  const detailLog = detailData?.data?.log
+    ? { ...selectedLog, ...detailData.data.log }
+    : selectedLog;
+
+  const handleExport = useCallback(async () => {
+    setIsExporting(true);
+    try {
+      const response = await exportAuditTrailApi(activeFilters);
+      const url = URL.createObjectURL(new Blob([response.data], { type: "text/csv" }));
+      // Prefer the server's filename when it sends one
+      const match = /filename="?([^"]+)"?/.exec(
+        response.headers?.["content-disposition"] || "",
+      );
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = match?.[1] || "audit-trail.csv";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      message.success("Audit trail exported");
+    } catch (err) {
+      message.error(err.response?.data?.message || "Failed to export audit trail");
+    } finally {
+      setIsExporting(false);
+    }
+  }, [activeFilters, message]);
 
   // ─── Handlers ─────────────────────────────────────────────────────
   const handleViewDetails = useCallback((record) => {
@@ -278,10 +327,15 @@ export const useAuditTrailHooks = () => {
     isSearching,
 
     // Detail modal
-    selectedLog,
+    selectedLog: detailLog,
     isDetailOpen,
+    isDetailLoading,
     handleViewDetails,
     handleCloseDetails,
     getActionItems,
+
+    // Export
+    handleExport,
+    isExporting,
   };
 };

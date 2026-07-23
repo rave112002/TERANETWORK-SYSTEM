@@ -12,11 +12,13 @@ import {
   useUpdateUser,
 } from "../../../../../services/requests/admin/user";
 import { useAdminAuthStore } from "../../../../../store/authStore";
+import { validationRules } from "../../../../../utils/validation";
 import {
-  formatPhoneNumber,
+  PHONE_MAX_LENGTH,
+  PHONE_PLACEHOLDER,
+  handlePhoneInput,
   phoneValidator,
 } from "../../../../../utils/phoneFormat";
-import { validationRules } from "../../../../../utils/validation";
 
 const { Option } = Select;
 
@@ -249,7 +251,7 @@ export default function UserFormDrawer({
             rules={[{ validator: phoneValidator }]}
           >
             <Input
-              placeholder="09XX XXX XXXX"
+              placeholder={PHONE_PLACEHOLDER}
               prefix={
                 <Phone
                   className="w-4 h-4 mr-2"
@@ -257,11 +259,8 @@ export default function UserFormDrawer({
                 />
               }
               size="large"
-              maxLength={11}
-              onBlur={(e) => {
-                const formatted = formatPhoneNumber(e.target.value);
-                form.setFieldsValue({ phone: formatted });
-              }}
+              onChange={(e) => handlePhoneInput(e, form)}
+              maxLength={PHONE_MAX_LENGTH}
             />
           </Form.Item>
         </div>

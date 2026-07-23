@@ -3,11 +3,12 @@ import {
   PlusOutlined,
   ReloadOutlined,
 } from "@ant-design/icons";
-import { Alert, App, Button, Col, Empty, Input, Row, Select, Spin, Table } from "antd";
+import { Alert, Button, Col, Empty, Input, Row, Select, Spin, Table } from "antd";
 import { useState } from "react";
 import { Building2, CheckCircle, MapPin, Search } from "lucide-react";
 import { useBranchHooks } from "./hooks";
-import CreateBranchDrawer from "./components/CreateBranchDrawer";
+import BranchFormDrawer from "./components/BranchFormDrawer";
+import ViewBranchModal from "./components/ViewBranchModal";
 import PageHeader from "../../../../components/PageHeader";
 import PaginationFooter from "../../../../components/PaginationFooter";
 import StatCard from "../../../../components/StatCard";
@@ -18,14 +19,18 @@ const BranchesPage = () => {
     isLoading,
     error,
     refetch,
-    getColumns,
+    columns,
     pagination,
     handleTableChange,
     isCreateDrawerOpen,
     handleOpenCreateDrawer,
     handleCloseCreateDrawer,
-    handleEdit,
-    handleDelete,
+    editingBranch,
+    handleCloseEditDrawer,
+    viewingBranch,
+    isViewModalOpen,
+    handleCloseView,
+    handleEditFromView,
     search,
     setSearch,
     statusFilter,
@@ -36,22 +41,7 @@ const BranchesPage = () => {
     orgOptions,
   } = useBranchHooks();
 
-  const { modal } = App.useApp();
   const [isFilterVisible, setIsFilterVisible] = useState(false);
-
-  // Destructive action gets an explicit confirm step.
-  const handleDeleteRequest = (record) => {
-    modal.confirm({
-      title: "Delete branch",
-      content: `Delete "${record.name}"? This can't be undone.`,
-      okText: "Delete",
-      okButtonProps: { danger: true },
-      cancelText: "Cancel",
-      onOk: () => handleDelete(record),
-    });
-  };
-
-  const columns = getColumns(handleEdit, handleDeleteRequest);
 
   const branches = data?.branches || [];
   const totalBranches = pagination?.total || 0;
@@ -269,11 +259,26 @@ const BranchesPage = () => {
         )}
       </div>
 
-      {/* 4. DRAWERS */}
-      <CreateBranchDrawer
+      {/* 4. DRAWERS + MODALS */}
+      <BranchFormDrawer
         open={isCreateDrawerOpen}
         onClose={handleCloseCreateDrawer}
         onSuccess={handleCloseCreateDrawer}
+      />
+
+      {/* Edit uses the same form; `entity` flips it into edit mode. */}
+      <BranchFormDrawer
+        open={!!editingBranch}
+        entity={editingBranch}
+        onClose={handleCloseEditDrawer}
+        onSuccess={handleCloseEditDrawer}
+      />
+
+      <ViewBranchModal
+        open={isViewModalOpen}
+        branch={viewingBranch}
+        onClose={handleCloseView}
+        onEdit={handleEditFromView}
       />
     </div>
   );

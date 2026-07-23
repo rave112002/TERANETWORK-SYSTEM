@@ -1,12 +1,38 @@
 import { PlusOutlined } from "@ant-design/icons";
-import { Button, Drawer, Form, Input, Select } from "antd";
+import { Button, Drawer, Form, Input, Select, Tooltip } from "antd";
 import { Building2, Mail, MapPin, Phone, X } from "lucide-react";
-import { useEffect, useMemo } from "react";
-import { useCreateBranch } from "../../../../../services/requests/superadmin/branches";
+import { useEffect, useMemo, useRef } from "react";
+import {
+  useCreateBranch,
+  useUpdateBranch,
+} from "../../../../../services/requests/superadmin/branches";
 import { useGetCompanies } from "../../../../../services/requests/superadmin/companies";
 import SectionLabel from "../../../../../components/SectionLabel";
+import {
+  PHONE_MAX_LENGTH,
+  PHONE_PLACEHOLDER,
+  handlePhoneInput,
+  phoneValidator,
+} from "../../../../../utils/phoneFormat";
 
 const { TextArea } = Input;
+
+// Branch status is a 4-value enum, so this is a Select rather than the binary
+// StatusToggle. 'Deleted' is reached through the delete action, not this form.
+const STATUS_OPTIONS = [
+  { value: "Active", label: "Active" },
+  { value: "Inactive", label: "Inactive" },
+  { value: "Suspended", label: "Suspended" },
+];
+
+// Dependency-free value compare for the dirty check.
+const isFormEqual = (a = {}, b = {}) => {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  for (const k of keys) {
+    if (JSON.stringify(a[k] ?? "") !== JSON.stringify(b[k] ?? "")) return false;
+  }
+  return true;
+};
 
 const focusFirstError = (form, error) => {
   const first = error?.errorFields?.[0]?.name;
@@ -18,11 +44,17 @@ const focusFirstError = (form, error) => {
     });
 };
 
-const CreateBranchDrawer = ({ open, onClose, onSuccess }) => {
+/**
+ * Create/edit a branch. `entity` presence flips edit mode (props contract per
+ * front/docs/ui-form-design.md).
+ */
+const BranchFormDrawer = ({ open, onClose, onSuccess, entity }) => {
   const [form] = Form.useForm();
-  const createBranchMutation = useCreateBranch();
+  const isEditMode = !!entity;
+  const createMutation = useCreateBranch();
+  const updateMutation = useUpdateBranch();
+  const initialValuesRef = useRef({});
 
-  // Get companies for company selection
   const { data: orgsData } = useGetCompanies({ pageSize: 100 });
 
   const orgOptions = useMemo(() => {
@@ -33,11 +65,36 @@ const CreateBranchDrawer = ({ open, onClose, onSuccess }) => {
     }));
   }, [orgsData]);
 
+  // Hydrate on open. Map fields explicitly — API rows carry extra keys.
   useEffect(() => {
-    if (open) {
+    if (!open) return;
+    if (entity) {
+      const values = {
+        companyId: entity.companyId,
+        name: entity.name,
+        email: entity.email,
+        phone: entity.phone,
+        address: entity.address,
+        status: entity.status,
+      };
+      form.setFieldsValue(values);
+      initialValuesRef.current = values;
+    } else {
       form.resetFields();
+      initialValuesRef.current = {};
     }
-  }, [open, form]);
+  }, [open, entity, form]);
+
+  const watchedValues = Form.useWatch([], form);
+  const isDirty = useMemo(
+    () =>
+      !isFormEqual(
+        watchedValues ?? form.getFieldsValue(),
+        initialValuesRef.current,
+      ),
+    [watchedValues, form],
+  );
+  const saveDisabled = isEditMode && !isDirty;
 
   const handleClose = () => {
     form.resetFields();
@@ -45,14 +102,39 @@ const CreateBranchDrawer = ({ open, onClose, onSuccess }) => {
   };
 
   const handleSubmit = async () => {
+    if (saveDisabled) return;
     try {
       const values = await form.validateFields();
-      await createBranchMutation.mutateAsync(values);
+
+      if (isEditMode) {
+        // The PUT endpoint does not accept companyId — a branch can't be moved
+        // between companies here, so it's deliberately omitted.
+        await updateMutation.mutateAsync({
+          branchId: entity.branchId,
+          branchData: {
+            name: values.name,
+            email: values.email || null,
+            phone: values.phone || null,
+            address: values.address || null,
+            status: values.status,
+          },
+        });
+      } else {
+        await createMutation.mutateAsync({
+          companyId: values.companyId,
+          name: values.name,
+          email: values.email || null,
+          phone: values.phone || null,
+          address: values.address || null,
+        });
+      }
+
+      form.resetFields();
       onSuccess?.();
     } catch (err) {
       if (err?.errorFields?.length) return focusFirstError(form, err);
       // mutation errors already surface a toast via onError
-      console.error("Create branch error:", err);
+      console.error("Branch form error:", err);
     }
   };
 
@@ -75,13 +157,15 @@ const CreateBranchDrawer = ({ open, onClose, onSuccess }) => {
               className="m-0 font-semibold leading-tight"
               style={{ fontSize: 19, color: "var(--color-text-dark)" }}
             >
-              Create New Branch
+              {isEditMode ? "Edit Branch" : "Create New Branch"}
             </h2>
             <p
               className="m-0 mt-0.5"
               style={{ fontSize: 13, color: "var(--color-text-secondary)" }}
             >
-              Add a branch to a company
+              {isEditMode
+                ? "Update branch information"
+                : "Add a branch to a company"}
             </p>
           </div>
         </div>
@@ -110,6 +194,11 @@ const CreateBranchDrawer = ({ open, onClose, onSuccess }) => {
             name="companyId"
             label="Company"
             rules={[{ required: true, message: "Please select a company" }]}
+            extra={
+              isEditMode
+                ? "A branch can't be moved to a different company."
+                : undefined
+            }
           >
             <Select
               placeholder="Select company"
@@ -117,6 +206,7 @@ const CreateBranchDrawer = ({ open, onClose, onSuccess }) => {
               showSearch
               optionFilterProp="label"
               size="large"
+              disabled={isEditMode}
             />
           </Form.Item>
         </div>
@@ -128,7 +218,10 @@ const CreateBranchDrawer = ({ open, onClose, onSuccess }) => {
           <Form.Item
             name="name"
             label="Branch name"
-            rules={[{ required: true, message: "Branch name is required" }]}
+            rules={[
+              { required: true, message: "Branch name is required" },
+              { max: 100, message: "Must be 100 characters or fewer" },
+            ]}
           >
             <Input
               prefix={
@@ -143,7 +236,11 @@ const CreateBranchDrawer = ({ open, onClose, onSuccess }) => {
           </Form.Item>
 
           <div className="grid grid-cols-2 gap-3">
-            <Form.Item name="email" label="Email">
+            <Form.Item
+              name="email"
+              label="Email"
+              rules={[{ type: "email", message: "Please enter a valid email" }]}
+            >
               <Input
                 prefix={
                   <Mail
@@ -156,7 +253,11 @@ const CreateBranchDrawer = ({ open, onClose, onSuccess }) => {
               />
             </Form.Item>
 
-            <Form.Item name="phone" label="Phone">
+            <Form.Item
+              name="phone"
+              label="Phone"
+              rules={[{ validator: phoneValidator }]}
+            >
               <Input
                 prefix={
                   <Phone
@@ -164,9 +265,10 @@ const CreateBranchDrawer = ({ open, onClose, onSuccess }) => {
                     style={{ color: "var(--color-text-muted)" }}
                   />
                 }
-                placeholder="09XX XXX XXXX"
+                placeholder={PHONE_PLACEHOLDER}
                 size="large"
-                maxLength={11}
+                onChange={(e) => handlePhoneInput(e, form)}
+                maxLength={PHONE_MAX_LENGTH}
               />
             </Form.Item>
           </div>
@@ -180,6 +282,16 @@ const CreateBranchDrawer = ({ open, onClose, onSuccess }) => {
             />
           </Form.Item>
         </div>
+
+        {/* Status — update-only; creation always starts a branch as Active */}
+        {isEditMode && (
+          <div className="mt-7">
+            <SectionLabel>Access status</SectionLabel>
+            <Form.Item name="status" label="Status">
+              <Select options={STATUS_OPTIONS} size="large" />
+            </Form.Item>
+          </div>
+        )}
       </Form>
 
       {/* Footer */}
@@ -193,18 +305,23 @@ const CreateBranchDrawer = ({ open, onClose, onSuccess }) => {
         <Button onClick={handleClose} size="large">
           Cancel
         </Button>
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={handleSubmit}
-          loading={createBranchMutation.isPending}
-          size="large"
-        >
-          Create Branch
-        </Button>
+        <Tooltip title={saveDisabled ? "No changes to save yet" : undefined}>
+          <span>
+            <Button
+              type="primary"
+              icon={isEditMode ? undefined : <PlusOutlined />}
+              onClick={handleSubmit}
+              disabled={saveDisabled}
+              loading={createMutation.isPending || updateMutation.isPending}
+              size="large"
+            >
+              {isEditMode ? "Update Branch" : "Create Branch"}
+            </Button>
+          </span>
+        </Tooltip>
       </div>
     </Drawer>
   );
 };
 
-export default CreateBranchDrawer;
+export default BranchFormDrawer;

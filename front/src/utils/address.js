@@ -1,8 +1,33 @@
-import { refbrgy, refcitymun, refprovince, refregion } from "../assets/address";
 import { decodeHTML } from "./decode-html";
 
 /**
- * Format address from full text values
+ * Philippine address helpers.
+ *
+ * ⚠️ The reference data (`assets/address/*.json`) is ~6.6 MB — `refbrgy.json`
+ * alone is 6.3 MB. It is therefore **lazy-loaded** via a dynamic import so it is
+ * code-split into its own chunk and only fetched the first time a code→name
+ * lookup actually runs. Never statically `import` from `assets/address` in a
+ * page/hook: that pulls the whole dataset into that page's bundle.
+ *
+ * Consequence: every code-based lookup below is **async**.
+ */
+
+let dataPromise = null;
+
+/** Load (once) and cache the reference tables. */
+const loadAddressData = () => {
+  if (!dataPromise) {
+    dataPromise = import("../assets/address");
+  }
+  return dataPromise;
+};
+
+/** Warm the cache ahead of time (e.g. when an address form mounts). */
+export const preloadAddressData = () => loadAddressData();
+
+/**
+ * Format an address from already-resolved text values. Needs no reference data,
+ * so this one stays synchronous.
  */
 export const formatAddress = ({
   address1,
@@ -34,9 +59,10 @@ export const capitalizeFirstLetter = (string) => {
 };
 
 /**
- * Format address from codes (brgyCode, citymunCode, provCode, regCode)
+ * Format an address from PSGC codes. Async — loads the reference data on demand.
+ * @returns {Promise<string>}
  */
-export const formatAddressByCode = ({
+export const formatAddressByCode = async ({
   address1,
   address2,
   brgy,
@@ -45,22 +71,23 @@ export const formatAddressByCode = ({
   region,
   zipCode,
 }) => {
+  // Nothing to resolve → don't pay for the dataset at all
+  if (!brgy && !city && !province && !region) {
+    return formatAddress({ address1, address2, zipCode });
+  }
+
+  const { refbrgy, refcitymun, refprovince, refregion } = await loadAddressData();
+
   return decodeHTML(
     [
       address1 ? `${address1},` : "",
       address2 ? `${address2},` : "",
-      brgy
-        ? `${refbrgy?.find((item) => item.brgyCode === brgy)?.brgyDesc},`
-        : "",
-      city
-        ? `${refcitymun?.find((item) => item.citymunCode === city)?.citymunDesc},`
-        : "",
+      brgy ? `${refbrgy?.find((i) => i.brgyCode === brgy)?.brgyDesc},` : "",
+      city ? `${refcitymun?.find((i) => i.citymunCode === city)?.citymunDesc},` : "",
       province
-        ? `${refprovince?.find((item) => item.provCode === province)?.provDesc},`
+        ? `${refprovince?.find((i) => i.provCode === province)?.provDesc},`
         : "",
-      region
-        ? `${refregion?.find((item) => item.regCode === region)?.regDesc},`
-        : "",
+      region ? `${refregion?.find((i) => i.regCode === region)?.regDesc},` : "",
       zipCode || "",
     ]
       .filter(Boolean)
@@ -69,51 +96,46 @@ export const formatAddressByCode = ({
   );
 };
 
-/**
- * Get region by code
- */
-export const getRegionByCode = (regCode) => {
-  return refregion?.find((item) => item.regCode === regCode);
+// ─── Code → record lookups (async) ──────────────────────────────────────────
+
+export const getRegionByCode = async (regCode) => {
+  const { refregion } = await loadAddressData();
+  return refregion?.find((i) => i.regCode === regCode);
 };
 
-/**
- * Get province by code
- */
-export const getProvinceByCode = (provCode) => {
-  return refprovince?.find((item) => item.provCode === provCode);
+export const getProvinceByCode = async (provCode) => {
+  const { refprovince } = await loadAddressData();
+  return refprovince?.find((i) => i.provCode === provCode);
 };
 
-/**
- * Get city/municipality by code
- */
-export const getCityMunByCode = (citymunCode) => {
-  return refcitymun?.find((item) => item.citymunCode === citymunCode);
+export const getCityMunByCode = async (citymunCode) => {
+  const { refcitymun } = await loadAddressData();
+  return refcitymun?.find((i) => i.citymunCode === citymunCode);
 };
 
-/**
- * Get barangay by code
- */
-export const getBarangayByCode = (brgyCode) => {
-  return refbrgy?.find((item) => item.brgyCode === brgyCode);
+export const getBarangayByCode = async (brgyCode) => {
+  const { refbrgy } = await loadAddressData();
+  return refbrgy?.find((i) => i.brgyCode === brgyCode);
 };
 
-/**
- * Get provinces by region code
- */
-export const getProvincesByRegion = (regCode) => {
-  return refprovince?.filter((item) => item.regCode === regCode) || [];
+// ─── Cascading option lists (async) ─────────────────────────────────────────
+
+export const getRegions = async () => {
+  const { refregion } = await loadAddressData();
+  return refregion || [];
 };
 
-/**
- * Get cities/municipalities by province code
- */
-export const getCitiesByProvince = (provCode) => {
-  return refcitymun?.filter((item) => item.provCode === provCode) || [];
+export const getProvincesByRegion = async (regCode) => {
+  const { refprovince } = await loadAddressData();
+  return refprovince?.filter((i) => i.regCode === regCode) || [];
 };
 
-/**
- * Get barangays by city/municipality code
- */
-export const getBarangaysByCity = (citymunCode) => {
-  return refbrgy?.filter((item) => item.citymunCode === citymunCode) || [];
+export const getCitiesByProvince = async (provCode) => {
+  const { refcitymun } = await loadAddressData();
+  return refcitymun?.filter((i) => i.provCode === provCode) || [];
+};
+
+export const getBarangaysByCity = async (citymunCode) => {
+  const { refbrgy } = await loadAddressData();
+  return refbrgy?.filter((i) => i.citymunCode === citymunCode) || [];
 };

@@ -74,6 +74,7 @@ router.get(
         b.companyId,
         b.name,
         b.email,
+        b.phone,
         b.website,
         b.logoUrl,
         b.subscriptionPlan,
@@ -115,7 +116,7 @@ router.get(
 
     const companies = await req.db.query(
       `SELECT 
-        companyId, name, email, website, logoUrl,
+        companyId, name, email, phone, website, logoUrl,
         subscriptionPlan, subscriptionStartDate, subscriptionEndDate,
         status, dateCreated, dateUpdated
       FROM companies
@@ -154,7 +155,7 @@ router.post(
   compressImage,
   validateBody(createCompanySchema),
   catchAsync(async (req, res) => {
-    const { name, email, website, subscriptionPlan } = req.body;
+    const { name, email, phone, website, subscriptionPlan } = req.body;
     const now = getCurrentTimestampLocal();
     const today = getTodayDateLocal(); // Manila date, server-timezone-independent
 
@@ -193,9 +194,9 @@ router.post(
 
       // Create company
       await conn.execute(
-        `INSERT INTO companies (companyId, name, email, website, logoUrl, subscriptionPlan, subscriptionStartDate, status, dateCreated, dateUpdated)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'Active', ?, ?)`,
-        [companyId, name, email, website || null, logoUrl, subscriptionPlan || "Basic", today, now, now]
+        `INSERT INTO companies (companyId, name, email, phone, website, logoUrl, subscriptionPlan, subscriptionStartDate, status, dateCreated, dateUpdated)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Active', ?, ?)`,
+        [companyId, name, email, phone || null, website || null, logoUrl, subscriptionPlan || "Basic", today, now, now]
       );
 
       await req.db.commit(conn);
@@ -222,6 +223,7 @@ router.put(
     const {
       name,
       email,
+      phone,
       website,
       subscriptionPlan,
       subscriptionStartDate,
@@ -233,12 +235,13 @@ router.put(
 
     const result = await req.db.query(
       `UPDATE companies 
-       SET name = ?, email = ?, website = ?, logoUrl = ?, subscriptionPlan = ?, 
+       SET name = ?, email = ?, phone = ?, website = ?, logoUrl = ?, subscriptionPlan = ?, 
            subscriptionStartDate = ?, subscriptionEndDate = ?, status = ?, dateUpdated = ?
        WHERE companyId = ? AND status != 'Deleted'`,
       [
         name,
         email,
+        phone || null,
         website || null,
         logoUrl || null,
         subscriptionPlan,

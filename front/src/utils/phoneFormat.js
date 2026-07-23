@@ -1,61 +1,65 @@
-import { patterns } from "./validation";
+/**
+ * Philippine mobile number helpers.
+ *
+ * Canonical format (stored + sent to the API): `09XX XXXX XXX`
+ *   11 digits, grouped 4-4-3 with single spaces — e.g. `0912 3456 789`.
+ *
+ * The UI hint is always the concrete example, never the `09XX…` mask.
+ * See the phone entry in the repo-root CLAUDE.md.
+ */
+
+/** The placeholder every phone input should use. */
+export const PHONE_PLACEHOLDER = "0912 3456 789";
+
+/** Canonical length once formatted: 11 digits + 2 spaces. */
+export const PHONE_MAX_LENGTH = 13;
 
 /**
- * Format phone number to 09XXXXXXXXX format
- * Handles various input formats:
- * - +639XXXXXXXXX → 09XXXXXXXXX
- * - 639XXXXXXXXX → 09XXXXXXXXX
- * - 9XXXXXXXXX → 09XXXXXXXXX
- * - 09XXXXXXXXX → 09XXXXXXXXX (no change)
- * - Removes spaces, dashes, parentheses
+ * Reduce any accepted input to bare local digits (`09XXXXXXXXX`).
+ * Handles +63 / 63 / 9… prefixes and strips spaces, dashes, parentheses.
  */
-export const formatPhoneNumber = (phone) => {
+export const toLocalDigits = (phone) => {
   if (!phone) return "";
+  let digits = String(phone).replace(/\D/g, "");
 
-  // Remove all non-digit characters
-  let cleaned = phone.replace(/\D/g, "");
-
-  // Handle different formats
-  if (cleaned.startsWith("63")) {
-    // +63 or 63 format
-    cleaned = "0" + cleaned.substring(2);
-  } else if (cleaned.startsWith("9") && cleaned.length === 10) {
-    // 9XXXXXXXXX format
-    cleaned = "0" + cleaned;
-  } else if (cleaned.startsWith("09") && cleaned.length === 11) {
-    // Already in correct format
-    return cleaned;
+  if (digits.startsWith("63") && digits.length === 12) {
+    digits = `0${digits.slice(2)}`; // 639XXXXXXXXX
+  } else if (digits.startsWith("9") && digits.length === 10) {
+    digits = `0${digits}`; // 9XXXXXXXXX
   }
 
-  // Validate length (should be 11 digits: 09XXXXXXXXX)
-  if (cleaned.length !== 11 || !cleaned.startsWith("09")) {
-    return phone; // Return original if invalid
-  }
-
-  return cleaned;
+  return digits;
 };
 
+/** True when the value is a complete PH mobile number. */
+export const isValidPhoneNumber = (phone) =>
+  /^09\d{9}$/.test(toLocalDigits(phone));
+
 /**
- * Validate Philippine mobile number format
- * Must be 09XXXXXXXXX (11 digits starting with 09)
+ * Group digits as 4-4-3, tolerating partial input so it can drive an
+ * as-you-type mask: "0912" → "0912", "09123456" → "0912 3456".
  */
-export const isValidPhoneNumber = (phone) => {
-  if (!phone) return false;
-
-  const cleaned = phone.replace(/\D/g, "");
-  return patterns.phone.test(cleaned);
+export const groupPhoneDigits = (digits) => {
+  const d = digits.slice(0, 11);
+  const parts = [d.slice(0, 4), d.slice(4, 8), d.slice(8, 11)].filter(Boolean);
+  return parts.join(" ");
 };
 
 /**
- * Format phone number for display with spacing
- * 09XXXXXXXXX → 09XX XXX XXXX
+ * Format a stored/arbitrary value for display: `09XX XXXX XXX`.
+ * Returns the original string untouched if it isn't a valid number, so odd
+ * legacy data stays visible rather than silently blanking.
  */
 export const formatPhoneDisplay = (phone) => {
-  const cleaned = formatPhoneNumber(phone);
+  if (!phone) return "";
+  const digits = toLocalDigits(phone);
+  return isValidPhoneNumber(digits) ? groupPhoneDigits(digits) : phone;
+};
 
-  if (cleaned.length !== 11) return phone;
-
-  return `${cleaned.substring(0, 4)} ${cleaned.substring(4, 7)} ${cleaned.substring(7)}`;
+/** Normalise to the canonical form for submission. */
+export const formatPhoneNumber = (phone) => {
+  const digits = toLocalDigits(phone);
+  return isValidPhoneNumber(digits) ? groupPhoneDigits(digits) : phone || "";
 };
 
 /**
@@ -72,11 +76,9 @@ export const formatPhoneDisplay = (phone) => {
 export const phoneValidator = (_, value) => {
   if (!value) return Promise.resolve();
 
-  const formatted = formatPhoneNumber(value);
-
-  if (!isValidPhoneNumber(formatted)) {
+  if (!isValidPhoneNumber(value)) {
     return Promise.reject(
-      new Error("Phone number must be in format 09XXXXXXXXX (11 digits)"),
+      new Error(`Enter a valid mobile number, e.g. ${PHONE_PLACEHOLDER}`),
     );
   }
 
@@ -84,14 +86,12 @@ export const phoneValidator = (_, value) => {
 };
 
 /**
- * Input handler for real-time formatting
- * Use with onChange event
+ * onChange handler that types the spaces in for the user.
+ *
+ * Usage:
+ *   <Input onChange={(e) => handlePhoneInput(e, form, "phone")} />
  */
-export const handlePhoneInput = (e, form, fieldName) => {
-  const value = e.target.value;
-  const formatted = formatPhoneNumber(value);
-
-  if (formatted !== value) {
-    form.setFieldsValue({ [fieldName]: formatted });
-  }
+export const handlePhoneInput = (e, form, fieldName = "phone") => {
+  const grouped = groupPhoneDigits(toLocalDigits(e.target.value));
+  form.setFieldsValue({ [fieldName]: grouped });
 };

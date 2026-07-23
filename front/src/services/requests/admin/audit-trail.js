@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { getAuditTrailApi } from "../../api/admin/audit-trail";
+import { getAuditTrailApi, getAuditDetailApi } from "../../api/admin/audit-trail";
 
 // Query: Get audit trail logs (paginated + filterable)
 export const useGetAuditTrail = (filters = {}) => {
@@ -10,3 +10,12 @@ export const useGetAuditTrail = (filters = {}) => {
     placeholderData: keepPreviousData, // keep old rows visible while paginating/filtering
   });
 };
+
+// Query: full detail for one audit event. Enabled only when a row is selected.
+export const useGetAuditDetail = (auditId) =>
+  useQuery({
+    queryKey: ["audit-trail", "detail", auditId],
+    queryFn: () => getAuditDetailApi(auditId),
+    enabled: !!auditId,
+    staleTime: 5 * 60 * 1000,
+  });

@@ -147,6 +147,26 @@ await req.db.query(
 
 ---
 
+## Phone Columns
+
+Every phone is a Philippine mobile number stored in the canonical grouped form
+**`09XX XXXX XXX`** (11 digits, 4-4-3, e.g. `0912 3456 789`). The column is always:
+
+```sql
+phone VARCHAR(20) NULL,
+```
+
+`VARCHAR(20)` rather than 13 leaves headroom for legacy rows written before the convention.
+Phone is **optional on every table that has it** — `companies`, `branches`, `users`,
+`superadmins` — so `NULL` is the "no number" value and controllers write `phone || null`.
+
+Never format or sanitise a phone in a controller. The `optionalPhone()` validator normalises
+whatever the client sent (`+63…`, `63…`, `9…`, bare digits, or already-grouped) into the
+canonical form before the handler runs, so the DB can only ever hold one shape. See
+[validators.md](./validators.md).
+
+---
+
 ## Foreign Key References
 
 Foreign keys reference the **business ID column** (not the auto-increment `id`).

@@ -15,13 +15,16 @@ import {
   useCreateCompany,
   useUpdateCompany,
 } from "../../../../services/requests/superadmin/companies";
-import {
-  formatPhoneNumber,
-  phoneValidator,
-} from "../../../../utils/phoneFormat";
 import { getImageUrl, validateImageFile } from "../../../../utils/upload";
 import { deleteFileApi } from "../../../../services/api/upload";
 import SectionLabel from "../../../../components/SectionLabel";
+import {
+  PHONE_MAX_LENGTH,
+  PHONE_PLACEHOLDER,
+  formatPhoneNumber,
+  handlePhoneInput,
+  phoneValidator,
+} from "../../../../utils/phoneFormat";
 
 const MAX_FILE_MB = 2;
 
@@ -273,6 +276,10 @@ export default function CompanyFormDrawer({
                     src={logoPreview}
                     alt="Company logo preview"
                     className="w-full h-full object-cover"
+                    width={96}
+                    height={96}
+                    loading="lazy"
+                    decoding="async"
                   />
                 </div>
                 <button
@@ -381,9 +388,10 @@ export default function CompanyFormDrawer({
                     style={{ color: "var(--color-text-muted)" }}
                   />
                 }
-                placeholder="09XXXXXXXXX"
+                placeholder={PHONE_PLACEHOLDER}
                 size="large"
-                maxLength={11}
+                onChange={(e) => handlePhoneInput(e, form)}
+                maxLength={PHONE_MAX_LENGTH}
               />
             </Form.Item>
           </div>

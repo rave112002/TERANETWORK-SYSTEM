@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { optionalPhone } from "./_helpers.js";
 
 export const loginSchema = z.object({
   email: z.string().min(1, "Email is required").email("Invalid email address"),
@@ -26,7 +27,7 @@ export const resetPasswordSchema = z.object({
 export const updateProfileSchema = z.object({
   firstName: z.string().min(1, "First name is required").max(50),
   lastName: z.string().min(1, "Last name is required").max(50),
-  phone: z.string().max(20).optional().nullable(),
+  phone: optionalPhone(),
   imageUrl: z.string().max(255).optional().nullable(),
 });
 

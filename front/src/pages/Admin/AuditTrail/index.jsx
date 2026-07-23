@@ -1,4 +1,4 @@
-import { FilterOutlined, ReloadOutlined } from "@ant-design/icons";
+import { DownloadOutlined, FilterOutlined, ReloadOutlined } from "@ant-design/icons";
 import {
   Alert,
   Button,
@@ -59,6 +59,8 @@ const AuditTrailPage = () => {
     selectedLog,
     isDetailOpen,
     handleCloseDetails,
+    handleExport,
+    isExporting,
   } = useAuditTrailHooks();
 
   const [isFilterVisible, setIsFilterVisible] = useState(false);
@@ -152,6 +154,13 @@ const AuditTrailPage = () => {
             style={{ width: 280 }}
           />
           <div className="flex items-center gap-2">
+            <Button
+              icon={<DownloadOutlined />}
+              onClick={handleExport}
+              loading={isExporting}
+            >
+              Export CSV
+            </Button>
             <Button
               icon={<ReloadOutlined />}
               onClick={() => refetch()}

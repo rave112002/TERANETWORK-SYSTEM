@@ -15,6 +15,12 @@ import { useGetCompanies } from "../../../../services/requests/superadmin/compan
 import { useGetBranches } from "../../../../services/requests/superadmin/branches";
 import SectionLabel from "../../../../components/SectionLabel";
 import { decodeHTML } from "../../../../utils/decode-html";
+import {
+  PHONE_MAX_LENGTH,
+  PHONE_PLACEHOLDER,
+  handlePhoneInput,
+  phoneValidator,
+} from "../../../../utils/phoneFormat";
 
 // Generate a random secure password
 const generatePassword = (length = 12) => {
@@ -295,9 +301,13 @@ const CreateUserDrawer = ({ open, onClose, onSuccess }) => {
               />
             </Form.Item>
 
-            <Form.Item name="phone" label="Phone">
+            <Form.Item
+              name="phone"
+              label="Phone"
+              rules={[{ validator: phoneValidator }]}
+            >
               <Input
-                placeholder="09XX XXX XXXX"
+                placeholder={PHONE_PLACEHOLDER}
                 prefix={
                   <Phone
                     className="w-4 h-4 mr-2"
@@ -305,6 +315,8 @@ const CreateUserDrawer = ({ open, onClose, onSuccess }) => {
                   />
                 }
                 size="large"
+                maxLength={PHONE_MAX_LENGTH}
+                onChange={(e) => handlePhoneInput(e, form)}
               />
             </Form.Item>
 

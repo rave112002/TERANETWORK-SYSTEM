@@ -30,6 +30,12 @@
 
   /* ── ACCENT · green, used sparingly (never on buttons) ──────────────────── */
   --color-secondary-color: #4ade80; /* bars, ticks, focus rings, chips */
+
+  /* Chart series colour. NOT the same as --color-secondary-color: that accent is
+     specced for tiny marks (ticks/chips) and only reaches 1.7:1 on a white
+     surface, which is unreadable as a line/area fill. This step is validated
+     (OKLCH lightness band + >=3:1 contrast) for the light surface. */
+  --chart-series-1: #16a34a;
   --color-secondary-dark: #22c55e;
   --color-secondary-light: #86efac;
   --color-link: #16a34a; /* text links */
@@ -100,6 +106,11 @@
   --color-link: #4ade80;
   --color-primary-color: #4ade80;
 
+  /* Chart series — a *selected* dark step from the same green ramp (not an
+     automatic flip of the light value). Validated against the dark surface:
+     inside the dark OKLCH lightness band and >=3:1 contrast. */
+  --chart-series-1: #1eb055;
+
   /* Text */
   --color-text-dark: #f4f4f5;
   --color-text2: #e4e4e7;
@@ -161,6 +172,35 @@ body,
     background-color 0.25s ease,
     border-color 0.25s ease,
     color 0.25s ease;
+}
+
+/* ── Accessibility ────────────────────────────────────────────────────────── */
+
+/* Keyboard focus ring for the hand-rolled controls (the bordered X in drawers,
+   .icon-btn, .pager-btn, plain <button>s). Ant styles its own components, but
+   these were previously focusable with no visible indicator. `:focus-visible`
+   keeps it keyboard-only, so mouse clicks don't show a ring. */
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--color-secondary-color);
+  outline-offset: 2px;
+  border-radius: var(--radius-control);
+}
+
+/* Honour the OS "reduce motion" setting: drop transitions/animations rather
+   than merely shortening them. Charts additionally skip their mount animation
+   (see components/charts/useChartTheme.js). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* ── Reusable utility: icon button (topbar / toolbar) ─────────────────────── */

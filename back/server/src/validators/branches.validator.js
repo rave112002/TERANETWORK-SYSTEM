@@ -1,5 +1,12 @@
 import { z } from "zod";
-import { optionalString, optionalEmail } from "./_helpers.js";
+import {
+  optionalString,
+  optionalEmail,
+  optionalPhone,
+  queryEnum,
+  queryEnumDefault,
+  queryInt,
+} from "./_helpers.js";
 
 const BRANCH_STATUSES = ["Active", "Inactive", "Suspended", "Deleted"];
 
@@ -8,7 +15,7 @@ export const createBranchSchema = z.object({
   companyId: z.string().min(1, "companyId is required").max(50),
   name: z.string().min(1, "Branch name is required").max(100),
   email: optionalEmail(100),
-  phone: optionalString(20),
+  phone: optionalPhone(),
   address: optionalString(1000),
 });
 
@@ -16,18 +23,18 @@ export const createBranchSchema = z.object({
 export const updateBranchSchema = z.object({
   name: z.string().min(1, "Branch name is required").max(100),
   email: optionalEmail(100),
-  phone: optionalString(20),
+  phone: optionalPhone(),
   address: optionalString(1000),
   status: z.enum(BRANCH_STATUSES).optional(),
 });
 
-// GET / — list query params
+// GET / — list query params (unset filters arrive as "", see _helpers.js)
 export const listBranchesQuerySchema = z.object({
-  page: z.coerce.number().int().positive().default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(10),
+  page: queryInt(1),
+  pageSize: queryInt(10, { max: 100 }),
   search: z.string().max(100).optional().default(""),
-  status: z.enum(BRANCH_STATUSES).optional(),
-  companyId: z.string().max(50).optional(),
-  sortBy: z.enum(["dateCreated", "dateUpdated", "name"]).default("dateCreated"),
-  sortOrder: z.enum(["ASC", "DESC"]).default("DESC"),
+  status: queryEnum(BRANCH_STATUSES),
+  companyId: optionalString(50),
+  sortBy: queryEnumDefault(["dateCreated", "dateUpdated", "name"], "dateCreated"),
+  sortOrder: queryEnumDefault(["ASC", "DESC"], "DESC"),
 });

@@ -3,6 +3,7 @@ import { Briefcase, Calendar, Mail, MapPin, Phone, User } from "lucide-react";
 import dayjs from "dayjs";
 import SectionLabel from "../../../../../components/SectionLabel";
 import { decodeHTML } from "../../../../../utils/decode-html";
+import { formatPhoneDisplay } from "../../../../../utils/phoneFormat";
 
 const labelWithIcon = (Icon, text) => (
   <span className="inline-flex items-center gap-2">
@@ -50,6 +51,10 @@ const UserViewModal = ({ open, onClose, user }) => {
                 src={user.imageUrl}
                 alt=""
                 className="w-full h-full object-cover"
+                width={56}
+                height={56}
+                loading="lazy"
+                decoding="async"
               />
             ) : (
               initial
@@ -108,7 +113,7 @@ const UserViewModal = ({ open, onClose, user }) => {
               {decodeHTML(user.email) || "-"}
             </Descriptions.Item>
             <Descriptions.Item label={labelWithIcon(Phone, "Phone")}>
-              {decodeHTML(user.phone) || "-"}
+              {formatPhoneDisplay(decodeHTML(user.phone)) || "-"}
             </Descriptions.Item>
           </Descriptions>
         </div>

@@ -8,6 +8,7 @@ import permissionsController from "../../../controllers/v1/admin/permissions.con
 import userPermissionsController from "../../../controllers/v1/admin/user-permissions.controller.js";
 import auditTrailController from "../../../controllers/v1/admin/audit-trail.controller.js";
 import settingsController from "../../../controllers/v1/admin/settings.controller.js";
+import dashboardController from "../../../controllers/v1/admin/dashboard.controller.js";
 import { auditTrail } from "../../../middlewares/auditTrail.middleware.js";
 
 const router = Router();
@@ -28,5 +29,6 @@ router.use(
 );
 router.use("/audit-trail", requireAuth, auditTrailController);
 router.use("/settings", requireAuth, auditTrail("settings"), settingsController);
+router.use("/dashboard", requireAuth, dashboardController);
 
 export default router;

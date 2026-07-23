@@ -109,6 +109,25 @@ parallelizable.
 
 All created and wired (`validateBody` on every mutation, `validateQuery` on every list). Shared `_helpers.js` (`emptyToUndefined`/`optionalString`/`optionalEmail`) handles `""` from Ant/multipart forms; multipart routes place `validateBody` after multer. Errors return `400 { code: "VALIDATION_FAILED", errors[] }` — e2e-verified.
 
+> 🐞 **Regression found in use and fixed** (reported: `/superadmin/companies?…&status=&subscriptionPlan=` → 400).
+> Two compounding bugs from this phase:
+> 1. **Query schemas rejected `""`.** A query string can't express "absent" for a rendered
+>    param — axios serialises `{ status: "" }` as `?status=`. Bare `z.enum().optional()`
+>    rejects that, so the **default page load** of Companies, Branches, SuperAdmin Users,
+>    Admin Users, Roles and Audit Trail all 400'd. Added `queryEnum`/`queryEnumDefault`/
+>    `queryInt` helpers and applied them across all 6 list schemas (incl. the audit date
+>    regexes, which also rejected `""`).
+> 2. **`validateQuery`'s write-back never worked.** `req.query` is a getter in Express 5,
+>    so the per-key copy silently did nothing and controllers kept reading raw strings —
+>    an empty `?page=` stayed `""`, dodged the `= 1` destructuring default (only fires on
+>    `undefined`), and `Number("")` yielded **page 0** with a `LIMIT 0` query. Now shadows
+>    the getter via `Object.defineProperty`, so coercions and defaults actually apply.
+>
+> Verified (15/15) against the exact frontend URLs on every list endpoint, including empty
+> `page`/`pageSize`/`sortBy`/`sortOrder`, while confirming invalid enums, over-max
+> pageSize, and malformed dates are **still** rejected. No regressions: Phase 3, 4 (17/17),
+> 5 (23/23) and the CSV-injection suite all still pass.
+
 - [x] `admin-users.validator.js`
 - [x] `roles.validator.js` (incl. the `permissions[]` array on `POST /:roleId/permissions`)
 - [x] `permissions.validator.js` (incl. `POST /check`)
@@ -182,29 +201,48 @@ All created and wired (`validateBody` on every mutation, `validateQuery` on ever
 
 ### Real dashboards *[§2.2]*
 
-- [ ] Backend stats endpoints: `GET /admin/dashboard/stats`, `GET /superadmin/dashboard/stats`
-- [ ] `npm i recharts` (documented library choice) and build chart components per the design system
-- [ ] Replace mock data in `Admin/Dashboard/index.jsx` + `SuperAdmin/Dashboard/index.jsx`; implement + actually call `useDashboardHooks`
-- [ ] Fix the address-bundle problem before shipping Companies polish: backend address resolution or lazy `import()` — removes ~6.6 MB from the Companies chunk *[§4.1]*
+- [x] `GET /admin/dashboard/stats` (tenant-scoped: user/role/audit totals, 14-day user-growth + activity series, recent activity) and `GET /superadmin/dashboard/stats` (platform totals, plan breakdown, 14-day growth, newest companies). Both return **gap-free** daily series (empty days filled server-side).
+- [x] `recharts` installed; chart components built per the **dataviz** procedure — see the colour note below
+- [x] Mock data gone from both dashboards; `useDashboardHooks` implemented and actually called in both portals
+- [x] **Address bundle fixed** — see the note below; eager `index` chunk **5,083 kB → 480 kB**
+
+> **Chart colour (validated, not eyeballed).** The design system's accent
+> `--color-secondary-color: #4ade80` is specced for ticks/chips and **failed** the
+> validator for chart marks (OKLCH L 0.80 outside the band; only **1.7:1** on white —
+> unreadable as a line/area). Added a dedicated, validated `--chart-series-1`:
+> `#16a34a` light / `#1eb055` dark (a *selected* dark step, not an automatic flip).
+> Both pass all checks against their own surface. Charts read the token at runtime
+> (`useChartTheme`) so they follow light/dark; all series are **single-series**, so
+> the card title names them and no legend box is needed.
+
+> **Address fix.** Root cause was worse than "heavy import": companies have **no
+> address columns at all** (`address`/`regCode`/… live on `branches`), so
+> `formatAddressByCode()` was fed all-undefined and always returned `""` — the full
+> 6.6 MB of PH reference JSON was parsed to render nothing. Removed the dead call
+> and its always-false UI, and converted `utils/address.js` to **lazy** (`await
+> import()`) so a future branch address picker code-splits it instead.
 
 ### Audit trail *[§2.1]*
 
-- [ ] `GET /audit-trail/:id` detail + `GET /audit-trail/export` (CSV)
-- [ ] Wire the existing frontend detail modal
+- [x] `GET /audit-trail/:auditId` (adds `userAgent`, which the list omits) + `GET /audit-trail/export` (CSV, UTF-8 BOM for Excel, 10k-row cap, filter-aware). `/export` is declared **before** `/:auditId` so it isn't swallowed by the param route — e2e-covered.
+- [x] 🔒 **CSV formula injection fixed** (flagged by security review). Exported rows carry user-controlled text (`firstName`/`lastName`, `description`, `metadata`), and RFC4180 quoting does **not** stop Excel evaluating a leading `= + - @ TAB CR` — so a user named `=HYPERLINK(...)` could attack whoever opens the export. `csvCell` now prefixes such values with `'`. Verified with real payloads: no cell begins with a raw trigger, and the data stays readable.
+- [x] Extracted a shared `buildAuditFilter()` so list and export can never drift
+- [x] Frontend: detail modal now fetches full detail on open (shows `userAgent`); **Export CSV** button added to the toolbar and exports exactly the active filter selection
 
-### Realtime decision *[§2.1, §2.2]*
+### Realtime decision *[§2.1, §2.2]* — **decided: OUT**
 
-- [ ] **In:** add socket.io server (JWT handshake, tenant-scoped rooms), mount `SocketProvider`, build the notifications bell/inbox
-- [ ] **Out:** confirm the Phase 2 removal covered client + provider + inbox plans
+- [x] Confirmed the Phase 2 removal is complete: zero `socket.io` / `SocketProvider` / `useSocket` references in `front/src` or `back/server`, and `socket.io-client` is absent from `package.json`. No notifications bell/inbox was built (it would need the server half first). Revisit by adding a socket.io server + re-adding the client together.
 
 ### Frontend perf/a11y pass *[§4.1]*
 
-- [ ] Prod sourcemaps uploaded to Sentry (not publicly served) — Sentry is currently blind in prod
-- [ ] Remove the redundant Google Fonts `<link>` from `index.html:19-24` (fonts are self-hosted)
-- [ ] Wire `build:analyze` to `rollup-plugin-visualizer` or delete the script
-- [ ] `loading="lazy"` + `width`/`height` on avatar/logo `<img>`s
-- [ ] Split `Sidebar.jsx` (723 lines) and `SuperAdmin/Dashboard/index.jsx` when touched; memoize new dashboard columns
-- [ ] `:focus-visible` for custom buttons, `prefers-reduced-motion`, labels on icon-only buttons
+- [x] Prod sourcemaps now `sourcemap: "hidden"` — `.map` files are emitted for Sentry upload but carry **no** `sourceMappingURL` comment, so they're never advertised to browsers (verified: 54 maps, 0 references). Upload + delete in CI.
+- [x] Redundant Google Fonts `<link>` removed from `index.html` (fonts are self-hosted; verified absent from the built HTML)
+- [x] `build:analyze` wired to `rollup-plugin-visualizer` → writes/opens `dist/stats.html`
+- [x] `loading="lazy"` + `width`/`height` + `decoding="async"` on all 6 avatar/logo `<img>`s
+- [x] `SuperAdmin/Dashboard/index.jsx` split **690 → 88 lines** (`RecentCompanies` extracted). `Sidebar.jsx` left alone — not touched this phase, so splitting it stays deferred.
+- [x] `:focus-visible` ring for hand-rolled buttons/links + a global `prefers-reduced-motion` block (charts also skip their mount animation)
+
+- ✅ *E2E-verified (23/23): both stats endpoints incl. 14-day series shape and plan breakdown, audit detail (with `userAgent`), unknown-id 404, and the CSV export's status/content-type/attachment/header/rows. Frontend lint clean, build green.*
 
 ---
 

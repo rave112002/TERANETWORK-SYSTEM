@@ -7,6 +7,12 @@ import {
   useSuperAdminAuthStore,
 } from "../../../../store/authStore";
 import { useUpdateProfile } from "../../../../services/requests/account";
+import {
+  PHONE_MAX_LENGTH,
+  PHONE_PLACEHOLDER,
+  handlePhoneInput,
+  phoneValidator,
+} from "../../../../utils/phoneFormat";
 
 // Dependency-free value compare for the dirty check.
 const isFormEqual = (a = {}, b = {}) => {
@@ -157,7 +163,11 @@ const ProfileSection = ({ portal = "admin" }) => {
           />
         </Form.Item>
 
-        <Form.Item name="phone" label="Phone number">
+        <Form.Item
+          name="phone"
+          label="Phone number"
+          rules={[{ validator: phoneValidator }]}
+        >
           <Input
             prefix={
               <Phone
@@ -165,8 +175,10 @@ const ProfileSection = ({ portal = "admin" }) => {
                 style={{ color: "var(--color-text-muted)" }}
               />
             }
-            placeholder="e.g., +63 912 345 6789"
+            placeholder={PHONE_PLACEHOLDER}
             size="large"
+            maxLength={PHONE_MAX_LENGTH}
+            onChange={(e) => handlePhoneInput(e, form)}
           />
         </Form.Item>
       </div>

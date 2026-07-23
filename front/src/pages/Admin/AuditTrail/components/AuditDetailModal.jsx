@@ -124,6 +124,17 @@ const AuditDetailModal = ({ open, onClose, log }) => {
             {log.ipAddress || "—"}
           </span>
         </Field>
+        {/* Only present once the detail endpoint has loaded */}
+        {log.userAgent && (
+          <Field label="User agent">
+            <span
+              className="font-mono break-all"
+              style={{ fontSize: 11.5, color: "var(--color-text-secondary)" }}
+            >
+              {log.userAgent}
+            </span>
+          </Field>
+        )}
       </div>
 
       {/* Metadata */}

@@ -1,5 +1,12 @@
 import { z } from "zod";
-import { emptyToUndefined, optionalString } from "./_helpers.js";
+import {
+  emptyToUndefined,
+  optionalString,
+  optionalPhone,
+  queryEnum,
+  queryEnumDefault,
+  queryInt,
+} from "./_helpers.js";
 
 // These endpoints are multipart/form-data (logo upload), so every field arrives
 // as a string and unset optional fields arrive as "". `emptyToUndefined` treats
@@ -12,6 +19,7 @@ const COMPANY_STATUSES = ["Active", "Inactive", "Suspended", "Pending", "Deleted
 export const createCompanySchema = z.object({
   name: z.string().min(1, "Company name is required").max(100),
   email: z.string().min(1, "Email is required").email("Invalid email address").max(100),
+  phone: optionalPhone(),
   website: optionalString(255),
   subscriptionPlan: emptyToUndefined(z.enum(SUBSCRIPTION_PLANS).optional().default("Basic")),
 });
@@ -20,6 +28,7 @@ export const createCompanySchema = z.object({
 export const updateCompanySchema = z.object({
   name: z.string().min(1, "Company name is required").max(100),
   email: z.string().min(1, "Email is required").email("Invalid email address").max(100),
+  phone: optionalPhone(),
   website: optionalString(255),
   logoUrl: optionalString(255),
   subscriptionPlan: z.enum(SUBSCRIPTION_PLANS),
@@ -29,13 +38,13 @@ export const updateCompanySchema = z.object({
   status: emptyToUndefined(z.enum(COMPANY_STATUSES).optional()),
 });
 
-// GET / — list query params
+// GET / — list query params (unset filters arrive as "", see _helpers.js)
 export const listCompaniesQuerySchema = z.object({
-  page: z.coerce.number().int().positive().default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(10),
+  page: queryInt(1),
+  pageSize: queryInt(10, { max: 100 }),
   search: z.string().max(100).optional().default(""),
-  status: z.enum(COMPANY_STATUSES).optional(),
-  subscriptionPlan: z.enum(SUBSCRIPTION_PLANS).optional(),
-  sortBy: z.enum(["dateCreated", "dateUpdated", "name"]).default("dateCreated"),
-  sortOrder: z.enum(["ASC", "DESC"]).default("DESC"),
+  status: queryEnum(COMPANY_STATUSES),
+  subscriptionPlan: queryEnum(SUBSCRIPTION_PLANS),
+  sortBy: queryEnumDefault(["dateCreated", "dateUpdated", "name"], "dateCreated"),
+  sortOrder: queryEnumDefault(["ASC", "DESC"], "DESC"),
 });

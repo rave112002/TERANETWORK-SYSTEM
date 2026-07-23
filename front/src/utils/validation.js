@@ -3,7 +3,8 @@
  */
 export const patterns = {
   email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-  phone: /^09\d{9}$/,
+  // Canonical PH mobile: 11 digits grouped 4-4-3 (e.g. 0912 3456 789)
+  phone: /^09\d{2} \d{4} \d{3}$/,
   url: /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?$/,
   alphanumeric: /^[a-zA-Z0-9]+$/,
   alphabetic: /^[a-zA-Z]+$/,
@@ -70,9 +71,9 @@ export const validationRules = {
   }),
 
   /**
-   * Phone number validation (Philippine format: 09XXXXXXXXX)
+   * Phone number validation — canonical PH mobile `09XX XXXX XXX`
    */
-  phone: (msg = "Phone number must be in format 09XXXXXXXXX") => ({
+  phone: (msg = "Enter a valid mobile number, e.g. 0912 3456 789") => ({
     pattern: patterns.phone,
     message: msg,
   }),

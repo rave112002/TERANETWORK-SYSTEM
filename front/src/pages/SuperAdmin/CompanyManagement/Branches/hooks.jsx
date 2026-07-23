@@ -1,6 +1,6 @@
-import { Button, Dropdown } from "antd";
+import { App, Button, Dropdown } from "antd";
 import { useCallback, useMemo, useState } from "react";
-import { MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { Eye, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { useDebounce } from "../../../../hooks/useDebounce";
 import { decodeHTML } from "../../../../utils/decode-html";
 import {
@@ -8,12 +8,19 @@ import {
   useDeleteBranch,
 } from "../../../../services/requests/superadmin/branches";
 import { useGetCompanies } from "../../../../services/requests/superadmin/companies";
+import { formatPhoneDisplay } from "../../../../utils/phoneFormat";
 
 export const useBranchHooks = () => {
+  const { modal } = App.useApp();
+
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+
+  // ─── Drawer / modal state ─────────────────────────────────────────
   const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false);
   const [editingBranch, setEditingBranch] = useState(null);
+  const [viewingBranch, setViewingBranch] = useState(null);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
 
   // Filters
   const [search, setSearch] = useState("");
@@ -70,7 +77,25 @@ export const useBranchHooks = () => {
     };
   }, [apiData]);
 
+  // ─── Handlers ─────────────────────────────────────────────────────
+  const handleView = useCallback((record) => {
+    setViewingBranch(record);
+    setIsViewModalOpen(true);
+  }, []);
+
+  const handleCloseView = useCallback(() => {
+    setIsViewModalOpen(false);
+    setViewingBranch(null);
+  }, []);
+
   const handleEdit = useCallback((record) => {
+    setEditingBranch(record);
+  }, []);
+
+  // View → Edit: close the detail modal and hand the record to the form drawer.
+  const handleEditFromView = useCallback((record) => {
+    setIsViewModalOpen(false);
+    setViewingBranch(null);
     setEditingBranch(record);
   }, []);
 
@@ -81,26 +106,50 @@ export const useBranchHooks = () => {
     [deleteMutation],
   );
 
+  // Destructive action gets an explicit confirm step.
+  const handleDeleteRequest = useCallback(
+    (record) => {
+      modal.confirm({
+        title: "Delete branch",
+        content: `Delete "${decodeHTML(record.name)}"? This can't be undone.`,
+        okText: "Delete",
+        okButtonProps: { danger: true },
+        cancelText: "Cancel",
+        onOk: () => handleDelete(record),
+      });
+    },
+    [modal, handleDelete],
+  );
+
   const handleOpenCreateDrawer = useCallback(() => {
     setIsCreateDrawerOpen(true);
   }, []);
 
   const handleCloseCreateDrawer = useCallback(() => {
     setIsCreateDrawerOpen(false);
-  }, []);
+    refetch?.();
+  }, [refetch]);
 
   const handleCloseEditDrawer = useCallback(() => {
     setEditingBranch(null);
-  }, []);
+    refetch?.();
+  }, [refetch]);
 
-  // ⋮ menu: Edit, divider, Delete (danger). The main branch can't be deleted.
+  // ⋮ menu: primary action, Edit, divider, Delete (danger).
+  // The main branch can't be deleted.
   const getActionItems = useCallback(
-    (record, onEdit, onDelete) => [
+    (record) => [
+      {
+        key: "view",
+        label: "View details",
+        icon: <Eye className="w-4 h-4" />,
+        onClick: () => handleView(record),
+      },
       {
         key: "edit",
         label: "Edit branch",
         icon: <Pencil className="w-4 h-4" />,
-        onClick: () => onEdit(record),
+        onClick: () => handleEdit(record),
       },
       { type: "divider" },
       {
@@ -108,16 +157,16 @@ export const useBranchHooks = () => {
         label: "Delete branch",
         icon: <Trash2 className="w-4 h-4" />,
         danger: true,
-        onClick: () => onDelete(record),
+        onClick: () => handleDeleteRequest(record),
         disabled: record.isMainBranch,
       },
     ],
-    [],
+    [handleView, handleEdit, handleDeleteRequest],
   );
 
   // # (mono) · initial-avatar + name · secondary text · status dot · ⋮
-  const getColumns = useCallback(
-    (onEdit, onDelete) => [
+  const columns = useMemo(
+    () => [
       {
         title: "#",
         key: "index",
@@ -206,7 +255,9 @@ export const useBranchHooks = () => {
         width: 180,
         ellipsis: true,
         render: (text) => (
-          <span style={{ fontSize: 13.5, color: "var(--color-text-secondary)" }}>
+          <span
+            style={{ fontSize: 13.5, color: "var(--color-text-secondary)" }}
+          >
             {decodeHTML(text) || "—"}
           </span>
         ),
@@ -227,7 +278,7 @@ export const useBranchHooks = () => {
               className="truncate"
               style={{ fontSize: 12.5, color: "var(--color-text-muted)" }}
             >
-              {decodeHTML(record.phone) || "—"}
+              {formatPhoneDisplay(decodeHTML(record.phone)) || "—"}
             </div>
           </div>
         ),
@@ -267,7 +318,7 @@ export const useBranchHooks = () => {
         align: "right",
         render: (_, record) => (
           <Dropdown
-            menu={{ items: getActionItems(record, onEdit, onDelete) }}
+            menu={{ items: getActionItems(record) }}
             trigger={["click"]}
             placement="bottomRight"
           >
@@ -302,8 +353,7 @@ export const useBranchHooks = () => {
     isLoading,
     error,
     refetch,
-    getColumns,
-    getActionItems,
+    columns,
     pagination: {
       current: currentPage,
       pageSize,
@@ -312,13 +362,21 @@ export const useBranchHooks = () => {
     currentPage,
     pageSize,
     handleTableChange,
+
+    // Create / edit drawer
     isCreateDrawerOpen,
     handleOpenCreateDrawer,
     handleCloseCreateDrawer,
     editingBranch,
-    handleEdit,
-    handleDelete,
     handleCloseEditDrawer,
+
+    // View modal
+    viewingBranch,
+    isViewModalOpen,
+    handleCloseView,
+    handleEditFromView,
+
+    // Filters
     search,
     setSearch,
     statusFilter,

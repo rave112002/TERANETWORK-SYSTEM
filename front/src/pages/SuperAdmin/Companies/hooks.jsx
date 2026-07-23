@@ -1,14 +1,14 @@
 import { App, Button, Dropdown } from "antd";
 import { useCallback, useMemo, useState } from "react";
-import { Eye, MapPin, MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { Eye, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { useDebounce } from "../../../hooks/useDebounce";
 import {
   useGetCompanies,
   useDeleteCompany,
 } from "../../../services/requests/superadmin/companies";
-import { formatAddressByCode } from "../../../utils/address";
 import { getImageUrl } from "../../../utils/upload";
 import { decodeHTML } from "../../../utils/decode-html";
+import { formatPhoneDisplay } from "../../../utils/phoneFormat";
 
 // Status → dot colour. Everything that isn't live reads as muted.
 const STATUS_DOT = {
@@ -64,14 +64,11 @@ export const useCompanyHooks = () => {
       id: org.companyId,
       name: org.name,
       logo: org.logoUrl ? getImageUrl(org.logoUrl) : null,
-      address: formatAddressByCode({
-        address1: org.address,
-        brgy: org.brgyCode,
-        city: org.citymunCode,
-        province: org.provCode,
-        region: org.regCode,
-        zipCode: org.zipCode,
-      }),
+      // NOTE: companies have no address columns (address/regCode/... live on
+      // `branches`), so the old formatAddressByCode() call here always resolved
+      // to "" while statically pulling ~6.6 MB of PH reference JSON into this
+      // chunk. Address lookups now live behind the async helpers in
+      // utils/address.js and load on demand.
       email: org.email,
       phone: org.phone,
       website: org.website,
@@ -245,6 +242,10 @@ export const useCompanyHooks = () => {
                     src={record.logo}
                     alt=""
                     className="w-full h-full object-cover"
+                    width={30}
+                    height={30}
+                    loading="lazy"
+                    decoding="async"
                   />
                 ) : (
                   initial
@@ -261,15 +262,6 @@ export const useCompanyHooks = () => {
                 >
                   {label}
                 </div>
-                {record.address && (
-                  <div
-                    className="flex items-center gap-1 min-w-0"
-                    style={{ fontSize: 12, color: "var(--color-text-muted)" }}
-                  >
-                    <MapPin className="w-3 h-3 shrink-0" />
-                    <span className="truncate">{decodeHTML(record.address)}</span>
-                  </div>
-                )}
               </div>
             </div>
           );
@@ -293,7 +285,7 @@ export const useCompanyHooks = () => {
                 className="truncate"
                 style={{ fontSize: 12, color: "var(--color-text-muted)" }}
               >
-                {record.phone}
+                {formatPhoneDisplay(record.phone)}
               </div>
             )}
           </div>

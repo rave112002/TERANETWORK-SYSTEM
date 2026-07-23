@@ -30,19 +30,25 @@ export const validateBody = (schema) => {
   };
 };
 
-// Validate query parameters
-// Note: req.query is read-only in Express, so we store parsed data in req.validatedQuery
-// and also copy validated values back to req.query properties individually
+// Validate query parameters.
+//
+// In Express 5 `req.query` is a GETTER on the prototype — assigning to its
+// properties does not stick, so the previous per-key copy silently did nothing
+// and controllers kept reading the raw strings (an empty `?page=` stayed "",
+// which is not `undefined`, so their destructuring defaults never fired and
+// `Number("")` produced 0). Shadow the getter with an own data property so the
+// coerced values and schema defaults actually reach the handler.
 export const validateQuery = (schema) => {
   // eslint-disable-next-line require-await
   return async (req, res, next) => {
     try {
       const parsed = schema.parse(req.query);
-      // Store validated data in a separate property
       req.validatedQuery = parsed;
-      // Also update individual query properties (since req.query object itself is read-only)
-      Object.keys(parsed).forEach((key) => {
-        req.query[key] = parsed[key];
+      Object.defineProperty(req, "query", {
+        value: parsed,
+        writable: true,
+        configurable: true,
+        enumerable: true,
       });
       next();
     } catch (error) {

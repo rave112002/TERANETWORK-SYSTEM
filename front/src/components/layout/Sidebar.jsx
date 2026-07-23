@@ -90,6 +90,9 @@ const Brand = ({ collapsed, companyLogo }) => {
         <img
           src={companyLogo || logo}
           alt=""
+          width={22}
+          height={22}
+          decoding="async"
           style={{ maxWidth: 22, maxHeight: 22, objectFit: "contain" }}
         />
       </span>
