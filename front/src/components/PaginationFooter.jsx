@@ -1,9 +1,14 @@
-import { Dropdown } from "antd";
 import { ChevronLeft, ChevronRight, ChevronsUpDown } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 /**
- * Custom pagination footer for list pages — replaces Ant's default pager
- * (tables must set `pagination={false}`). Renders inside the table card.
+ * Custom pagination footer for list pages — `DataTable` has no built-in pager,
+ * so this renders below it inside the table card.
  *
  * @param {{current:number,pageSize:number,total:number}} pagination
  * @param {(p:{current:number,pageSize:number}) => void} onChange - the module's handleTableChange
@@ -61,24 +66,27 @@ const PaginationFooter = ({
           </button>
         </div>
 
-        <Dropdown
-          trigger={["click"]}
-          menu={{
-            items: [10, 20, 50, 100].map((n) => ({
-              key: String(n),
-              label: `${n} / page`,
-              onClick: () => onChange({ current: 1, pageSize: n }),
-            })),
-          }}
-        >
-          <button className="pager-size">
-            {pgSize} / page{" "}
-            <ChevronsUpDown
-              className="w-3 h-3"
-              style={{ color: "var(--color-text-muted)" }}
-            />
-          </button>
-        </Dropdown>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="pager-size">
+              {pgSize} / page{" "}
+              <ChevronsUpDown
+                className="w-3 h-3"
+                style={{ color: "var(--color-text-muted)" }}
+              />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {[10, 20, 50, 100].map((n) => (
+              <DropdownMenuItem
+                key={n}
+                onClick={() => onChange({ current: 1, pageSize: n })}
+              >
+                {n} / page
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tailwindcss/theme.css" layer(theme);
+@import "tw-animate-css";
 
 /* ──────────────────────────────────────────────────────────────────────────
    Dark mode is driven by a `.dark` class on <html> (toggled by the theme
@@ -16,8 +17,7 @@
    no shadow.
 
    Never hardcode a hex in a page — reference these tokens so light/dark and
-   future re-themes "just work". Keep the accent in sync with `antdTheme.js`
-   (Ant Design needs JS values, so the accent lives in both places).
+   future re-themes "just work".
    ============================================================================ */
 @theme {
   /* ── TYPE ───────────────────────────────────────────────────────────────
@@ -92,7 +92,7 @@
   --gradient-background: linear-gradient(135deg, #f5f5f6 0%, #ffffff 100%);
 
   /* ── SHADOWS — structure comes from borders, not shadows. Flat by design;
-     floating layers (dropdown/modal/drawer) get their shadow from Ant. ────── */
+     floating layers (dropdown/modal/drawer) get their shadow from shadcn/Radix. ── */
   --shadow-card: none;
   --shadow-raised: none;
 }
@@ -143,6 +143,84 @@
   --gradient-background: linear-gradient(135deg, #09090b 0%, #0f0f12 100%);
 }
 
+/* ============================================================================
+   shadcn/ui BRIDGE — maps shadcn's semantic token names onto the Modern
+   tokens above so shadcn components inherit this design system for free.
+
+   HOW IT WORKS
+   - `@theme inline` inlines these `var(--color-*)` refs straight into the
+     generated utilities (`bg-primary`, `border-border`, `bg-card`, …). Because
+     each points at a Modern token that already flips in `.dark`, the shadcn
+     utilities flip automatically — no `.dark` block needed here.
+   - `inline` also means these do NOT re-emit `--color-primary` etc. to `:root`,
+     so existing inline-style refs like `var(--color-border)` keep their
+     legacy `@theme` values. No collision.
+
+   Notably: `--color-primary` maps to the INVERTED monochrome button (never the
+   green accent — that stays reserved for bars/ticks/focus/chips), and `--ring`
+   is the green accent, per the Modern design system.
+
+   When re-theming, change the Modern tokens above; this bridge follows.
+   ============================================================================ */
+:root {
+  /* Base radius shadcn derives its scale from — the Modern control radius. */
+  --radius: var(--radius-control);
+}
+
+@theme inline {
+  /* Radius scale (shadcn: rounded-sm/md/lg/xl) derived from --radius */
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* Surfaces & text */
+  --color-background: var(--color-canvas);
+  --color-foreground: var(--color-text-dark);
+  --color-card: var(--color-surface);
+  --color-card-foreground: var(--color-text-dark);
+  --color-popover: var(--color-surface-raised);
+  --color-popover-foreground: var(--color-text-dark);
+
+  /* Primary = inverted monochrome button (NOT the accent) */
+  --color-primary: var(--color-btn-bg);
+  --color-primary-foreground: var(--color-btn-text);
+
+  /* Secondary / muted / accent = the sunken neutral well + hover */
+  --color-secondary: var(--color-surface-sunken);
+  --color-secondary-foreground: var(--color-text-dark);
+  --color-muted: var(--color-surface-sunken);
+  --color-muted-foreground: var(--color-text-secondary);
+  --color-accent: var(--color-surface-sunken);
+  --color-accent-foreground: var(--color-text-dark);
+
+  /* Destructive */
+  --color-destructive: var(--color-error);
+  --color-destructive-foreground: var(--color-text-color);
+
+  /* Borders, inputs, focus ring (ring = green accent) */
+  --color-border: var(--color-line);
+  --color-input: var(--color-line);
+  --color-ring: var(--color-secondary-color);
+
+  /* Charts */
+  --color-chart-1: var(--chart-series-1);
+  --color-chart-2: var(--color-secondary-dark);
+  --color-chart-3: var(--color-secondary-light);
+  --color-chart-4: var(--color-warning);
+  --color-chart-5: var(--color-info);
+
+  /* Sidebar (shadcn sidebar block, if ever used) */
+  --color-sidebar: var(--color-surface);
+  --color-sidebar-foreground: var(--color-text-secondary);
+  --color-sidebar-primary: var(--color-btn-bg);
+  --color-sidebar-primary-foreground: var(--color-btn-text);
+  --color-sidebar-accent: var(--color-surface-sunken);
+  --color-sidebar-accent-foreground: var(--color-text-dark);
+  --color-sidebar-border: var(--color-line);
+  --color-sidebar-ring: var(--color-secondary-color);
+}
+
 /* ── Base ────────────────────────────────────────────────────────────────────
    Set on html/body (not `*`) so element-level utilities such as `font-mono`
    still win via normal inheritance rules. */
@@ -177,8 +255,8 @@ body,
 /* ── Accessibility ────────────────────────────────────────────────────────── */
 
 /* Keyboard focus ring for the hand-rolled controls (the bordered X in drawers,
-   .icon-btn, .pager-btn, plain <button>s). Ant styles its own components, but
-   these were previously focusable with no visible indicator. `:focus-visible`
+   .icon-btn, .pager-btn, plain <button>s). shadcn/Radix styles its own components,
+   but these were previously focusable with no visible indicator. `:focus-visible`
    keeps it keyboard-only, so mouse clicks don't show a ring. */
 button:focus-visible,
 a:focus-visible,
@@ -354,94 +432,4 @@ summary:focus-visible {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: color-mix(in srgb, var(--color-text-muted) 70%, transparent);
-}
-
-/* ============================================================================
-   Ant Design overrides — token-driven so they hold in both themes.
-   ============================================================================ */
-
-/* Primary button is INVERTED and monochrome — never the accent, never a
-   gradient. Pages must not put an inline `background` on type="primary". */
-.ant-btn-primary {
-  background: var(--color-btn-bg) !important;
-  color: var(--color-btn-text) !important;
-  border: 1px solid transparent !important;
-  box-shadow: none !important;
-}
-.ant-btn-primary:hover:not(:disabled) {
-  background: color-mix(
-    in srgb,
-    var(--color-btn-bg) 86%,
-    var(--color-surface)
-  ) !important;
-  color: var(--color-btn-text) !important;
-}
-.ant-btn-primary:disabled,
-.ant-btn-primary.ant-btn-disabled {
-  opacity: 0.45;
-  background: var(--color-btn-bg) !important;
-  color: var(--color-btn-text) !important;
-}
-
-/* Default buttons: hairline outline, no shadow */
-.ant-btn-default {
-  border-color: var(--color-line) !important;
-  color: var(--color-text-secondary) !important;
-  box-shadow: none !important;
-}
-.ant-btn-default:hover:not(:disabled) {
-  border-color: var(--color-line) !important;
-  background: var(--color-surface-sunken) !important;
-  color: var(--color-text-dark) !important;
-}
-
-/* Table header — small, quiet, hairline rule beneath */
-.ant-table-thead > tr > th {
-  font-size: 11.5px !important;
-  font-weight: 500 !important;
-  color: var(--color-text-muted) !important;
-  background: var(--color-surface) !important;
-  border-bottom: 1px solid var(--color-line) !important;
-}
-.ant-table-thead > tr > th::before {
-  display: none !important;
-}
-.ant-table-tbody > tr > td {
-  border-bottom: 1px solid var(--color-line-soft) !important;
-}
-
-/* Cards are flat: hairline border, radius 14, no shadow */
-.ant-card {
-  border: 1px solid var(--color-line) !important;
-  border-radius: var(--radius-card) !important;
-  box-shadow: none !important;
-}
-
-/* Focus rings use the accent */
-.ant-input:focus,
-.ant-input-focused,
-.ant-input-affix-wrapper-focused {
-  border-color: var(--color-secondary-color) !important;
-  box-shadow: 0 0 0 2px
-    color-mix(in srgb, var(--color-secondary-color) 25%, transparent) !important;
-}
-.ant-select:not(.ant-select-disabled):hover .ant-select-selector {
-  border-color: var(--color-secondary-color) !important;
-}
-.ant-select-focused:not(.ant-select-disabled).ant-select:not(
-    .ant-select-customize-input
-  )
-  .ant-select-selector {
-  border-color: var(--color-secondary-color) !important;
-  box-shadow: 0 0 0 2px
-    color-mix(in srgb, var(--color-secondary-color) 25%, transparent) !important;
-}
-
-/* Tags: Tailwind Preflight sets `svg { display: block }`, which knocks an icon
-   inside an Ant tag onto its own line (text wraps below). Lay tag contents out
-   as a centered inline row so the icon + label always stay together. */
-.ant-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
 }

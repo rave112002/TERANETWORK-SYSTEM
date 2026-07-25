@@ -8,6 +8,8 @@
  * See the phone entry in the repo-root CLAUDE.md.
  */
 
+import { z } from "zod";
+
 /** The placeholder every phone input should use. */
 export const PHONE_PLACEHOLDER = "0912 3456 789";
 
@@ -62,36 +64,28 @@ export const formatPhoneNumber = (phone) => {
   return isValidPhoneNumber(digits) ? groupPhoneDigits(digits) : phone || "";
 };
 
-/**
- * Custom validator for Ant Design Form.
- *
- * Phone is OPTIONAL: every `phone` column is NULL-able and the API writes
- * `phone || null`, so an empty value passes. Only the *format* is enforced, and
- * only once something has been typed.
- *
- * If a form ever needs phone to be mandatory, pair this with a separate
- * `{ required: true }` rule — that way Ant also renders the required asterisk,
- * instead of the field erroring "required" with no `*` next to its label.
- */
-export const phoneValidator = (_, value) => {
-  if (!value) return Promise.resolve();
-
-  if (!isValidPhoneNumber(value)) {
-    return Promise.reject(
-      new Error(`Enter a valid mobile number, e.g. ${PHONE_PLACEHOLDER}`),
-    );
-  }
-
-  return Promise.resolve();
-};
+/* ── React Hook Form + Zod ───────────────────────────────────────────────── */
 
 /**
- * onChange handler that types the spaces in for the user.
+ * As-you-type formatter for a react-hook-form field. Returns the grouped value
+ * so the spaces are typed in for the user.
  *
  * Usage:
- *   <Input onChange={(e) => handlePhoneInput(e, form, "phone")} />
+ *   <Input onChange={(e) => field.onChange(formatPhoneOnChange(e.target.value))} />
  */
-export const handlePhoneInput = (e, form, fieldName = "phone") => {
-  const grouped = groupPhoneDigits(toLocalDigits(e.target.value));
-  form.setFieldsValue({ [fieldName]: grouped });
-};
+export const formatPhoneOnChange = (value) =>
+  groupPhoneDigits(toLocalDigits(value));
+
+/**
+ * Zod schema fragment for an optional PH phone. Phone is optional everywhere
+ * (every `phone` column is NULL-able and the API writes `phone || null`), so an
+ * empty string passes; only the *format* is enforced once something is typed.
+ *
+ * If a form needs phone mandatory, add `.min(1, "…")` in front of the refine so
+ * the empty case fails too.
+ */
+export const zPhone = z
+  .string()
+  .refine((v) => v === "" || isValidPhoneNumber(v), {
+    message: `Enter a valid mobile number, e.g. ${PHONE_PLACEHOLDER}`,
+  });

@@ -1,4 +1,3 @@
-import { Col, Row } from "antd";
 import { Bell, Lock, User } from "lucide-react";
 import PageHeader from "../../../components/PageHeader";
 import ProfileSection from "./components/ProfileSection";
@@ -67,38 +66,34 @@ const AccountSettings = () => {
       />
 
       {/* 2. SETTINGS PANELS */}
-      <Row gutter={[14, 14]}>
-        <Col xs={24} lg={16}>
-          <div className="space-y-3.5">
-            <SettingsPanel
-              title="Profile Information"
-              description="Your name and how we reach you."
-              icon={<User className="w-4.25 h-4.25" strokeWidth={1.8} />}
-            >
-              <ProfileSection portal={portal} />
-            </SettingsPanel>
-
-            <SettingsPanel
-              title="Change Password"
-              description="Update the password you use to sign in."
-              icon={<Lock className="w-4.25 h-4.25" strokeWidth={1.8} />}
-            >
-              <PasswordSection portal={portal} />
-            </SettingsPanel>
-          </div>
-        </Col>
-
-        <Col xs={24} lg={8}>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5">
+        <div className="lg:col-span-2 space-y-3.5">
           <SettingsPanel
-            title="Notifications"
-            description="Choose what you get told about."
-            icon={<Bell className="w-4.25 h-4.25" strokeWidth={1.8} />}
-            className="h-full"
+            title="Profile Information"
+            description="Your name and how we reach you."
+            icon={<User className="w-4.25 h-4.25" strokeWidth={1.8} />}
           >
-            <NotificationSection portal={portal} />
+            <ProfileSection portal={portal} />
           </SettingsPanel>
-        </Col>
-      </Row>
+
+          <SettingsPanel
+            title="Change Password"
+            description="Update the password you use to sign in."
+            icon={<Lock className="w-4.25 h-4.25" strokeWidth={1.8} />}
+          >
+            <PasswordSection portal={portal} />
+          </SettingsPanel>
+        </div>
+
+        <SettingsPanel
+          title="Notifications"
+          description="Choose what you get told about."
+          icon={<Bell className="w-4.25 h-4.25" strokeWidth={1.8} />}
+          className="h-full"
+        >
+          <NotificationSection portal={portal} />
+        </SettingsPanel>
+      </div>
     </div>
   );
 };

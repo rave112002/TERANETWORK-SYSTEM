@@ -1,22 +1,15 @@
-import {
-  DeleteOutlined,
-  FilterOutlined,
-  PlusOutlined,
-} from "@ant-design/icons";
-import {
-  Alert,
-  Button,
-  Col,
-  Empty,
-  Input,
-  Popconfirm,
-  Row,
-  Select,
-  Spin,
-  Table,
-} from "antd";
 import { useState } from "react";
-import { Building2, CheckCircle, Search, XCircle } from "lucide-react";
+import { Building2, CheckCircle, CircleAlert, Filter, Plus, Trash2, XCircle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { confirm } from "../../../store/confirmStore";
 import { useCompanyHooks } from "./hooks";
 import CompanyFormDrawer from "./components/CompanyFormDrawer";
 import ViewCompanyModal from "./components/ViewCompanyModal";
@@ -24,6 +17,8 @@ import PageHeader from "../../../components/PageHeader";
 import PaginationFooter from "../../../components/PaginationFooter";
 import StatCard from "../../../components/StatCard";
 import RefreshButton from "../../../components/RefreshButton";
+import SearchInput from "../../../components/SearchInput";
+import DataTable from "../../../components/DataTable";
 
 const Companies = () => {
   const {
@@ -69,17 +64,30 @@ const Companies = () => {
   );
   const isEmpty = !isLoading && companies.length === 0;
 
+  const requestBulkDelete = async () => {
+    const ok = await confirm({
+      title: "Delete selected companies",
+      description: `Delete ${selectedRowKeys.length} ${
+        selectedRowKeys.length === 1 ? "company" : "companies"
+      }? This can't be undone.`,
+      confirmText: "Delete",
+      cancelText: "Cancel",
+      danger: true,
+    });
+    if (ok) handleBulkDelete();
+  };
+
   if (error) {
     return (
       <div className="p-8">
-        <Alert
-          message="Error loading companies"
-          description={
-            error.message || "Failed to load companies data. Please try again."
-          }
-          type="error"
-          showIcon
-        />
+        <Alert variant="destructive">
+          <CircleAlert />
+          <AlertTitle>Error loading companies</AlertTitle>
+          <AlertDescription>
+            {error.message ||
+              "Failed to load companies data. Please try again."}
+          </AlertDescription>
+        </Alert>
       </div>
     );
   }
@@ -91,43 +99,34 @@ const Companies = () => {
         title="Companies"
         subtitle="Manage every company on the platform and their information."
         actions={
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={handleOpenCreateModal}
-          >
+          <Button onClick={handleOpenCreateModal}>
+            <Plus />
             New company
           </Button>
         }
       />
 
       {/* 2. STAT CARDS */}
-      <Row gutter={[14, 14]}>
-        <Col xs={24} sm={12} lg={8}>
-          <StatCard
-            title="Total companies"
-            value={totalCompanies}
-            change="all time"
-            icon={<Building2 className="w-4.25 h-4.25" strokeWidth={1.8} />}
-          />
-        </Col>
-        <Col xs={24} sm={12} lg={8}>
-          <StatCard
-            title="Active companies"
-            value={activeCompanies}
-            change="on this page"
-            icon={<CheckCircle className="w-4.25 h-4.25" strokeWidth={1.8} />}
-          />
-        </Col>
-        <Col xs={24} sm={12} lg={8}>
-          <StatCard
-            title="Inactive companies"
-            value={inactiveCompanies}
-            change="on this page"
-            icon={<XCircle className="w-4.25 h-4.25" strokeWidth={1.8} />}
-          />
-        </Col>
-      </Row>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+        <StatCard
+          title="Total companies"
+          value={totalCompanies}
+          change="all time"
+          icon={<Building2 className="w-4.25 h-4.25" strokeWidth={1.8} />}
+        />
+        <StatCard
+          title="Active companies"
+          value={activeCompanies}
+          change="on this page"
+          icon={<CheckCircle className="w-4.25 h-4.25" strokeWidth={1.8} />}
+        />
+        <StatCard
+          title="Inactive companies"
+          value={inactiveCompanies}
+          change="on this page"
+          icon={<XCircle className="w-4.25 h-4.25" strokeWidth={1.8} />}
+        />
+      </div>
 
       {/* 3. TABLE CARD */}
       <div
@@ -142,42 +141,31 @@ const Companies = () => {
           className="flex items-center justify-between gap-3 flex-wrap px-[18px] py-3.5"
           style={{ borderBottom: "1px solid var(--color-line)" }}
         >
-          <Input
-            placeholder="Filter companies…"
-            prefix={
-              <Search
-                className="w-[15px] h-[15px]"
-                style={{ color: "var(--color-text-muted)" }}
-              />
-            }
+          <SearchInput
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            allowClear
-            style={{ width: 280 }}
+            onChange={setSearch}
+            placeholder="Filter companies…"
           />
           <div className="flex items-center gap-2">
             {hasSelectedRows && (
-              <Popconfirm
-                title="Delete selected companies"
-                description={`Delete ${selectedRowKeys.length} ${
-                  selectedRowKeys.length === 1 ? "company" : "companies"
-                }? This can't be undone.`}
-                onConfirm={handleBulkDelete}
-                okText="Delete"
-                okType="danger"
-                cancelText="Cancel"
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={requestBulkDelete}
               >
-                <Button danger icon={<DeleteOutlined />} loading={isLoading}>
-                  Delete ({selectedRowKeys.length})
-                </Button>
-              </Popconfirm>
+                <Trash2 />
+                Delete ({selectedRowKeys.length})
+              </Button>
             )}
             <RefreshButton onRefresh={refetch} isFetching={isFetching} />
             <Button
-              icon={<FilterOutlined />}
+              variant={
+                isFilterVisible || hasActiveFilters ? "default" : "outline"
+              }
+              size="sm"
               onClick={() => setIsFilterVisible(!isFilterVisible)}
-              type={isFilterVisible || hasActiveFilters ? "primary" : "default"}
             >
+              <Filter />
               Filters
             </Button>
           </div>
@@ -202,19 +190,21 @@ const Companies = () => {
                 Status
               </span>
               <Select
-                value={statusFilter || undefined}
-                onChange={setStatusFilter}
-                placeholder="All statuses"
-                allowClear
-                style={{ width: 200 }}
-                options={[
-                  { value: "Active", label: "Active" },
-                  { value: "Inactive", label: "Inactive" },
-                  { value: "Suspended", label: "Suspended" },
-                  { value: "Pending", label: "Pending" },
-                  { value: "Deleted", label: "Deleted" },
-                ]}
-              />
+                value={statusFilter || "all"}
+                onValueChange={(v) => setStatusFilter(v === "all" ? "" : v)}
+              >
+                <SelectTrigger className="h-10 w-[200px]">
+                  <SelectValue placeholder="All statuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="Active">Active</SelectItem>
+                  <SelectItem value="Inactive">Inactive</SelectItem>
+                  <SelectItem value="Suspended">Suspended</SelectItem>
+                  <SelectItem value="Pending">Pending</SelectItem>
+                  <SelectItem value="Deleted">Deleted</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex flex-col gap-1.5">
               <span
@@ -229,18 +219,22 @@ const Companies = () => {
                 Subscription
               </span>
               <Select
-                value={subscriptionFilter || undefined}
-                onChange={setSubscriptionFilter}
-                placeholder="All plans"
-                allowClear
-                style={{ width: 200 }}
-                options={[
-                  { value: "Basic", label: "Basic" },
-                  { value: "Standard", label: "Standard" },
-                  { value: "Premium", label: "Premium" },
-                  { value: "Enterprise", label: "Enterprise" },
-                ]}
-              />
+                value={subscriptionFilter || "all"}
+                onValueChange={(v) =>
+                  setSubscriptionFilter(v === "all" ? "" : v)
+                }
+              >
+                <SelectTrigger className="h-10 w-[200px]">
+                  <SelectValue placeholder="All plans" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All plans</SelectItem>
+                  <SelectItem value="Basic">Basic</SelectItem>
+                  <SelectItem value="Standard">Standard</SelectItem>
+                  <SelectItem value="Premium">Premium</SelectItem>
+                  <SelectItem value="Enterprise">Enterprise</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             {hasActiveFilters && (
               <button
@@ -256,33 +250,24 @@ const Companies = () => {
 
         {/* Table + custom pagination footer */}
         {isEmpty ? (
-          <div className="flex items-center justify-center py-20">
-            <Empty description="No companies found">
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={handleOpenCreateModal}
-              >
-                New company
-              </Button>
-            </Empty>
+          <div className="flex flex-col items-center justify-center gap-4 py-20 text-center">
+            <p style={{ fontSize: 13.5, color: "var(--color-text-muted)" }}>
+              No companies found
+            </p>
+            <Button onClick={handleOpenCreateModal}>
+              <Plus />
+              New company
+            </Button>
           </div>
         ) : (
           <>
-            <Table
+            <DataTable
               dataSource={companies}
               columns={columns}
               rowSelection={rowSelection}
               rowKey="id"
-              pagination={false}
-              loading={{
-                spinning: isLoading,
-                indicator: <Spin size="large" style={{ marginTop: 50 }} />,
-              }}
-              onChange={handleTableChange}
+              loading={isLoading}
               scroll={{ x: 1150 }}
-              size="middle"
-              className="border-none"
             />
             <PaginationFooter
               pagination={pagination}
@@ -295,7 +280,6 @@ const Companies = () => {
       </div>
 
       {/* 4. DRAWERS & MODALS */}
-      {/* Form owns its Drawer; entity=null → create, entity set → edit */}
       <CompanyFormDrawer
         open={isCreateModalOpen || !!editingCompany}
         entity={editingCompany}

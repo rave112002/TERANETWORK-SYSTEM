@@ -1,10 +1,10 @@
+import { toast } from "sonner";
 import {
   keepPreviousData,
   useMutation,
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { message } from "antd";
 import {
   getUsersApi,
   getUserByIdApi,
@@ -40,11 +40,11 @@ export const useCreateUser = () => {
   return useMutation({
     mutationFn: createUserApi,
     onSuccess: () => {
-      message.success("User created successfully");
+      toast.success("User created successfully");
       queryClient.invalidateQueries({ queryKey: ["users"] });
     },
     onError: (error) => {
-      message.error(error.response?.data?.message || "Failed to create user");
+      toast.error(error.response?.data?.message || "Failed to create user");
     },
   });
 };
@@ -56,12 +56,12 @@ export const useUpdateUser = () => {
   return useMutation({
     mutationFn: ({ userId, userData }) => updateUserApi(userId, userData),
     onSuccess: (data, variables) => {
-      message.success("User updated successfully");
+      toast.success("User updated successfully");
       queryClient.invalidateQueries({ queryKey: ["users"] });
       queryClient.invalidateQueries({ queryKey: ["users", variables.userId] });
     },
     onError: (error) => {
-      message.error(error.response?.data?.message || "Failed to update user");
+      toast.error(error.response?.data?.message || "Failed to update user");
     },
   });
 };
@@ -73,11 +73,11 @@ export const useDeleteUser = () => {
   return useMutation({
     mutationFn: deleteUserApi,
     onSuccess: () => {
-      message.success("User deleted successfully");
+      toast.success("User deleted successfully");
       queryClient.invalidateQueries({ queryKey: ["users"] });
     },
     onError: (error) => {
-      message.error(error.response?.data?.message || "Failed to delete user");
+      toast.error(error.response?.data?.message || "Failed to delete user");
     },
   });
 };

@@ -1,10 +1,10 @@
+import { toast } from "sonner";
 import {
   keepPreviousData,
   useMutation,
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { message } from "antd";
 import {
   getSuperAdminUsersApi,
   createSuperAdminUserApi,
@@ -27,11 +27,11 @@ export const useCreateSuperAdminUser = () => {
   return useMutation({
     mutationFn: createSuperAdminUserApi,
     onSuccess: () => {
-      message.success("User created successfully");
+      toast.success("User created successfully");
       queryClient.invalidateQueries({ queryKey: ["superadmin-users"] });
     },
     onError: (error) => {
-      message.error(error.response?.data?.message || "Failed to create user");
+      toast.error(error.response?.data?.message || "Failed to create user");
     },
   });
 };

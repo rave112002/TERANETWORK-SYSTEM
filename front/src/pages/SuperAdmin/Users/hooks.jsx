@@ -1,6 +1,6 @@
-import { Button, Dropdown } from "antd";
 import { useCallback, useMemo, useState } from "react";
-import { Eye, MoreVertical } from "lucide-react";
+import { Eye } from "lucide-react";
+import RowActions from "../../../components/RowActions";
 import { useDebounce } from "../../../hooks/useDebounce";
 import { useGetSuperAdminUsers } from "../../../services/requests/superadmin/users";
 import { useGetCompanies } from "../../../services/requests/superadmin/companies";
@@ -250,19 +250,7 @@ export const useUserHooks = () => {
         key: "actions",
         width: 60,
         align: "right",
-        render: (_, record) => (
-          <Dropdown
-            menu={{ items: getActionItems(record) }}
-            trigger={["click"]}
-            placement="bottomRight"
-          >
-            <Button
-              type="text"
-              icon={<MoreVertical className="w-4 h-4" />}
-              className="hover:bg-(--color-surface-sunken)"
-            />
-          </Dropdown>
-        ),
+        render: (_, record) => <RowActions items={getActionItems(record)} />,
       },
     ],
     [getActionItems, currentPage, pageSize],

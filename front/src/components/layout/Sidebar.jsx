@@ -1,4 +1,21 @@
-import { App, Drawer, Dropdown, Popover, Tooltip } from "antd";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import clsx from "clsx";
 import {
   ChevronDown,
@@ -8,15 +25,10 @@ import {
   Search,
   Settings,
 } from "lucide-react";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { logo } from "../../assets/images/logos";
+import { confirm } from "../../store/confirmStore";
 import { useWindowSize } from "../../hooks/useWindowSize";
 
 // Shared widths — imported by BasicLayout so the content offset stays in sync.
@@ -34,7 +46,10 @@ const isRouteActive = (pathname, route) =>
 const detectIsMac = () => {
   if (typeof navigator === "undefined") return false;
   const platform =
-    navigator.userAgentData?.platform || navigator.platform || navigator.userAgent || "";
+    navigator.userAgentData?.platform ||
+    navigator.platform ||
+    navigator.userAgent ||
+    "";
   return /mac|iphone|ipad|ipod/i.test(platform);
 };
 
@@ -117,7 +132,14 @@ const Brand = ({ collapsed, companyLogo }) => {
 };
 
 // ── Search ───────────────────────────────────────────────────────────────────
-const SearchBox = ({ inputRef, query, onQuery, onKeyDown, showHint, isMac }) => (
+const SearchBox = ({
+  inputRef,
+  query,
+  onQuery,
+  onKeyDown,
+  showHint,
+  isMac,
+}) => (
   <div className="shrink-0 px-3 pb-3">
     <div
       className="flex items-center gap-2 transition-colors"
@@ -200,8 +222,9 @@ const NavItem = ({
   );
 
   return collapsed ? (
-    <Tooltip title={item.label} placement="right">
-      {node}
+    <Tooltip>
+      <TooltipTrigger asChild>{node}</TooltipTrigger>
+      <TooltipContent side="right">{item.label}</TooltipContent>
     </Tooltip>
   ) : (
     node
@@ -241,45 +264,45 @@ const NavGroup = ({
   // Collapsed rail → group becomes a hover flyout listing its children
   if (collapsed) {
     return (
-      <Popover
-        placement="rightTop"
-        trigger="hover"
-        styles={{ body: { padding: "0.375rem" } }}
-        content={
-          <div className="min-w-[180px]">
-            <div
-              className="px-2 pb-1.5 mb-1 text-xs font-semibold uppercase tracking-wide"
-              style={{
-                color: "var(--color-text-muted)",
-                borderBottom: "1px solid var(--color-line)",
-              }}
-            >
-              {item.label}
-            </div>
-            {item.children.map((child) => (
-              <NavItem
-                key={child.route}
-                item={child}
-                isActive={isRouteActive(pathname, child.route)}
-                onClick={onNavigate}
-              />
-            ))}
+      <HoverCard openDelay={100} closeDelay={100}>
+        <HoverCardTrigger asChild>
+          <div
+            className={clsx(
+              "nav-item justify-center",
+              hasActiveChild && "is-active",
+            )}
+          >
+            {item.icon && (
+              <span className="shrink-0 flex items-center justify-center w-4 h-4">
+                {item.icon}
+              </span>
+            )}
           </div>
-        }
-      >
-        <div
-          className={clsx(
-            "nav-item justify-center",
-            hasActiveChild && "is-active",
-          )}
+        </HoverCardTrigger>
+        <HoverCardContent
+          side="right"
+          align="start"
+          className="w-auto min-w-[180px] p-1.5"
         >
-          {item.icon && (
-            <span className="shrink-0 flex items-center justify-center w-4 h-4">
-              {item.icon}
-            </span>
-          )}
-        </div>
-      </Popover>
+          <div
+            className="px-2 pb-1.5 mb-1 text-xs font-semibold uppercase tracking-wide"
+            style={{
+              color: "var(--color-text-muted)",
+              borderBottom: "1px solid var(--color-line)",
+            }}
+          >
+            {item.label}
+          </div>
+          {item.children.map((child) => (
+            <NavItem
+              key={child.route}
+              item={child}
+              isActive={isRouteActive(pathname, child.route)}
+              onClick={onNavigate}
+            />
+          ))}
+        </HoverCardContent>
+      </HoverCard>
     );
   }
 
@@ -379,9 +402,13 @@ const NavSection = ({
   );
 
 // ── User footer ──────────────────────────────────────────────────────────────
-const UserFooter = ({ userData, basePath, onNavigate, onLogout, collapsed }) => {
-  const { modal } = App.useApp();
-
+const UserFooter = ({
+  userData,
+  basePath,
+  onNavigate,
+  onLogout,
+  collapsed,
+}) => {
   const fullName =
     [userData?.firstName, userData?.lastName].filter(Boolean).join(" ") ||
     "Account";
@@ -391,32 +418,16 @@ const UserFooter = ({ userData, basePath, onNavigate, onLogout, collapsed }) => 
       .join("")
       .toUpperCase() || "?";
 
-  const confirmLogout = () =>
-    modal.confirm({
+  const confirmLogout = async () => {
+    const ok = await confirm({
       title: "Logout",
-      content: "Do you want to logout?",
-      okText: "Yes",
+      description: "Do you want to logout?",
+      confirmText: "Yes",
       cancelText: "No",
-      okButtonProps: { danger: true },
-      onOk: onLogout,
-    });
-
-  const menuItems = [
-    {
-      key: "account",
-      label: <Link to={`${basePath}/account-settings`}>Account settings</Link>,
-      icon: <Settings className="w-4 h-4" />,
-      onClick: onNavigate,
-    },
-    { type: "divider" },
-    {
-      key: "logout",
-      label: "Logout",
-      icon: <LogOut className="w-4 h-4" />,
       danger: true,
-      onClick: confirmLogout,
-    },
-  ];
+    });
+    if (ok) onLogout();
+  };
 
   const avatar = (
     <span
@@ -441,43 +452,62 @@ const UserFooter = ({ userData, basePath, onNavigate, onLogout, collapsed }) => 
       className="shrink-0 px-2 py-2.5"
       style={{ borderTop: "1px solid var(--color-line)" }}
     >
-      <Dropdown
-        menu={{ items: menuItems }}
-        trigger={["click"]}
-        placement={collapsed ? "topRight" : "topLeft"}
-      >
-        <button
-          className={clsx(
-            "w-full flex items-center gap-2.5 rounded-lg px-1.5 py-1.5 transition-colors hover:bg-(--color-surface-sunken)",
-            collapsed && "justify-center",
-          )}
-          aria-label="Account menu"
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            className={clsx(
+              "w-full flex items-center gap-2.5 rounded-lg px-1.5 py-1.5 transition-colors hover:bg-(--color-surface-sunken)",
+              collapsed && "justify-center",
+            )}
+            aria-label="Account menu"
+          >
+            {avatar}
+            {!collapsed && (
+              <>
+                <span className="min-w-0 flex-1 text-left leading-tight">
+                  <span
+                    className="block truncate"
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 500,
+                      color: "var(--color-text-dark)",
+                    }}
+                  >
+                    {fullName}
+                  </span>
+                  <span
+                    className="block truncate"
+                    style={{ fontSize: 11.5, color: "var(--color-text-muted)" }}
+                  >
+                    {userData?.email}
+                  </span>
+                </span>
+                <ChevronsUpDown
+                  className="w-3.5 h-3.5 shrink-0"
+                  style={{ color: "var(--color-text-muted)" }}
+                />
+              </>
+            )}
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          side="top"
+          align={collapsed ? "end" : "start"}
+          className="min-w-[200px]"
         >
-          {avatar}
-          {!collapsed && (
-            <>
-              <span className="min-w-0 flex-1 text-left leading-tight">
-                <span
-                  className="block truncate"
-                  style={{ fontSize: 13, fontWeight: 500, color: "var(--color-text-dark)" }}
-                >
-                  {fullName}
-                </span>
-                <span
-                  className="block truncate"
-                  style={{ fontSize: 11.5, color: "var(--color-text-muted)" }}
-                >
-                  {userData?.email}
-                </span>
-              </span>
-              <ChevronsUpDown
-                className="w-3.5 h-3.5 shrink-0"
-                style={{ color: "var(--color-text-muted)" }}
-              />
-            </>
-          )}
-        </button>
-      </Dropdown>
+          <DropdownMenuItem asChild>
+            <Link to={`${basePath}/account-settings`} onClick={onNavigate}>
+              <Settings className="w-4 h-4" />
+              Account settings
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem variant="destructive" onClick={confirmLogout}>
+            <LogOut className="w-4 h-4" />
+            Logout
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 };
@@ -503,7 +533,10 @@ const SidebarShell = ({
   const isMac = useMemo(detectIsMac, []);
 
   const searching = query.trim().length > 0;
-  const filtered = useMemo(() => filterNav(navigations, query), [navigations, query]);
+  const filtered = useMemo(
+    () => filterNav(navigations, query),
+    [navigations, query],
+  );
   const leaves = useMemo(() => flattenLeaves(filtered), [filtered]);
 
   // Keep the highlight in range as results change.
@@ -588,10 +621,19 @@ const SidebarShell = ({
 
       {collapsed ? (
         <div className="shrink-0 flex justify-center pb-3">
-          <Tooltip title={`Search (${isMac ? "⌘K" : "Ctrl K"})`} placement="right">
-            <button className="icon-btn w-9 h-9" aria-label="Search" onClick={focusSearch}>
-              <Search className="w-4 h-4" />
-            </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                className="icon-btn w-9 h-9"
+                aria-label="Search"
+                onClick={focusSearch}
+              >
+                <Search className="w-4 h-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              {`Search (${isMac ? "⌘K" : "Ctrl K"})`}
+            </TooltipContent>
           </Tooltip>
         </div>
       ) : (
@@ -674,24 +716,30 @@ const Sidebar = ({
   // Mobile → off-canvas drawer (collapsed === open)
   if (width <= 992) {
     return (
-      <Drawer
-        placement="left"
-        onClose={close}
+      <Sheet
         open={collapsed}
-        width={280}
-        styles={{ body: { padding: 0 }, header: { display: "none" } }}
+        onOpenChange={(open) => {
+          if (!open) close();
+        }}
       >
-        <SidebarShell
-          navigations={navigations}
-          pathname={pathname}
-          basePath={basePath}
-          onNavigate={close}
-          onLogout={handleLogout}
-          companyLogo={company?.companyLogo}
-          userData={userData}
-          isMobile
-        />
-      </Drawer>
+        <SheetContent
+          side="left"
+          className="w-[280px] max-w-[280px] gap-0 p-0"
+          style={{ background: "var(--color-surface)" }}
+        >
+          <SheetTitle className="sr-only">Navigation</SheetTitle>
+          <SidebarShell
+            navigations={navigations}
+            pathname={pathname}
+            basePath={basePath}
+            onNavigate={close}
+            onLogout={handleLogout}
+            companyLogo={company?.companyLogo}
+            userData={userData}
+            isMobile
+          />
+        </SheetContent>
+      </Sheet>
     );
   }
 
@@ -705,7 +753,10 @@ const Sidebar = ({
         width: railWidth,
         minWidth: railWidth,
         transition: "width 0.2s ease, min-width 0.2s ease",
-        zIndex: 100,
+        // Keep the rail below Radix floating layers (dropdown/dialog/sheet =
+        // z-50) so the account menu and any popovers render above it, not
+        // behind it. Still above the topbar (z-30) and page content.
+        zIndex: 40,
       }}
     >
       <SidebarShell

@@ -1,5 +1,7 @@
-import { Spin, Result, Button } from "antd";
+import { Button } from "@/components/ui/button";
 import { usePermissions } from "../hooks/usePermissions";
+import Spinner from "./Spinner";
+import ResultState from "./ResultState";
 
 /**
  * Protected Route Component
@@ -17,7 +19,7 @@ export const ProtectedRoute = ({
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <Spin size="large" fullscreen tip="Loading permissions..." />
+        <Spinner size="large" tip="Loading permissions..." />
       </div>
     );
   }
@@ -25,14 +27,12 @@ export const ProtectedRoute = ({
   if (error) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <Result
+        <ResultState
           status="error"
           title="Failed to Load Permissions"
-          subTitle="Unable to verify your access permissions. Please try again."
-          extra={
-            <Button type="primary" onClick={() => window.location.reload()}>
-              Reload Page
-            </Button>
+          description="Unable to verify your access permissions. Please try again."
+          action={
+            <Button onClick={() => window.location.reload()}>Reload Page</Button>
           }
         />
       </div>
@@ -42,15 +42,12 @@ export const ProtectedRoute = ({
   if (!hasPermission(module, submodule, accessLevel)) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <Result
+        <ResultState
           status="403"
           title="Access Denied"
-          subTitle="You don't have permission to access this page."
-          extra={
-            <Button
-              type="primary"
-              onClick={() => (window.location.href = fallbackPath)}
-            >
+          description="You don't have permission to access this page."
+          action={
+            <Button onClick={() => (window.location.href = fallbackPath)}>
               Go to Dashboard
             </Button>
           }

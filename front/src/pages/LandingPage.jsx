@@ -1,5 +1,5 @@
-import { Button } from "antd";
 import { useNavigate } from "react-router";
+import { Button } from "@/components/ui/button";
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -26,7 +26,7 @@ const LandingPage = () => {
         >
           Your modern web application
         </p>
-        <Button type="primary" size="large" onClick={() => navigate("/admin")}>
+        <Button size="lg" onClick={() => navigate("/admin")}>
           Admin Login
         </Button>
       </div>

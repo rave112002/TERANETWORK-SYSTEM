@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { message, Modal } from "antd";
+import { toast } from "sonner";
 import { useSuperAdminAuthStore } from "../../../store/authStore";
 import { useCsrfStore } from "../../../store/csrfStore";
 import {
@@ -30,13 +30,10 @@ export const useLoginSuperAdminAuth = () => {
           console.error("Failed to fetch CSRF token:", error);
         });
 
-      message.success("Login successful");
+      toast.success("Login successful");
     },
     onError: (error) => {
-      message.error(error.response?.data?.message || "Login failed");
-    },
-    onSettled: () => {
-      Modal.destroyAll();
+      toast.error(error.response?.data?.message || "Login failed");
     },
   });
 };
@@ -50,10 +47,10 @@ export const useLogoutSuperAdminAuth = () => {
     onSuccess: () => {
       reset();
       clearCsrfToken();
-      message.success("Logged out successfully");
+      toast.success("Logged out successfully");
     },
     onError: (error) => {
-      message.error(error.response?.data?.message || "Logout failed");
+      toast.error(error.response?.data?.message || "Logout failed");
     },
   });
 };

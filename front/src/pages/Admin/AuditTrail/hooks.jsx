@@ -1,7 +1,8 @@
 import { useState, useCallback, useMemo } from "react";
-import { App, Button, Dropdown } from "antd";
+import { toast } from "sonner";
 import dayjs from "dayjs";
-import { Eye, MoreVertical } from "lucide-react";
+import { Eye } from "lucide-react";
+import RowActions from "../../../components/RowActions";
 import { useDebounce } from "../../../hooks/useDebounce";
 import {
   useGetAuditTrail,
@@ -25,7 +26,6 @@ const MODULE_OPTIONS = [
 ];
 
 export const useAuditTrailHooks = () => {
-  const { message } = App.useApp();
 
   // ─── Pagination ───────────────────────────────────────────────────
   const [currentPage, setCurrentPage] = useState(1);
@@ -93,15 +93,15 @@ export const useAuditTrailHooks = () => {
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
-      message.success("Audit trail exported");
+      toast.success("Audit trail exported");
     } catch (err) {
-      message.error(
+      toast.error(
         err.response?.data?.message || "Failed to export audit trail",
       );
     } finally {
       setIsExporting(false);
     }
-  }, [activeFilters, message]);
+  }, [activeFilters]);
 
   // ─── Handlers ─────────────────────────────────────────────────────
   const handleViewDetails = useCallback((record) => {
@@ -286,19 +286,7 @@ export const useAuditTrailHooks = () => {
         key: "actions",
         width: 60,
         align: "right",
-        render: (_, record) => (
-          <Dropdown
-            menu={{ items: getActionItems(record) }}
-            trigger={["click"]}
-            placement="bottomRight"
-          >
-            <Button
-              type="text"
-              icon={<MoreVertical className="w-4 h-4" />}
-              className="hover:bg-(--color-surface-sunken)"
-            />
-          </Dropdown>
-        ),
+        render: (_, record) => <RowActions items={getActionItems(record)} />,
       },
     ],
     [getActionItems, currentPage, pageSize],

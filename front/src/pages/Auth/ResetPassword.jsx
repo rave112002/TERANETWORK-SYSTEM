@@ -1,58 +1,66 @@
-import { App, Button, Form, Input } from "antd";
-import { CheckCircle2, Eye, EyeOff, Lock } from "lucide-react";
 import { useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { toast } from "sonner";
+import { CheckCircle2, Lock } from "lucide-react";
 import { NavLink, useSearchParams } from "react-router";
+import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import AuthHeading from "../../components/AuthHeading";
 import AuthLayout from "../../components/AuthLayout";
+import PasswordInput from "../../components/PasswordInput";
 import PasswordStrengthIndicator from "../../components/PasswordStrengthIndicator";
 import { useResetPassword } from "../../services/requests/account";
-import { validationRules } from "../../utils/validation";
+import { zStrongPassword } from "../../utils/validation";
+
+const schema = z
+  .object({
+    password: zStrongPassword(8),
+    confirmPassword: z.string().min(1, "Please confirm your new password"),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
 
 /**
  * Reset-password page. Reads the single-use token from the ?token= query param.
  * Portal-aware (`portal` = "admin" | "superadmin").
  */
 const ResetPassword = ({ portal = "admin" }) => {
-  const [form] = Form.useForm();
-  const { message } = App.useApp();
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token");
   const { mutate, isPending } = useResetPassword(portal);
-  const [newPassword, setNewPassword] = useState("");
   const [done, setDone] = useState(false);
+  const form = useForm({
+    resolver: zodResolver(schema),
+    defaultValues: { password: "", confirmPassword: "" },
+  });
+  const newPassword = form.watch("password");
 
   const loginPath = `/${portal}`;
 
-  const onFinish = ({ password }) => {
+  const onSubmit = ({ password }) => {
     mutate(
       { token, password },
       {
         onSuccess: () => setDone(true),
         onError: (error) =>
-          message.error(
+          toast.error(
             error.response?.data?.message ||
               "This reset link is invalid or has expired.",
           ),
       },
     );
   };
-
-  const lockPrefix = (
-    <Lock
-      className="w-4 h-4 mr-2"
-      style={{ color: "var(--color-text-muted)" }}
-    />
-  );
-
-  const eyeIcon = (visible) =>
-    visible ? (
-      <Eye className="w-4 h-4" style={{ color: "var(--color-text-muted)" }} />
-    ) : (
-      <EyeOff
-        className="w-4 h-4"
-        style={{ color: "var(--color-text-muted)" }}
-      />
-    );
 
   if (done) {
     return (
@@ -64,7 +72,7 @@ const ResetPassword = ({ portal = "admin" }) => {
           subtitle="Your password has been updated. You can now sign in with your new password."
         />
         <NavLink to={loginPath}>
-          <Button type="primary" block size="large" className="mt-6">
+          <Button size="lg" className="mt-6 w-full">
             Back to sign in
           </Button>
         </NavLink>
@@ -81,7 +89,7 @@ const ResetPassword = ({ portal = "admin" }) => {
           subtitle="This link is missing its reset token. Please request a new one."
         />
         <NavLink to={`${loginPath}/forgot-password`}>
-          <Button type="primary" block size="large" className="mt-6">
+          <Button size="lg" className="mt-6 w-full">
             Request a new link
           </Button>
         </NavLink>
@@ -97,67 +105,56 @@ const ResetPassword = ({ portal = "admin" }) => {
         subtitle="Choose a strong password you don't use elsewhere."
       />
 
-      <Form
-        form={form}
-        layout="vertical"
-        onFinish={onFinish}
-        size="large"
-        disabled={isPending}
-        requiredMark={false}
-      >
-        <Form.Item
-          name="password"
-          label="New password"
-          rules={[validationRules.strongPassword(8)]}
-        >
-          <Input.Password
-            prefix={lockPrefix}
-            placeholder="Enter new password"
-            autoComplete="new-password"
-            autoFocus
-            onChange={(e) => setNewPassword(e.target.value)}
-            iconRender={eyeIcon}
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>New password</FormLabel>
+                <FormControl>
+                  <PasswordInput
+                    autoComplete="new-password"
+                    autoFocus
+                    placeholder="Enter new password"
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
           />
-        </Form.Item>
 
-        <PasswordStrengthIndicator password={newPassword} />
+          <PasswordStrengthIndicator password={newPassword} />
 
-        <Form.Item
-          name="confirmPassword"
-          label="Confirm new password"
-          dependencies={["password"]}
-          className="mt-4"
-          rules={[
-            { required: true, message: "Please confirm your new password" },
-            ({ getFieldValue }) => ({
-              validator(_, value) {
-                if (!value || getFieldValue("password") === value) {
-                  return Promise.resolve();
-                }
-                return Promise.reject(new Error("Passwords do not match"));
-              },
-            }),
-          ]}
-        >
-          <Input.Password
-            prefix={lockPrefix}
-            placeholder="Confirm new password"
-            autoComplete="new-password"
-            iconRender={eyeIcon}
+          <FormField
+            control={form.control}
+            name="confirmPassword"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Confirm new password</FormLabel>
+                <FormControl>
+                  <PasswordInput
+                    autoComplete="new-password"
+                    placeholder="Confirm new password"
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
           />
-        </Form.Item>
 
-        <Form.Item className="mb-0">
           <Button
-            type="primary"
-            htmlType="submit"
-            loading={isPending}
-            block
-            size="large"
+            type="submit"
+            size="lg"
+            className="w-full"
+            disabled={isPending}
           >
             {isPending ? "Resetting..." : "Reset password"}
           </Button>
-        </Form.Item>
+        </form>
       </Form>
 
       <div

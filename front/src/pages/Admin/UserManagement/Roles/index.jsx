@@ -1,17 +1,14 @@
-import { FilterOutlined, PlusOutlined } from "@ant-design/icons";
-import {
-  Alert,
-  Button,
-  Col,
-  Empty,
-  Input,
-  Row,
-  Select,
-  Spin,
-  Table,
-} from "antd";
 import { useState } from "react";
-import { CheckCircle, Key, Search, Shield } from "lucide-react";
+import { CheckCircle, CircleAlert, Filter, Key, Plus, Shield } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useRolesData } from "./hooks";
 import RoleFormDrawer from "./components/RoleFormDrawer";
 import PermissionsDrawer from "./components/PermissionsDrawer";
@@ -19,6 +16,8 @@ import PageHeader from "../../../../components/PageHeader";
 import PaginationFooter from "../../../../components/PaginationFooter";
 import StatCard from "../../../../components/StatCard";
 import RefreshButton from "../../../../components/RefreshButton";
+import SearchInput from "../../../../components/SearchInput";
+import DataTable from "../../../../components/DataTable";
 
 const RolesPage = () => {
   const {
@@ -56,14 +55,13 @@ const RolesPage = () => {
   if (error) {
     return (
       <div className="p-8">
-        <Alert
-          message="Error loading roles"
-          description={
-            error.message || "Failed to load roles data. Please try again."
-          }
-          type="error"
-          showIcon
-        />
+        <Alert variant="destructive">
+          <CircleAlert />
+          <AlertTitle>Error loading roles</AlertTitle>
+          <AlertDescription>
+            {error.message || "Failed to load roles data. Please try again."}
+          </AlertDescription>
+        </Alert>
       </div>
     );
   }
@@ -76,11 +74,8 @@ const RolesPage = () => {
         subtitle="Manage roles and the permissions attached to them."
         actions={
           canWrite && (
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={handleCreate}
-            >
+            <Button onClick={handleCreate}>
+              <Plus />
               New role
             </Button>
           )
@@ -88,32 +83,26 @@ const RolesPage = () => {
       />
 
       {/* 2. STAT CARDS */}
-      <Row gutter={[14, 14]}>
-        <Col xs={24} sm={12} lg={8}>
-          <StatCard
-            title="Total roles"
-            value={totalRoles}
-            change="all time"
-            icon={<Shield className="w-4.25 h-4.25" strokeWidth={1.8} />}
-          />
-        </Col>
-        <Col xs={24} sm={12} lg={8}>
-          <StatCard
-            title="Active roles"
-            value={activeRoles}
-            change="on this page"
-            icon={<CheckCircle className="w-4.25 h-4.25" strokeWidth={1.8} />}
-          />
-        </Col>
-        <Col xs={24} sm={12} lg={8}>
-          <StatCard
-            title="Permissions granted"
-            value={totalPermissions}
-            change="on this page"
-            icon={<Key className="w-4.25 h-4.25" strokeWidth={1.8} />}
-          />
-        </Col>
-      </Row>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+        <StatCard
+          title="Total roles"
+          value={totalRoles}
+          change="all time"
+          icon={<Shield className="w-4.25 h-4.25" strokeWidth={1.8} />}
+        />
+        <StatCard
+          title="Active roles"
+          value={activeRoles}
+          change="on this page"
+          icon={<CheckCircle className="w-4.25 h-4.25" strokeWidth={1.8} />}
+        />
+        <StatCard
+          title="Permissions granted"
+          value={totalPermissions}
+          change="on this page"
+          icon={<Key className="w-4.25 h-4.25" strokeWidth={1.8} />}
+        />
+      </div>
 
       {/* 3. TABLE CARD */}
       <div
@@ -128,26 +117,21 @@ const RolesPage = () => {
           className="flex items-center justify-between gap-3 flex-wrap px-[18px] py-3.5"
           style={{ borderBottom: "1px solid var(--color-line)" }}
         >
-          <Input
-            placeholder="Filter roles…"
-            prefix={
-              <Search
-                className="w-[15px] h-[15px]"
-                style={{ color: "var(--color-text-muted)" }}
-              />
-            }
+          <SearchInput
             value={filters.search}
-            onChange={(e) => handleSearch(e.target.value)}
-            allowClear
-            style={{ width: 280 }}
+            onChange={handleSearch}
+            placeholder="Filter roles…"
           />
           <div className="flex items-center gap-2">
             <RefreshButton onRefresh={refetch} isFetching={isFetching} />
             <Button
-              icon={<FilterOutlined />}
+              variant={
+                isFilterVisible || hasActiveFilters ? "default" : "outline"
+              }
+              size="sm"
               onClick={() => setIsFilterVisible(!isFilterVisible)}
-              type={isFilterVisible || hasActiveFilters ? "primary" : "default"}
             >
+              <Filter />
               Filters
             </Button>
           </div>
@@ -172,16 +156,18 @@ const RolesPage = () => {
                 Status
               </span>
               <Select
-                value={filters.status || undefined}
-                onChange={handleStatusFilter}
-                placeholder="All statuses"
-                allowClear
-                style={{ width: 200 }}
-                options={[
-                  { value: "Active", label: "Active" },
-                  { value: "Inactive", label: "Inactive" },
-                ]}
-              />
+                value={filters.status || "all"}
+                onValueChange={(v) => handleStatusFilter(v === "all" ? "" : v)}
+              >
+                <SelectTrigger className="h-10 w-[200px]">
+                  <SelectValue placeholder="All statuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="Active">Active</SelectItem>
+                  <SelectItem value="Inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             {hasActiveFilters && (
               <button
@@ -197,34 +183,25 @@ const RolesPage = () => {
 
         {/* Table + custom pagination footer */}
         {isEmpty ? (
-          <div className="flex items-center justify-center py-20">
-            <Empty description="No roles found">
-              {canWrite && (
-                <Button
-                  type="primary"
-                  icon={<PlusOutlined />}
-                  onClick={handleCreate}
-                >
-                  New role
-                </Button>
-              )}
-            </Empty>
+          <div className="flex flex-col items-center justify-center gap-4 py-20 text-center">
+            <p style={{ fontSize: 13.5, color: "var(--color-text-muted)" }}>
+              No roles found
+            </p>
+            {canWrite && (
+              <Button onClick={handleCreate}>
+                <Plus />
+                New role
+              </Button>
+            )}
           </div>
         ) : (
           <>
-            <Table
+            <DataTable
               dataSource={data}
               columns={columns}
               rowKey="roleId"
-              pagination={false}
-              loading={{
-                spinning: isLoading,
-                indicator: <Spin size="large" style={{ marginTop: 50 }} />,
-              }}
-              onChange={handleTableChange}
+              loading={isLoading}
               scroll={{ x: 900 }}
-              size="middle"
-              className="border-none"
             />
             <PaginationFooter
               pagination={pagination}

@@ -1,6 +1,26 @@
-import { App, Button, Form, Input, Tooltip } from "antd";
-import { Mail, Phone, User } from "lucide-react";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { toast } from "sonner";
+import { Loader2, Mail, Phone, User } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
 import SectionLabel from "../../../../components/SectionLabel";
 import {
   useAdminAuthStore,
@@ -10,23 +30,20 @@ import { useUpdateProfile } from "../../../../services/requests/account";
 import {
   PHONE_MAX_LENGTH,
   PHONE_PLACEHOLDER,
-  handlePhoneInput,
-  phoneValidator,
+  formatPhoneOnChange,
+  zPhone,
 } from "../../../../utils/phoneFormat";
 
-// Dependency-free value compare for the dirty check.
-const isFormEqual = (a = {}, b = {}) => {
-  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
-  for (const k of keys) {
-    if (JSON.stringify(a[k] ?? "") !== JSON.stringify(b[k] ?? "")) return false;
-  }
-  return true;
-};
+const schema = z.object({
+  firstName: z.string().trim().min(1, "First name is required"),
+  lastName: z.string().trim().min(1, "Last name is required"),
+  email: z.string(),
+  phone: zPhone,
+});
+
+const req = <span style={{ color: "var(--color-error)" }}>*</span>;
 
 const ProfileSection = ({ portal = "admin" }) => {
-  const [form] = Form.useForm();
-  const { message } = App.useApp();
-  // Both hooks always run (rules-of-hooks); pick by portal.
   const adminUser = useAdminAuthStore((s) => s.userData);
   const superUser = useSuperAdminAuthStore((s) => s.userData);
   const userData = portal === "superadmin" ? superUser : adminUser;
@@ -34,39 +51,29 @@ const ProfileSection = ({ portal = "admin" }) => {
     portal === "superadmin"
       ? useSuperAdminAuthStore.getState().setUserData
       : useAdminAuthStore.getState().setUserData;
-  const initialValuesRef = useRef({});
+
   const { mutate, isPending } = useUpdateProfile(portal);
+
+  const form = useForm({
+    resolver: zodResolver(schema),
+    defaultValues: { firstName: "", lastName: "", email: "", phone: "" },
+  });
+  const {
+    formState: { isDirty },
+  } = form;
 
   useEffect(() => {
     if (userData) {
-      const values = {
-        firstName: userData.firstName,
-        lastName: userData.lastName,
-        email: userData.email,
-        phone: userData.phone,
-      };
-      form.setFieldsValue(values);
-      initialValuesRef.current = values;
+      form.reset({
+        firstName: userData.firstName ?? "",
+        lastName: userData.lastName ?? "",
+        email: userData.email ?? "",
+        phone: userData.phone ?? "",
+      });
     }
   }, [userData, form]);
 
-  // Live dirty flag so Save stays disabled until something actually changes.
-  const watchedValues = Form.useWatch([], form);
-  const isDirty = useMemo(
-    () =>
-      !isFormEqual(
-        watchedValues ?? form.getFieldsValue(),
-        initialValuesRef.current,
-      ),
-    [watchedValues, form],
-  );
-
-  const handleSubmit = async () => {
-    if (!isDirty) {
-      message.info("No changes to save");
-      return;
-    }
-    const values = form.getFieldsValue();
+  const onSubmit = (values) => {
     mutate(
       {
         firstName: values.firstName,
@@ -76,12 +83,12 @@ const ProfileSection = ({ portal = "admin" }) => {
       {
         onSuccess: (response) => {
           const updated = response?.data?.user;
-          if (updated) setUserData(updated); // keep the store (and header) in sync
-          message.success("Profile updated successfully");
-          initialValuesRef.current = form.getFieldsValue(); // new baseline
+          if (updated) setUserData(updated);
+          toast.success("Profile updated successfully");
+          form.reset(values); // new baseline
         },
         onError: (error) =>
-          message.error(
+          toast.error(
             error.response?.data?.message || "Failed to update profile",
           ),
       },
@@ -89,119 +96,135 @@ const ProfileSection = ({ portal = "admin" }) => {
   };
 
   return (
-    <Form
-      form={form}
-      layout="vertical"
-      onFinish={handleSubmit}
-      requiredMark
-      autoComplete="off"
-      scrollToFirstError={{ behavior: "smooth", block: "center", focus: true }}
-    >
-      {/* Personal details */}
-      <div>
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} autoComplete="off">
+        {/* Personal details */}
         <SectionLabel>Personal details</SectionLabel>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
-          <Form.Item
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4 items-start">
+          <FormField
+            control={form.control}
             name="firstName"
-            label="First name"
-            rules={[{ required: true, message: "First name is required" }]}
-          >
-            <Input
-              prefix={
-                <User
-                  className="w-4 h-4 mr-2"
-                  style={{ color: "var(--color-text-muted)" }}
-                />
-              }
-              placeholder="e.g., Juan"
-              size="large"
-            />
-          </Form.Item>
-
-          <Form.Item
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>First name {req}</FormLabel>
+                <div className="relative">
+                  <User
+                    className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
+                    style={{ color: "var(--color-text-muted)" }}
+                  />
+                  <FormControl>
+                    <Input placeholder="e.g., Juan" className="h-10 pl-9" {...field} />
+                  </FormControl>
+                </div>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
             name="lastName"
-            label="Last name"
-            rules={[{ required: true, message: "Last name is required" }]}
-          >
-            <Input
-              prefix={
-                <User
-                  className="w-4 h-4 mr-2"
-                  style={{ color: "var(--color-text-muted)" }}
-                />
-              }
-              placeholder="e.g., Dela Cruz"
-              size="large"
-            />
-          </Form.Item>
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Last name {req}</FormLabel>
+                <div className="relative">
+                  <User
+                    className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
+                    style={{ color: "var(--color-text-muted)" }}
+                  />
+                  <FormControl>
+                    <Input
+                      placeholder="e.g., Dela Cruz"
+                      className="h-10 pl-9"
+                      {...field}
+                    />
+                  </FormControl>
+                </div>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
         </div>
-      </div>
 
-      {/* Contact */}
-      <div className="mt-7">
-        <SectionLabel>Contact</SectionLabel>
-
-        <Form.Item
-          name="email"
-          label="Email address"
-          rules={[
-            { required: true, message: "Email is required" },
-            { type: "email", message: "Please enter a valid email" },
-          ]}
-        >
-          <Input
-            prefix={
-              <Mail
-                className="w-4 h-4 mr-2"
-                style={{ color: "var(--color-text-muted)" }}
-              />
-            }
-            placeholder="juan@example.com"
-            size="large"
-            disabled
+        {/* Contact */}
+        <div className="mt-7">
+          <SectionLabel>Contact</SectionLabel>
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem className="mb-5">
+                <FormLabel>Email address {req}</FormLabel>
+                <div className="relative">
+                  <Mail
+                    className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
+                    style={{ color: "var(--color-text-muted)" }}
+                  />
+                  <FormControl>
+                    <Input
+                      placeholder="juan@example.com"
+                      className="h-10 pl-9"
+                      disabled
+                      {...field}
+                    />
+                  </FormControl>
+                </div>
+                <FormMessage />
+              </FormItem>
+            )}
           />
-        </Form.Item>
-
-        <Form.Item
-          name="phone"
-          label="Phone number"
-          rules={[{ validator: phoneValidator }]}
-        >
-          <Input
-            prefix={
-              <Phone
-                className="w-4 h-4 mr-2"
-                style={{ color: "var(--color-text-muted)" }}
-              />
-            }
-            placeholder={PHONE_PLACEHOLDER}
-            size="large"
-            maxLength={PHONE_MAX_LENGTH}
-            onChange={(e) => handlePhoneInput(e, form)}
+          <FormField
+            control={form.control}
+            name="phone"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Phone number</FormLabel>
+                <div className="relative">
+                  <Phone
+                    className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
+                    style={{ color: "var(--color-text-muted)" }}
+                  />
+                  <FormControl>
+                    <Input
+                      placeholder={PHONE_PLACEHOLDER}
+                      className="h-10 pl-9"
+                      maxLength={PHONE_MAX_LENGTH}
+                      {...field}
+                      onChange={(e) =>
+                        field.onChange(formatPhoneOnChange(e.target.value))
+                      }
+                    />
+                  </FormControl>
+                </div>
+                <FormMessage />
+              </FormItem>
+            )}
           />
-        </Form.Item>
-      </div>
+        </div>
 
-      {/* Footer */}
-      <div
-        className="mt-7 pt-5 flex justify-end"
-        style={{ borderTop: "1px solid var(--color-line)" }}
-      >
-        <Tooltip title={!isDirty ? "No changes to save yet" : undefined}>
-          <span>
-            <Button
-              type="primary"
-              htmlType="submit"
-              disabled={!isDirty}
-              loading={isPending}
-              size="large"
-            >
-              Save Changes
-            </Button>
-          </span>
-        </Tooltip>
-      </div>
+        {/* Footer */}
+        <div
+          className="mt-7 pt-5 flex justify-end"
+          style={{ borderTop: "1px solid var(--color-line)" }}
+        >
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="inline-flex">
+                <Button
+                  type="submit"
+                  size="lg"
+                  disabled={!isDirty || isPending}
+                >
+                  {isPending && <Loader2 className="animate-spin" />}
+                  Save Changes
+                </Button>
+              </span>
+            </TooltipTrigger>
+            {!isDirty && (
+              <TooltipContent>No changes to save yet</TooltipContent>
+            )}
+          </Tooltip>
+        </div>
+      </form>
     </Form>
   );
 };

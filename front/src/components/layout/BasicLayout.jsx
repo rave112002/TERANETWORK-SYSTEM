@@ -1,9 +1,10 @@
+import { PanelLeftClose, PanelLeftOpen, User } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
-  MenuFoldOutlined,
-  MenuUnfoldOutlined,
-  UserOutlined,
-} from "@ant-design/icons";
-import { Avatar, Dropdown } from "antd";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useMemo, useState } from "react";
 import { Outlet, useLocation } from "react-router";
 import ThemeToggle from "../ThemeToggle";
@@ -50,37 +51,6 @@ const BasicLayout = ({ navigations, store }) => {
 
   const handleCollapse = (value) => setCollapsed(value);
 
-  const userMenuItems = [
-    {
-      key: "info",
-      label: (
-        <div className="px-1 py-2 min-w-[180px]">
-          <div
-            className="font-semibold"
-            style={{ color: "var(--color-text-dark)" }}
-          >
-            {userData && [userData.firstName, userData.lastName].join(" ")}
-          </div>
-          <div
-            className="text-xs mt-0.5"
-            style={{ color: "var(--color-text-secondary)" }}
-          >
-            {userData?.email}
-          </div>
-          {userData?.roleName && (
-            <div
-              className="text-xs mt-0.5 font-medium"
-              style={{ color: "var(--color-primary-color)" }}
-            >
-              {userData.roleName}
-            </div>
-          )}
-        </div>
-      ),
-      disabled: true,
-    },
-  ];
-
   // Content offset matches the sidebar: hidden on mobile, rail or full on desktop
   const contentMargin = isMobile ? 0 : collapsed ? RAIL_WIDTH : SIDEBAR_WIDTH;
 
@@ -120,9 +90,9 @@ const BasicLayout = ({ navigations, store }) => {
               onClick={() => handleCollapse(!collapsed)}
             >
               {collapsed ? (
-                <MenuUnfoldOutlined className="text-base" />
+                <PanelLeftOpen className="w-[18px] h-[18px]" />
               ) : (
-                <MenuFoldOutlined className="text-base" />
+                <PanelLeftClose className="w-[18px] h-[18px]" />
               )}
             </button>
 
@@ -163,31 +133,56 @@ const BasicLayout = ({ navigations, store }) => {
             />
 
             {/* User dropdown */}
-            <Dropdown
-              menu={{ items: userMenuItems }}
-              trigger={["click"]}
-              placement="bottomRight"
-            >
-              <button
-                className="flex items-center gap-2 pl-1.5 pr-2.5 py-1.5 rounded-lg transition-colors hover:bg-(--color-surface-sunken)"
-                style={{ color: "var(--color-text-dark)" }}
-              >
-                <Avatar
-                  size={32}
-                  icon={<UserOutlined />}
-                  style={{
-                    background: "var(--gradient-primary)",
-                    flexShrink: 0,
-                  }}
-                />
-                {width > 640 && (
-                  <span className="text-sm font-medium max-w-[140px] truncate text-left leading-tight">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="flex items-center gap-2 pl-1.5 pr-2.5 py-1.5 rounded-lg transition-colors hover:bg-(--color-surface-sunken)"
+                  style={{ color: "var(--color-text-dark)" }}
+                >
+                  <Avatar className="size-8 shrink-0">
+                    <AvatarFallback
+                      style={{
+                        background: "var(--gradient-primary)",
+                        color: "#fff",
+                      }}
+                    >
+                      <User className="w-4 h-4" />
+                    </AvatarFallback>
+                  </Avatar>
+                  {width > 640 && (
+                    <span className="text-sm font-medium max-w-[140px] truncate text-left leading-tight">
+                      {userData &&
+                        [userData.firstName, userData.lastName].join(" ")}
+                    </span>
+                  )}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-[200px]">
+                <div className="px-2 py-1.5">
+                  <div
+                    className="font-semibold"
+                    style={{ color: "var(--color-text-dark)" }}
+                  >
                     {userData &&
                       [userData.firstName, userData.lastName].join(" ")}
-                  </span>
-                )}
-              </button>
-            </Dropdown>
+                  </div>
+                  <div
+                    className="text-xs mt-0.5"
+                    style={{ color: "var(--color-text-secondary)" }}
+                  >
+                    {userData?.email}
+                  </div>
+                  {userData?.roleName && (
+                    <div
+                      className="text-xs mt-0.5 font-medium"
+                      style={{ color: "var(--color-primary-color)" }}
+                    >
+                      {userData.roleName}
+                    </div>
+                  )}
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
 

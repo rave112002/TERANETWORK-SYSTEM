@@ -1,6 +1,7 @@
-import { App, Button, Dropdown } from "antd";
 import { useCallback, useMemo, useState } from "react";
-import { Eye, MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { confirm } from "../../../../store/confirmStore";
+import { Eye, Pencil, Trash2 } from "lucide-react";
+import RowActions from "../../../../components/RowActions";
 import { useDebounce } from "../../../../hooks/useDebounce";
 import { decodeHTML } from "../../../../utils/decode-html";
 import {
@@ -11,8 +12,6 @@ import { useGetCompanies } from "../../../../services/requests/superadmin/compan
 import { formatPhoneDisplay } from "../../../../utils/phoneFormat";
 
 export const useBranchHooks = () => {
-  const { modal } = App.useApp();
-
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
@@ -109,17 +108,17 @@ export const useBranchHooks = () => {
 
   // Destructive action gets an explicit confirm step.
   const handleDeleteRequest = useCallback(
-    (record) => {
-      modal.confirm({
+    async (record) => {
+      const ok = await confirm({
         title: "Delete branch",
-        content: `Delete "${decodeHTML(record.name)}"? This can't be undone.`,
-        okText: "Delete",
-        okButtonProps: { danger: true },
+        description: `Delete "${decodeHTML(record.name)}"? This can't be undone.`,
+        confirmText: "Delete",
         cancelText: "Cancel",
-        onOk: () => handleDelete(record),
+        danger: true,
       });
+      if (ok) handleDelete(record);
     },
-    [modal, handleDelete],
+    [handleDelete],
   );
 
   const handleOpenCreateDrawer = useCallback(() => {
@@ -317,19 +316,7 @@ export const useBranchHooks = () => {
         key: "actions",
         width: 60,
         align: "right",
-        render: (_, record) => (
-          <Dropdown
-            menu={{ items: getActionItems(record) }}
-            trigger={["click"]}
-            placement="bottomRight"
-          >
-            <Button
-              type="text"
-              icon={<MoreVertical className="w-4 h-4" />}
-              className="hover:bg-(--color-surface-sunken)"
-            />
-          </Dropdown>
-        ),
+        render: (_, record) => <RowActions items={getActionItems(record)} />,
       },
     ],
     [getActionItems, currentPage, pageSize],

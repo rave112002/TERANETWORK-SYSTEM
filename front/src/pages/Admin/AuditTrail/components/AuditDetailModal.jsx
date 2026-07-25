@@ -1,6 +1,12 @@
-import { Button, Modal } from "antd";
 import dayjs from "dayjs";
 import { FileText, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { ACTION_DOT } from "../hooks";
 import SectionLabel from "../../../../components/SectionLabel";
 import { decodeHTML } from "../../../../utils/decode-html";
@@ -47,16 +53,19 @@ const AuditDetailModal = ({ open, onClose, log }) => {
     "—";
 
   return (
-    <Modal
+    <Dialog
       open={open}
-      onCancel={onClose}
-      footer={null}
-      closable={false}
-      width={640}
-      styles={{ body: { padding: 24 } }}
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
     >
-      {/* Header — accent chip + title + subtitle + bordered X */}
-      <div className="flex items-start justify-between gap-3 mb-7">
+      <DialogContent
+        showCloseButton={false}
+        className="sm:max-w-[640px] max-h-[85vh] overflow-y-auto"
+      >
+        <DialogTitle className="sr-only">Audit Event</DialogTitle>
+        {/* Header — accent chip + title + subtitle + bordered X */}
+        <div className="flex items-start justify-between gap-3 mb-7">
         <div className="flex items-center gap-3 min-w-0">
           <span className="inline-flex items-center justify-center w-11 h-11 rounded-xl shrink-0 bg-(image:--gradient-primary)">
             <FileText className="w-[22px] h-[22px] text-white" />
@@ -157,16 +166,17 @@ const AuditDetailModal = ({ open, onClose, log }) => {
         </div>
       )}
 
-      {/* Footer */}
-      <div
-        className="mt-8 pt-5 flex justify-end gap-3"
-        style={{ borderTop: "1px solid var(--color-line)" }}
-      >
-        <Button type="primary" onClick={onClose} size="large">
-          Close
-        </Button>
-      </div>
-    </Modal>
+        {/* Footer */}
+        <DialogFooter
+          className="mt-8 pt-5"
+          style={{ borderTop: "1px solid var(--color-line)" }}
+        >
+          <Button size="lg" onClick={onClose}>
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
 

@@ -36,8 +36,8 @@ Pattern: `use[Entity]Hooks` or `use[Entity]Data`. Pick one per project — `useX
 
 ```jsx
 import { useState, useCallback, useMemo } from "react";
-import { Button, Dropdown, Tag, Avatar } from "antd";
 import { MoreVertical, Edit, Trash2, Eye } from "lucide-react";
+import RowActions from "../../../../components/RowActions";
 import { useDebounce } from "../../../../hooks/useDebounce";
 import { usePermissions } from "../../../../hooks/usePermissions";
 import {
@@ -177,21 +177,12 @@ export const useItemHooks = () => {
       {
         title: "",
         key: "actions",
-        fixed: "right",
+        align: "right",
         width: 60,
-        render: (_, record) => (
-          <Dropdown
-            menu={{ items: getActionItems(record) }}
-            trigger={["click"]}
-            placement="bottomRight"
-          >
-            <Button
-              type="text"
-              icon={<MoreVertical className="w-4 h-4" />}
-              className="hover:bg-gray-100"
-            />
-          </Dropdown>
-        ),
+        // The shared RowActions renders the ⋮ shadcn DropdownMenu from the
+        // getActionItems array — { key, label, icon, onClick, danger?, disabled? }
+        // with { type: "divider" } separators. Returns null when empty.
+        render: (_, record) => <RowActions items={getActionItems(record)} />,
       },
     ],
     [getActionItems],
@@ -272,8 +263,8 @@ export const useItemHooks = () => {
 5. **Use `useDebounce`** for search inputs. Always 500ms delay.
 6. **Derive `canWrite`** from `usePermissions` — pass it in the return so the page can gate UI.
 7. **Refetch after mutations.** Call `refetch()` in drawer close handlers and after delete.
-8. **Action items use Lucide icons** (`w-4 h-4`) — never Ant icons in dropdown menus.
-9. **Actions column** is always last, `fixed: "right"`, `width: 60–80`, uses `<Dropdown>` with `<MoreVertical>`.
+8. **Action items use Lucide icons** (`w-4 h-4`) — every icon in the app is lucide-react.
+9. **Actions column** is always last, `align: "right"`, `width: 60–80`, rendered by the shared `<RowActions items={getActionItems(record)} />`.
 10. **Return shape** is flat — no nesting except for the raw `data` from React Query.
 
 ---

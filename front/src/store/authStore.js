@@ -23,7 +23,7 @@ export const useAdminAuthStore = create(
         }),
     }),
     {
-      name: "admin-auth",
+      name: "template-admin-auth",
       storage: createJSONStorage(() => localStorage),
     },
   ),

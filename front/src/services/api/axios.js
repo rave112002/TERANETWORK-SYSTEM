@@ -1,5 +1,5 @@
-import { message } from "antd";
 import axios from "axios";
+import { toast } from "sonner";
 import {
   useAdminAuthStore,
   useSuperAdminAuthStore,
@@ -178,7 +178,7 @@ const handleSessionExpired = (user) => {
   store.getState().reset();
   useCsrfStore?.getState()?.clearCsrfToken?.();
   if (hadToken) {
-    message.warning("Your session has expired. Please log in again.");
+    toast.warning("Your session has expired. Please log in again.");
   }
 };
 

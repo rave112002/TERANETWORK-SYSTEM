@@ -5,15 +5,16 @@ import {
   useMutation,
   useQueryClient,
 } from "@tanstack/react-query";
-import { message, App, Button, Dropdown } from "antd";
-import { Key, MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { Key, Pencil, Trash2 } from "lucide-react";
+import RowActions from "../../../../components/RowActions";
 import { getRoles, deleteRole } from "../../../../services/api/admin/roles";
 import { usePermissions } from "../../../../hooks/usePermissions";
 import { decodeHTML } from "../../../../utils/decode-html";
+import { confirm } from "../../../../store/confirmStore";
 
 export const useRolesData = () => {
   const queryClient = useQueryClient();
-  const { modal } = App.useApp();
   const { hasPermission } = usePermissions();
   const canWrite = hasPermission("users", "roles", "write");
 
@@ -48,11 +49,11 @@ export const useRolesData = () => {
   const deleteMutation = useMutation({
     mutationFn: deleteRole,
     onSuccess: () => {
-      message.success("Role deleted successfully");
+      toast.success("Role deleted successfully");
       queryClient.invalidateQueries({ queryKey: ["roles"] });
     },
     onError: (error) => {
-      message.error(error.response?.data?.message || "Failed to delete role");
+      toast.error(error.response?.data?.message || "Failed to delete role");
     },
   });
 
@@ -115,17 +116,17 @@ export const useRolesData = () => {
 
   // Destructive action gets an explicit confirm step.
   const handleDeleteRequest = useCallback(
-    (record) => {
-      modal.confirm({
+    async (record) => {
+      const ok = await confirm({
         title: "Delete role",
-        content: `Delete "${record.roleName}"? This can't be undone.`,
-        okText: "Delete",
-        okButtonProps: { danger: true },
+        description: `Delete "${record.roleName}"? This can't be undone.`,
+        confirmText: "Delete",
         cancelText: "Cancel",
-        onOk: () => handleDelete(record.roleId),
+        danger: true,
       });
+      if (ok) handleDelete(record.roleId);
     },
-    [modal, handleDelete],
+    [handleDelete],
   );
 
   // ⋮ menu: primary action, Edit, divider, Delete (danger)
@@ -269,19 +270,7 @@ export const useRolesData = () => {
         key: "actions",
         width: 60,
         align: "right",
-        render: (_, record) => (
-          <Dropdown
-            menu={{ items: getActionItems(record) }}
-            trigger={["click"]}
-            placement="bottomRight"
-          >
-            <Button
-              type="text"
-              icon={<MoreVertical className="w-4 h-4" />}
-              className="hover:bg-(--color-surface-sunken)"
-            />
-          </Dropdown>
-        ),
+        render: (_, record) => <RowActions items={getActionItems(record)} />,
       },
     ],
     [getActionItems, pagination],

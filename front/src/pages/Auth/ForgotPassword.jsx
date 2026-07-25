@@ -1,10 +1,31 @@
-import { App, Button, Form, Input } from "antd";
-import { ArrowLeft, CheckCircle2, Mail } from "lucide-react";
 import { useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { toast } from "sonner";
+import { ArrowLeft, CheckCircle2, Mail } from "lucide-react";
 import { NavLink } from "react-router";
+import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 import AuthHeading from "../../components/AuthHeading";
 import AuthLayout from "../../components/AuthLayout";
 import { useForgotPassword } from "../../services/requests/account";
+
+const schema = z.object({
+  email: z
+    .string()
+    .trim()
+    .min(1, "Please enter your email address")
+    .email("Please enter a valid email address"),
+});
 
 /**
  * Forgot-password page. Portal-aware (`portal` = "admin" | "superadmin").
@@ -12,18 +33,20 @@ import { useForgotPassword } from "../../services/requests/account";
  * show the same generic confirmation regardless of whether the email exists.
  */
 const ForgotPassword = ({ portal = "admin" }) => {
-  const [form] = Form.useForm();
-  const { message } = App.useApp();
   const { mutate, isPending } = useForgotPassword(portal);
   const [sent, setSent] = useState(false);
+  const form = useForm({
+    resolver: zodResolver(schema),
+    defaultValues: { email: "" },
+  });
 
   const loginPath = `/${portal}`;
 
-  const onFinish = ({ email }) => {
+  const onSubmit = ({ email }) => {
     mutate(email, {
       onSuccess: () => setSent(true),
       onError: (error) =>
-        message.error(
+        toast.error(
           error.response?.data?.message ||
             "Something went wrong. Please try again.",
         ),
@@ -47,51 +70,44 @@ const ForgotPassword = ({ portal = "admin" }) => {
             subtitle="Enter your email and we'll send you a reset link."
           />
 
-          <Form
-            form={form}
-            layout="vertical"
-            onFinish={onFinish}
-            size="large"
-            disabled={isPending}
-            requiredMark={false}
-          >
-            <Form.Item
-              name="email"
-              label="Email Address"
-              getValueFromEvent={(e) => e.target.value.trim()}
-              rules={[
-                { required: true, message: "Please enter your email address" },
-                {
-                  type: "email",
-                  message: "Please enter a valid email address",
-                },
-              ]}
-            >
-              <Input
-                prefix={
-                  <Mail
-                    className="w-4 h-4 mr-2"
-                    style={{ color: "var(--color-text-muted)" }}
-                  />
-                }
-                placeholder="Enter your email"
-                type="email"
-                autoComplete="username"
-                autoFocus
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email Address</FormLabel>
+                    <div className="relative">
+                      <Mail
+                        className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
+                        style={{ color: "var(--color-text-muted)" }}
+                      />
+                      <FormControl>
+                        <Input
+                          type="email"
+                          autoComplete="username"
+                          autoFocus
+                          placeholder="Enter your email"
+                          className="h-10 pl-9"
+                          {...field}
+                        />
+                      </FormControl>
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </Form.Item>
 
-            <Form.Item className="mb-0">
               <Button
-                type="primary"
-                htmlType="submit"
-                loading={isPending}
-                block
-                size="large"
+                type="submit"
+                size="lg"
+                className="w-full"
+                disabled={isPending}
               >
                 {isPending ? "Sending..." : "Send reset link"}
               </Button>
-            </Form.Item>
+            </form>
           </Form>
         </>
       )}

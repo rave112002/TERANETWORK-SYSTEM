@@ -1,40 +1,36 @@
 # Modern Module Pattern
 
-How to build any admin module's **list page** and **create/edit drawer** to match the
-"Modern" design (Onest + monochrome surfaces + green accent, hairline borders, no
-shadows). The Roles submodule
-(`src/pages/Admin/UserManagement/Roles/`) is the reference implementation — copy its
-shape.
+How to build any admin module's **list page** and **create/edit form** to match the "Modern"
+design (Onest + monochrome surfaces + green accent, hairline borders, no shadows). The Roles
+submodule (`src/pages/Admin/UserManagement/Roles/`) is the reference implementation — copy its
+shape. UI primitives are **shadcn/ui** (`@/components/ui/*`), with lucide-react icons.
 
-> Everything visual is driven by central tokens. **Never hardcode hex colors** in a
-> page — use the CSS variables below so light/dark and future re-brands "just work".
+> Everything visual is driven by central tokens. **Never hardcode hex colors** in a page — use the
+> CSS variables below so light/dark and future re-brands "just work". The form pattern lives in
+> **`ui-form-design.md`** (Sheet + react-hook-form + zod); this doc covers the list page and the
+> shared chrome.
 
 ---
 
 ## 1. The design system (already global — don't re-declare)
 
-- **Fonts** — `Onest` (UI + headings) and `JetBrains Mono` (row `#`, ⌘K, ids).
-  **Self-hosted** via `@fontsource-variable/onest` + `@fontsource-variable/jetbrains-mono`,
-  imported in `src/main.jsx` (offline-safe in production). A Google Fonts `<link>` in
-  `index.html` is kept as a **fallback** so the font also renders in dev without a Vite
-  restart. The stacks list the bundled family first (`"Onest Variable"`,
-  `"JetBrains Mono Variable"`) then the plain CDN name (`"Onest"`), in `--font-sans` /
-  `--font-mono` (`index.css`) and `antdTheme.js`. Body weight is **400** (light),
-  headings **600**.
-- **Accent** — green: `--color-secondary-color` (`#4ade80`) for bars/focus/chips,
-  `--color-link` (`#16a34a`) for text links. Ant's `colorPrimary` is `#22c55e`.
-  Used **sparingly** — never on buttons.
-- **Primary buttons are INVERTED** (`type="primary"` → dark button/light text in light
-  mode, light/dark in dark mode). Handled by the `.ant-btn-primary` override — just use
-  `type="primary"`, never add an inline `background`.
-- **Cards/panels** — `1px solid var(--color-line)`, `border-radius: 14`, **no shadow**.
+- **Fonts** — `Onest` (UI + headings) and `JetBrains Mono` (row `#`, ⌘K, ids). Self-hosted via
+  `@fontsource-variable/*` (imported in `src/main.jsx`). Stacks live in `--font-sans` /
+  `--font-mono` (`index.css`). Body weight **400**, headings **600**.
+- **Accent** — green: `--color-secondary-color` (`#4ade80`) for bars/focus/chips, `--color-link`
+  (`#16a34a`) for text links. Used **sparingly** — never on buttons.
+- **Primary buttons are INVERTED** — the default shadcn `<Button>` variant is dark-on-light /
+  light-on-dark (via the token bridge). Just use `<Button>`; never add an inline `background`.
+  `variant="outline"` = secondary (Cancel), `variant="destructive"` = danger.
+- **Cards/panels** — plain `<div>` with `1px solid var(--color-line)`, `border-radius: 14`,
+  **no shadow**. There is no Card component.
 
 ### Token cheat-sheet
 
 | Token                                     | Use                                              |
 | ----------------------------------------- | ------------------------------------------------ |
 | `--color-canvas`                          | page background                                  |
-| `--color-surface`                         | cards, table, drawer body                        |
+| `--color-surface`                         | cards, table, sheet body                         |
 | `--color-surface-sunken`                  | wells, hover, segmented-toggle track             |
 | `--color-line`                            | hairline borders                                 |
 | `--color-line-soft`                       | row dividers                                     |
@@ -45,99 +41,80 @@ shape.
 | `--color-secondary-color`                 | accent (bars, ticks, focus, chips)               |
 | `--radius-card` 14 · `--radius-control` 9 | radii                                            |
 
-Shared components: `components/PageHeader.jsx`, `components/StatCard.jsx`. Shared CSS
-classes (in `index.css`): `.pager-btn`, `.pager-active`, `.pager-size`, plus global
-`.ant-table-thead > tr > th` (11.5px/500) and `.ant-card` (flat).
+shadcn's semantic tokens are bridged onto these in the `@theme inline` block of `index.css`.
+Shared components: `PageHeader`, `StatCard`, `SearchInput`, `DataTable`, `RowActions`,
+`PaginationFooter`, `SectionLabel`, `StatusToggle` (see `ui-design-system.md` for the full list).
 
 ---
 
 ## 2. List page skeleton
 
-Structure: **PageHeader → stat cards → one table card** that contains the toolbar, an
-optional filter row, the table, and a custom pagination footer. Root padding is `p-8`.
+Structure: **PageHeader → stat cards → one table card** that contains the toolbar, an optional
+filter row, the `DataTable`, and the custom pagination footer. Root padding is `p-8`.
 
 ```jsx
+import { Plus, Filter } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import PageHeader from "…/components/PageHeader";
+import StatCard from "…/components/StatCard";
+import SearchInput from "…/components/SearchInput";
+import DataTable from "…/components/DataTable";
+import PaginationFooter from "…/components/PaginationFooter";
+import RefreshButton from "…/components/RefreshButton";
+
 return (
   <div className="p-8 space-y-5">
     {/* 1. HEADER — plain title + subtitle + inverted primary action */}
     <PageHeader
       title="Roles"
       subtitle="Manage roles and the permissions attached to them."
-      actions={
-        canWrite && (
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-            New role
-          </Button>
-        )
-      }
+      actions={canWrite && (
+        <Button onClick={handleCreate}><Plus />New role</Button>
+      )}
     />
 
-    {/* 2. STAT CARDS — 3 equal columns; StatCard = label + dim icon + value + unit */}
-    <Row gutter={[14, 14]}>
-      <Col xs={24} sm={12} lg={8}>
-        <StatCard
-          title="Total roles"
-          value={totalRoles}
-          change="all time"
-          icon={<Shield className="w-4.25 h-4.25" strokeWidth={1.8} />}
-        />
-      </Col>
+    {/* 2. STAT CARDS — CSS grid, 3 equal columns */}
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+      <StatCard title="Total roles" value={totalRoles} change="all time"
+        icon={<Shield className="w-4.25 h-4.25" strokeWidth={1.8} />} />
       {/* …two more… */}
-    </Row>
+    </div>
 
     {/* 3. TABLE CARD */}
-    <div
-      className="bg-surface overflow-hidden"
-      style={{ border: "1px solid var(--color-line)", borderRadius: 14 }}
-    >
-      {/* Toolbar: filter input (left) + Refresh / Filters (right) */}
-      <div
-        className="flex items-center justify-between gap-3 flex-wrap px-[18px] py-3.5"
-        style={{ borderBottom: "1px solid var(--color-line)" }}
-      >
-        <Input
-          placeholder="Filter roles…"
-          prefix={<Search className="w-[15px] h-[15px] text-text-muted" />}
-          value={filters.search}
-          onChange={(e) => handleSearch(e.target.value)}
-          allowClear
-          style={{ width: 280 }}
-        />
+    <div className="bg-surface overflow-hidden"
+      style={{ border: "1px solid var(--color-line)", borderRadius: "var(--radius-card)" }}>
+      {/* Toolbar: SearchInput (left) + Refresh / Filters (right) */}
+      <div className="flex items-center justify-between gap-3 flex-wrap px-[18px] py-3.5"
+        style={{ borderBottom: "1px solid var(--color-line)" }}>
+        <SearchInput value={filters.search} onChange={handleSearch} placeholder="Filter roles…" />
         <div className="flex items-center gap-2">
-          <Button icon={<ReloadOutlined />} onClick={refetch} loading={isLoading}>
-            Refresh
-          </Button>
+          <RefreshButton onRefresh={refetch} isFetching={isFetching} />
           <Button
-            icon={<FilterOutlined />}
+            variant={isFilterVisible || hasActiveFilters ? "default" : "outline"}
+            size="sm"
             onClick={() => setIsFilterVisible(!isFilterVisible)}
-            type={isFilterVisible || hasActiveFilters ? "primary" : "default"}
           >
-            Filters
+            <Filter />Filters
           </Button>
         </div>
       </div>
 
-      {/* Optional filter row (Select + Clear all) — same left/right padding */}
+      {/* Optional filter row — shadcn <Select> + Clear all, same padding.
+          Use a "all" sentinel value mapped to "" (Radix SelectItem can't be empty). */}
       {isFilterVisible && (/* …status Select + Clear all… */)}
 
-      {/* Table (Ant pager OFF) + custom footer (see §4) */}
-      {empty ? <EmptyState /> : (
+      {/* DataTable (no built-in pager) + custom footer (§4) */}
+      {isEmpty ? <EmptyState /> : (
         <>
-          <Table
-            dataSource={data}
-            columns={columns}
-            rowKey="roleId"
-            pagination={false}
-            onChange={handleTableChange}
-            size="middle"
-            className="border-none"
-          />
-          <PaginationFooter />
+          <DataTable dataSource={data} columns={columns} rowKey="roleId"
+            loading={isLoading} scroll={{ x: 900 }} />
+          <PaginationFooter pagination={pagination} onChange={handleTableChange} noun="role" />
         </>
       )}
     </div>
 
-    {/* 4. DRAWERS at the bottom */}
+    {/* 4. FORM DRAWERS (Sheet) at the bottom */}
   </div>
 );
 ```
@@ -145,383 +122,110 @@ return (
 Rules:
 
 - The toolbar lives **inside** the card (not a floating action bar).
-- `Table pagination={false}` — the footer below replaces Ant's pager.
+- `DataTable` has no pager — the `<PaginationFooter />` below replaces it. Pass `rowSelection`
+  `{ selectedRowKeys, onChange }` only when the page supports bulk actions.
 - No `boxShadow` on the card; hairline border only.
+- Empty state: a centered message + the primary create button (see `Roles/index.jsx`).
 
 ---
 
-## 3. Table columns (in the module's `hooks.jsx` `getColumns`)
+## 3. Table columns (in the module's `hooks.jsx`)
 
-Five columns: `#` (mono) · primary (initial-avatar + name) · secondary text · status
-dot · `⋮`. Header cells auto-shrink to 11.5px via the global CSS.
+`DataTable` accepts the **same column shape** the app has always used
+(`title`/`dataIndex`/`key`/`render`/`width`/`align`/`fixed`/`sorter`/`ellipsis`). Five columns:
+`#` (mono) · primary (initial-avatar + name) · secondary text · status dot · `⋮`.
 
 ```jsx
-const getColumns = useCallback(
-  (onEdit, onManage, onDelete) => [
-    {
-      title: "#",
-      key: "index",
-      width: 56,
-      render: (_, __, index) => (
-        <span
-          className="font-mono"
-          style={{ fontSize: 12, color: "var(--color-text-muted)" }}
-        >
-          {String(
-            (pagination.current - 1) * pagination.pageSize + index + 1,
-          ).padStart(2, "0")}
-        </span>
-      ),
-    },
-    {
-      title: "Role name",
-      dataIndex: "roleName",
-      key: "roleName",
-      render: (name) => {
-        const label = heDecode(name) || "";
-        const initial = (label.trim().charAt(0) || "?").toUpperCase();
-        return (
-          <div className="flex items-center gap-3 min-w-0">
-            <span
-              style={{
-                width: 30,
-                height: 30,
-                borderRadius: 8,
-                background: "var(--color-surface-sunken)",
-                border: "1px solid var(--color-line)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flex: "none",
-                fontSize: 13,
-                fontWeight: 600,
-                color: "var(--color-text-secondary)",
-              }}
-            >
-              {initial}
-            </span>
-            <span
-              className="truncate"
-              style={{
-                fontSize: 14,
-                fontWeight: 500,
-                color: "var(--color-text-dark)",
-              }}
-            >
-              {label}
-            </span>
-          </div>
-        );
-      },
-    },
-    {
-      title: "Description",
-      dataIndex: "description",
-      key: "description",
-      ellipsis: true,
-      render: (d) => (
-        <span style={{ fontSize: 13.5, color: "var(--color-text-secondary)" }}>
-          {heDecode(d)}
-        </span>
-      ),
-    },
-    {
-      title: "Status",
-      dataIndex: "status",
-      key: "status",
-      width: 130,
-      render: (status) => {
-        const active = status === "Active";
-        return (
-          <span
-            className="inline-flex items-center gap-2"
-            style={{ fontSize: 13, color: "var(--color-text-secondary)" }}
-          >
-            <span
-              style={{
-                width: 7,
-                height: 7,
-                borderRadius: "50%",
-                background: active ? "#22c55e" : "var(--color-text-muted)",
-                boxShadow: active ? "0 0 8px rgba(34,197,94,.5)" : "none",
-              }}
-            />
-            {status}
+import RowActions from "…/components/RowActions";
+
+const columns = useMemo(() => [
+  {
+    title: "#", key: "index", width: 56,
+    render: (_, __, index) => (
+      <span className="font-mono" style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+        {String((pagination.current - 1) * pagination.pageSize + index + 1).padStart(2, "0")}
+      </span>
+    ),
+  },
+  {
+    title: "Role name", dataIndex: "roleName", key: "roleName",
+    render: (name) => {
+      const label = decodeHTML(name) || "";
+      const initial = (label.trim().charAt(0) || "?").toUpperCase();
+      return (
+        <div className="flex items-center gap-3 min-w-0">
+          <span style={{
+            width: 30, height: 30, borderRadius: 8, display: "flex", flex: "none",
+            alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 600,
+            background: "var(--color-surface-sunken)", border: "1px solid var(--color-line)",
+            color: "var(--color-text-secondary)",
+          }}>{initial}</span>
+          <span className="truncate" style={{ fontSize: 14, fontWeight: 500, color: "var(--color-text-dark)" }}>
+            {label}
           </span>
-        );
-      },
+        </div>
+      );
     },
-    {
-      title: "",
-      key: "actions",
-      width: 60,
-      align: "right",
-      render: (_, record) => (
-        <Dropdown
-          menu={{ items: getActionItems(record, onEdit, onManage, onDelete) }}
-          trigger={["click"]}
-          placement="bottomRight"
-        >
-          <Button
-            type="text"
-            icon={<MoreVertical className="w-4 h-4" />}
-            className="hover:bg-(--color-surface-sunken)"
-          />
-        </Dropdown>
-      ),
+  },
+  {
+    title: "Status", dataIndex: "status", key: "status", width: 130,
+    render: (status) => {
+      const active = status === "Active";
+      return (
+        <span className="inline-flex items-center gap-2" style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
+          <span style={{
+            width: 7, height: 7, borderRadius: "50%",
+            background: active ? "var(--color-success)" : "var(--color-text-muted)",
+            boxShadow: active ? "0 0 8px rgba(34,197,94,.5)" : "none",
+          }} />
+          {status}
+        </span>
+      );
     },
-  ],
-  [getActionItems, pagination],
-);
+  },
+  {
+    title: "", key: "actions", width: 60, align: "right",
+    render: (_, record) => <RowActions items={getActionItems(record)} />,
+  },
+], [getActionItems, pagination]);
 ```
 
-Swap `roleName`/`description`/`status` for the module's fields. Keep the shape.
-`⋮` menu items: primary action, Edit, divider, Delete (danger).
+`getActionItems(record)` returns `{ key, label, icon, onClick, danger?, disabled? }` with
+`{ type: "divider" }` separators — primary action, Edit, divider, Delete (danger). `RowActions`
+renders the ⋮ shadcn `DropdownMenu` from it. Decode API strings with `decodeHTML()`.
 
 ---
 
 ## 4. Custom pagination footer
 
-Compute values in the page body, then render the footer inside the table card. Styles
-come from the shared `.pager-*` classes.
-
-```jsx
-// in the component body:
-const pgCurrent = pagination?.current || 1;
-const pgSize = pagination?.pageSize || 10;
-const pgTotal = pagination?.total || 0;
-const pgTotalPages = Math.max(1, Math.ceil(pgTotal / pgSize));
-const pgStart = pgTotal === 0 ? 0 : (pgCurrent - 1) * pgSize + 1;
-const pgEnd = Math.min(pgCurrent * pgSize, pgTotal);
-const goPage = (p) =>
-  handleTableChange({
-    current: Math.min(Math.max(1, p), pgTotalPages),
-    pageSize: pgSize,
-  });
-```
-
-```jsx
-<div className="flex items-center justify-between gap-3 flex-wrap px-5 py-3">
-  <span className="text-[12.5px]" style={{ color: "var(--color-text-muted)" }}>
-    {pgTotal === 0
-      ? "No results"
-      : `Showing ${pgStart}${pgEnd > pgStart ? `–${pgEnd}` : ""} of ${pgTotal} role${pgTotal === 1 ? "" : "s"}`}
-  </span>
-  <div className="flex items-center gap-2.5">
-    <div className="flex items-center gap-1">
-      <button
-        onClick={() => goPage(pgCurrent - 1)}
-        disabled={pgCurrent <= 1}
-        className="pager-btn"
-      >
-        <ChevronLeft className="w-3.5 h-3.5" />
-      </button>
-      <div className="pager-active">{pgCurrent}</div>
-      <button
-        onClick={() => goPage(pgCurrent + 1)}
-        disabled={pgCurrent >= pgTotalPages}
-        className="pager-btn"
-      >
-        <ChevronRight className="w-3.5 h-3.5" />
-      </button>
-    </div>
-    <Dropdown
-      trigger={["click"]}
-      menu={{
-        items: [10, 20, 50, 100].map((n) => ({
-          key: String(n),
-          label: `${n} / page`,
-          onClick: () => handleTableChange({ current: 1, pageSize: n }),
-        })),
-      }}
-    >
-      <button className="pager-size">
-        {pgSize} / page{" "}
-        <ChevronsUpDown
-          className="w-3 h-3"
-          style={{ color: "var(--color-text-muted)" }}
-        />
-      </button>
-    </Dropdown>
-  </div>
-</div>
-```
-
-Only the noun ("role") changes per module.
+Use the shared **`<PaginationFooter pagination onChange noun nounPlural />`** component — it renders
+the "Showing X–Y of N" caption, the prev/active/next controls (`.pager-*` classes), and the
+page-size `DropdownMenu`. `onChange` is the hook's `handleTableChange`, called with
+`{ current, pageSize }`. Only the noun changes per module (`noun="role"`,
+`nounPlural="companies"` for irregulars).
 
 ---
 
-## 5. Create / edit drawer
+## 5. Create / edit form (Sheet + RHF + zod)
 
-Follow `Roles/components/RoleFormDrawer.jsx`. Props are exactly
-`{ open, onClose, onSuccess, entity? }`; the form owns its `<Drawer>`. Width `480`,
-`closable={false}` (we render our own X). All the create/update mutation + dirty-check
-logic stays as-is — only the chrome below is the pattern.
+Full pattern in **`ui-form-design.md`**; reference `RoleFormDrawer.jsx`. In short:
 
-**Header** — accent chip + title + subtitle + bordered X:
+- The form file owns a shadcn `<Sheet>` (`side="right"`, `sm:max-w-[800px]`, `showCloseButton={false}`
+  — we render our own bordered X). Props are exactly `{ open, onClose, onSuccess, entity? }`.
+- State is `react-hook-form` with a `zod` schema via `zodResolver`; hydrate with `form.reset()`,
+  dirty-check with `formState.isDirty`, submit with `form.handleSubmit(onSubmit)`.
+- **Header** — accent gradient chip + title + subtitle + bordered X (copy switches on `isEditMode`).
+- **Sections** — `<SectionLabel>` per group (uppercase + accent tick), not a divider.
+- **Fields** — `<FormField>` + shadcn `<Input>`/`<Textarea>`/`<Select>` at `h-10`; icon prefix via a
+  relative wrapper outside `<FormControl>`; phone via `phoneFormat` helpers; passwords via
+  `PasswordInput`. Required fields render an explicit `*`.
+- **Segmented toggle** — `<StatusToggle value={field.value} onChange={field.onChange} />` for
+  on/off choices (not a Select).
+- **Footer** (inside the `<form>`) — hairline top border; Cancel (`variant="outline"`) + inverted
+  primary (`type="submit"`, default variant, `+` icon), dirty-check disable + tooltip.
 
-```jsx
-<div className="flex items-start justify-between gap-3 mb-7">
-  <div className="flex items-center gap-3 min-w-0">
-    <span className="inline-flex items-center justify-center w-11 h-11 rounded-xl shrink-0 bg-(image:--gradient-primary)">
-      <Shield className="w-[22px] h-[22px] text-white" />
-    </span>
-    <div className="min-w-0">
-      <h2
-        className="m-0 font-semibold leading-tight"
-        style={{ fontSize: 19, color: "var(--color-text-dark)" }}
-      >
-        {isEditMode ? "Edit Role" : "Create New Role"}
-      </h2>
-      <p
-        className="m-0 mt-0.5"
-        style={{ fontSize: 13, color: "var(--color-text-secondary)" }}
-      >
-        {isEditMode
-          ? "Update role information"
-          : "Define a new role for your school"}
-      </p>
-    </div>
-  </div>
-  <button
-    onClick={handleClose}
-    aria-label="Close"
-    className="inline-flex items-center justify-center shrink-0 transition-colors hover:bg-(--color-surface-sunken)"
-    style={{
-      width: 32,
-      height: 32,
-      borderRadius: 8,
-      border: "1px solid var(--color-line)",
-      color: "var(--color-text-secondary)",
-    }}
-  >
-    <X className="w-[18px] h-[18px]" />
-  </button>
-</div>
-```
-
-**Section label** — reusable helper (uppercase + accent tick):
-
-```jsx
-const SectionLabel = ({ children }) => (
-  <div className="flex items-center gap-2 mb-4">
-    <span
-      style={{
-        width: 3,
-        height: 14,
-        borderRadius: 2,
-        background: "var(--color-secondary-color)",
-      }}
-    />
-    <span
-      className="uppercase"
-      style={{
-        fontSize: 11,
-        fontWeight: 600,
-        letterSpacing: "0.08em",
-        color: "var(--color-text-muted)",
-      }}
-    >
-      {children}
-    </span>
-  </div>
-);
-```
-
-**Fields** — Ant `Form` `layout="vertical"` `requiredMark`; `size="large"` inputs; icon
-prefix where it clarifies; `showCount maxLength` on textareas. Sections separated by
-`<div className="mt-7"><SectionLabel/>…</div>`, not a `<Divider>`.
-
-**Segmented toggle** (for status / on-off choices) — a controlled component usable
-inside `Form.Item`; the selected option is a white pill:
-
-```jsx
-const StatusToggle = ({ value, onChange }) => {
-  const opts = [
-    { v: "Active", dot: "#22c55e" },
-    { v: "Inactive", dot: "var(--color-text-muted)" },
-  ];
-  return (
-    <div
-      className="grid grid-cols-2 gap-1 p-1"
-      style={{
-        background: "var(--color-surface-sunken)",
-        border: "1px solid var(--color-line)",
-        borderRadius: 12,
-      }}
-    >
-      {opts.map((o) => {
-        const active = value === o.v;
-        return (
-          <button
-            key={o.v}
-            type="button"
-            onClick={() => onChange?.(o.v)}
-            className="flex items-center justify-center gap-2 transition-colors"
-            style={{
-              height: 40,
-              borderRadius: 9,
-              fontSize: 13.5,
-              fontWeight: 500,
-              border: "none",
-              cursor: "pointer",
-              background: active ? "var(--color-surface)" : "transparent",
-              color: active
-                ? "var(--color-text-dark)"
-                : "var(--color-text-secondary)",
-              boxShadow: active ? "0 1px 2px rgba(0,0,0,.06)" : "none",
-            }}
-          >
-            <span
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: "50%",
-                background: o.dot,
-              }}
-            />
-            {o.v}
-          </button>
-        );
-      })}
-    </div>
-  );
-};
-// usage: <Form.Item name="status" label="Status" ...><StatusToggle /></Form.Item>
-```
-
-**Footer** — hairline top border; Cancel (outline) + inverted primary with a `+` icon;
-keep the dirty-check disable + tooltip:
-
-```jsx
-<div
-  className="mt-8 pt-5 flex justify-end gap-3"
-  style={{
-    borderTop: "1px solid var(--color-line)",
-    paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))",
-  }}
->
-  <Button onClick={handleClose} size="large">
-    Cancel
-  </Button>
-  <Tooltip title={saveDisabled ? "No changes to save yet" : undefined}>
-    <span>
-      <Button
-        type="primary"
-        icon={<PlusOutlined />}
-        onClick={handleSubmit}
-        disabled={saveDisabled}
-        loading={createMutation.isPending || updateMutation.isPending}
-        size="large"
-      >
-        {isEditMode ? "Update Role" : "Create Role"}
-      </Button>
-    </span>
-  </Tooltip>
-</div>
-```
-
-Never put an inline `background` on the primary button — the inverted style is global.
+Read-only **detail views** use a `<Dialog>` + `DescriptionList` at `sm:max-w-[640px]` (see
+`UserViewModal.jsx`).
 
 ---
 
@@ -530,31 +234,33 @@ Never put an inline `background` on the primary button — the inverted style is
 **List page (`index.jsx`)**
 
 - [ ] Root `p-8 space-y-5`
-- [ ] `<PageHeader title subtitle actions={<Button type="primary" icon={<PlusOutlined/>}>New …</Button>} />`
-- [ ] Stat cards in a `Row gutter={[14,14]}` of `Col lg={8}` `<StatCard title value change icon />`
+- [ ] `<PageHeader title subtitle actions={<Button><Plus/>New …</Button>} />`
+- [ ] Stat cards in a CSS grid (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5`) of `<StatCard title value change icon />`
 - [ ] One bordered table card (1px line, radius 14, no shadow)
-- [ ] Toolbar row inside the card: filter `Input` (280px) left; Refresh + Filters right
-- [ ] `Table pagination={false}` + the custom pagination footer
+- [ ] Toolbar inside the card: `<SearchInput>` left; `<RefreshButton>` + Filters (`variant` toggles) right
+- [ ] `<DataTable>` + `<PaginationFooter>` (no built-in pager)
+- [ ] Filter `<Select>` uses an `"all"` sentinel mapped to `""`
 - [ ] Remove any legacy: gradient buttons, `shadow-*`, pastel tints, `bg-primary-pale`
 
 **Columns (`hooks.jsx`)**
 
 - [ ] `#` mono · initial-avatar + name · secondary text · status dot · `⋮`
 - [ ] Sentence-case header titles ("Role name")
+- [ ] Actions column renders `<RowActions items={getActionItems(record)} />`
 - [ ] `getActionItems`: primary action, Edit, divider, Delete (danger)
 
-**Drawer (`components/…FormDrawer.jsx`)**
+**Form (`components/…FormDrawer.jsx`)** — see `ui-form-design.md`
 
-- [ ] Props `{ open, onClose, onSuccess, entity? }`; owns its `<Drawer width={800} closable={false}>`
-- [ ] Header: accent chip + title + subtitle + bordered X
-- [ ] `SectionLabel` (uppercase + tick) for each group
-- [ ] Vertical form, `size="large"`, `showCount` on textareas
-- [ ] `StatusToggle` for on/off choices (not a Select)
-- [ ] Footer: Cancel + inverted primary (`+` icon), dirty-check disable + tooltip
+- [ ] Owns a `<Sheet>`; props `{ open, onClose, onSuccess, entity? }`; `sr-only` `<SheetTitle>`
+- [ ] `useForm({ resolver: zodResolver(schema) })`; `form.reset()` to hydrate; `isDirty` dirty-check
+- [ ] Header chip + bordered X; `SectionLabel` per group
+- [ ] `<FormField>` fields; `StatusToggle` for on/off; phone/password via shared helpers
+- [ ] Footer: Cancel + inverted primary (`type="submit"`, `+` icon), dirty disable + tooltip
 
 **Never**
 
+- [ ] Pull in another component or icon library (shadcn/ui + lucide only)
 - [ ] Hardcode a hex — use tokens
-- [ ] Inline a `background` on `type="primary"`
-- [ ] Add a shadow, gradient, or pastel chip
-- [ ] Leave Ant's default pager on a list table
+- [ ] Inline a `background` on the primary button
+- [ ] Add a shadow, gradient, or pastel chip (except the form header chip)
+- [ ] Use a raw `<table>` instead of `DataTable`

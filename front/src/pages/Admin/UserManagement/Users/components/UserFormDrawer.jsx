@@ -1,8 +1,34 @@
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { PlusOutlined } from "@ant-design/icons";
-import { App, Button, Drawer, Form, Input, Select, Tooltip } from "antd";
-import { Eye, EyeOff, Lock, Mail, Phone, Shield, Users, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { Eye, EyeOff, Loader2, Lock, Mail, Phone, Plus, Shield, Users, X } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
 import PasswordStrengthIndicator from "../../../../../components/PasswordStrengthIndicator";
 import SectionLabel from "../../../../../components/SectionLabel";
 import StatusToggle from "../../../../../components/StatusToggle";
@@ -12,122 +38,107 @@ import {
   useUpdateUser,
 } from "../../../../../services/requests/admin/user";
 import { useAdminAuthStore } from "../../../../../store/authStore";
-import { validationRules } from "../../../../../utils/validation";
+import { zStrongPassword } from "../../../../../utils/validation";
 import {
   PHONE_MAX_LENGTH,
   PHONE_PLACEHOLDER,
-  handlePhoneInput,
-  phoneValidator,
+  formatPhoneOnChange,
+  zPhone,
 } from "../../../../../utils/phoneFormat";
 
-const { Option } = Select;
-
-// Dependency-free value compare for the dirty check. dayjs serialises to ISO via
-// toJSON (stable); null/undefined/"" are treated as equal.
-const isFormEqual = (a = {}, b = {}) => {
-  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
-  for (const k of keys) {
-    if (JSON.stringify(a[k] ?? "") !== JSON.stringify(b[k] ?? "")) return false;
-  }
-  return true;
+const baseShape = {
+  firstName: z.string().trim().min(1, "First name is required"),
+  lastName: z.string().trim().min(1, "Last name is required"),
+  email: z
+    .string()
+    .trim()
+    .min(1, "Email is required")
+    .email("Enter a valid email address"),
+  phone: zPhone,
+  roleId: z.string().min(1, "Please select a role"),
+  status: z.enum(["Active", "Inactive"]),
 };
 
-const focusFirstError = (form, error) => {
-  const first = error?.errorFields?.[0]?.name;
-  if (first)
-    form.scrollToField(first, {
-      behavior: "smooth",
-      block: "center",
-      focus: true,
-    });
+const EMPTY = {
+  firstName: "",
+  lastName: "",
+  email: "",
+  phone: "",
+  roleId: "",
+  status: "Active",
+  password: "",
 };
 
-export default function UserFormDrawer({
-  open,
-  onClose,
-  onSuccess,
-  entity = null,
-}) {
-  const [form] = Form.useForm();
-  const { message } = App.useApp();
-  const [showPassword, setShowPassword] = useState(false);
-  const [password, setPassword] = useState("");
+const req = <span style={{ color: "var(--color-error)" }}>*</span>;
+
+const UserFormDrawer = ({ open, onClose, onSuccess, entity = null }) => {
   const { userData } = useAdminAuthStore();
-  const initialValuesRef = useRef({});
+  const [showPassword, setShowPassword] = useState(false);
+  const isEditMode = !!entity;
 
   const createUserMutation = useCreateUser();
   const updateUserMutation = useUpdateUser();
 
-  const isEditMode = !!entity;
+  const schema = useMemo(
+    () =>
+      z.object(
+        isEditMode ? baseShape : { ...baseShape, password: zStrongPassword(8) },
+      ),
+    [isEditMode],
+  );
 
-  // Fetch roles
+  const form = useForm({ resolver: zodResolver(schema), defaultValues: EMPTY });
+  const {
+    formState: { isDirty },
+  } = form;
+
+  const password = form.watch("password");
+
   const { data: rolesData } = useQuery({
     queryKey: ["roles", { status: "Active" }],
     queryFn: () => getRoles({ status: "Active", pageSize: 100 }),
   });
-
   const roles = rolesData?.data?.roles || [];
 
-  // Hydrate (and snapshot the baseline) every time the drawer opens.
   useEffect(() => {
     if (!open) return;
-    if (entity) {
-      const values = {
-        firstName: entity.firstName,
-        lastName: entity.lastName,
-        email: entity.email,
-        phone: entity.phone,
-        roleId: entity.roleId,
-        status: entity.status,
-      };
-      form.setFieldsValue(values);
-      initialValuesRef.current = values;
-    } else {
-      form.resetFields();
-      const defaults = { status: "Active" };
-      form.setFieldsValue(defaults);
-      initialValuesRef.current = defaults;
-      setPassword("");
-    }
+    setShowPassword(false);
+    form.reset(
+      entity
+        ? {
+            firstName: entity.firstName ?? "",
+            lastName: entity.lastName ?? "",
+            email: entity.email ?? "",
+            phone: entity.phone ?? "",
+            roleId: entity.roleId ?? "",
+            status: entity.status ?? "Active",
+            password: "",
+          }
+        : EMPTY,
+    );
   }, [open, entity, form]);
 
-  // Live dirty flag — Form.useWatch makes `watchedValues` reactive on every change.
-  const watchedValues = Form.useWatch([], form);
-  const isDirty = useMemo(
-    () =>
-      !isFormEqual(
-        watchedValues ?? form.getFieldsValue(),
-        initialValuesRef.current,
-      ),
-    [watchedValues, form],
-  );
+  const isPending =
+    createUserMutation.isPending || updateUserMutation.isPending;
   const saveDisabled = isEditMode && !isDirty;
 
   const handleClose = () => {
-    form.resetFields();
-    setPassword("");
+    form.reset(EMPTY);
     setShowPassword(false);
     onClose();
   };
 
-  const handleSubmit = async () => {
-    if (isEditMode && !isDirty) {
-      message.info("No changes to save");
-      return;
-    }
+  const onSubmit = async (values) => {
+    const payload = {
+      firstName: values.firstName,
+      lastName: values.lastName,
+      email: values.email,
+      phone: values.phone,
+      roleId: values.roleId,
+      status: values.status,
+      companyId: userData?.companyId,
+    };
     try {
-      const values = await form.validateFields();
-
-      const payload = {
-        firstName: values.firstName,
-        lastName: values.lastName,
-        email: values.email,
-        phone: values.phone,
-        roleId: values.roleId,
-        status: values.status,
-        companyId: userData?.companyId,
-      };
-
       if (isEditMode) {
         await updateUserMutation.mutateAsync({
           userId: entity.accountId,
@@ -139,247 +150,312 @@ export default function UserFormDrawer({
           password: values.password,
         });
       }
-
-      form.resetFields();
-      setPassword("");
       onSuccess?.();
     } catch (error) {
-      if (error?.errorFields?.length) return focusFirstError(form, error);
       console.error("Form submission error:", error);
     }
   };
 
   return (
-    <Drawer
+    <Sheet
       open={open}
-      onClose={handleClose}
-      width={800}
-      closable={false}
-      styles={{ body: { padding: 24 } }}
+      onOpenChange={(next) => {
+        if (!next) handleClose();
+      }}
     >
-      {/* Header — accent chip + title + subtitle + bordered X */}
-      <div className="flex items-start justify-between gap-3 mb-7">
-        <div className="flex items-center gap-3 min-w-0">
-          <span className="inline-flex items-center justify-center w-11 h-11 rounded-xl shrink-0 bg-(image:--gradient-primary)">
-            <Users className="w-[22px] h-[22px] text-white" />
-          </span>
-          <div className="min-w-0">
-            <h2
-              className="m-0 font-semibold leading-tight"
-              style={{ fontSize: 19, color: "var(--color-text-dark)" }}
-            >
-              {isEditMode ? "Edit User" : "Create New User"}
-            </h2>
-            <p
-              className="m-0 mt-0.5"
-              style={{ fontSize: 13, color: "var(--color-text-secondary)" }}
-            >
-              {isEditMode
-                ? "Update user account and permissions"
-                : "Add a new team member to your company"}
-            </p>
-          </div>
-        </div>
-        <button
-          onClick={handleClose}
-          aria-label="Close"
-          className="inline-flex items-center justify-center shrink-0 transition-colors hover:bg-(--color-surface-sunken)"
-          style={{
-            width: 32,
-            height: 32,
-            borderRadius: 8,
-            border: "1px solid var(--color-line)",
-            color: "var(--color-text-secondary)",
-          }}
-        >
-          <X className="w-[18px] h-[18px]" />
-        </button>
-      </div>
-
-      <Form form={form} layout="vertical" requiredMark autoComplete="off">
-        {/* Personal information */}
-        <div>
-          <SectionLabel>Personal information</SectionLabel>
-
-          <div className="grid grid-cols-2 gap-4">
-            <Form.Item
-              name="firstName"
-              label="First name"
-              rules={[{ required: true, message: "First name is required" }]}
-            >
-              <Input placeholder="Juan" size="large" />
-            </Form.Item>
-
-            <Form.Item
-              name="lastName"
-              label="Last name"
-              rules={[{ required: true, message: "Last name is required" }]}
-            >
-              <Input placeholder="Dela Cruz" size="large" />
-            </Form.Item>
-          </div>
-        </div>
-
-        {/* Contact information */}
-        <div className="mt-7">
-          <SectionLabel>Contact information</SectionLabel>
-
-          <Form.Item
-            name="email"
-            label="Email address"
-            rules={[
-              { required: true, message: "Email is required" },
-              { type: "email", message: "Enter a valid email address" },
-            ]}
-          >
-            <Input
-              placeholder="juan@example.com"
-              prefix={
-                <Mail
-                  className="w-4 h-4 mr-2"
-                  style={{ color: "var(--color-text-muted)" }}
-                />
-              }
-              disabled={isEditMode}
-              size="large"
-            />
-          </Form.Item>
-
-          <Form.Item
-            name="phone"
-            label="Phone number"
-            rules={[{ validator: phoneValidator }]}
-          >
-            <Input
-              placeholder={PHONE_PLACEHOLDER}
-              prefix={
-                <Phone
-                  className="w-4 h-4 mr-2"
-                  style={{ color: "var(--color-text-muted)" }}
-                />
-              }
-              size="large"
-              onChange={(e) => handlePhoneInput(e, form)}
-              maxLength={PHONE_MAX_LENGTH}
-            />
-          </Form.Item>
-        </div>
-
-        {/* Role & access */}
-        <div className="mt-7">
-          <SectionLabel>Role &amp; access</SectionLabel>
-
-          <Form.Item
-            name="roleId"
-            label="Role"
-            rules={[{ required: true, message: "Please select a role" }]}
-          >
-            <Select
-              placeholder="Select role"
-              size="large"
-              showSearch
-              optionFilterProp="children"
-            >
-              {roles.map((role) => (
-                <Option key={role.roleId} value={role.roleId}>
-                  <span className="flex items-center gap-2">
-                    <Shield className="w-4 h-4" />
-                    {role.roleName}
-                  </span>
-                </Option>
-              ))}
-            </Select>
-          </Form.Item>
-
-          <Form.Item
-            name="status"
-            label="Status"
-            initialValue="Active"
-            rules={[{ required: true, message: "Please select a status" }]}
-          >
-            <StatusToggle />
-          </Form.Item>
-        </div>
-
-        {/* Security — create mode only */}
-        {!isEditMode && (
-          <div className="mt-7">
-            <SectionLabel>Security</SectionLabel>
-
-            <Form.Item
-              name="password"
-              label="Temporary password"
-              required
-              rules={[validationRules.strongPassword(8)]}
-            >
-              <Input
-                type={showPassword ? "text" : "password"}
-                placeholder="Enter temporary password"
-                prefix={
-                  <Lock
-                    className="w-4 h-4 mr-2"
-                    style={{ color: "var(--color-text-muted)" }}
-                  />
-                }
-                suffix={
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="transition-colors"
-                    style={{ color: "var(--color-text-muted)" }}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="w-4 h-4" />
-                    ) : (
-                      <Eye className="w-4 h-4" />
-                    )}
-                  </button>
-                }
-                size="large"
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </Form.Item>
-
-            <PasswordStrengthIndicator password={password} />
-
-            <p
-              className="mt-3"
-              style={{ fontSize: 12, color: "var(--color-text-muted)" }}
-            >
-              User will be prompted to change this on first login.
-            </p>
-          </div>
-        )}
-      </Form>
-
-      {/* Footer */}
-      <div
-        className="mt-8 pt-5 flex justify-end gap-3"
-        style={{
-          borderTop: "1px solid var(--color-line)",
-          paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))",
-        }}
+      <SheetContent
+        side="right"
+        showCloseButton={false}
+        className="w-full gap-0 p-0 sm:max-w-[800px]"
+        style={{ background: "var(--color-surface)" }}
       >
-        <Button onClick={handleClose} size="large">
-          Cancel
-        </Button>
-        <Tooltip title={saveDisabled ? "No changes to save yet" : undefined}>
-          <span>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={handleSubmit}
-              disabled={saveDisabled}
-              loading={
-                createUserMutation.isPending || updateUserMutation.isPending
-              }
-              size="large"
+        <SheetTitle className="sr-only">
+          {isEditMode ? "Edit User" : "Create New User"}
+        </SheetTitle>
+
+        <Form {...form}>
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            autoComplete="off"
+            className="flex h-full flex-col"
+          >
+            <div className="flex-1 overflow-y-auto p-6">
+              {/* Header */}
+              <div className="flex items-start justify-between gap-3 mb-7">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="inline-flex items-center justify-center w-11 h-11 rounded-xl shrink-0 bg-(image:--gradient-primary)">
+                    <Users className="w-[22px] h-[22px] text-white" />
+                  </span>
+                  <div className="min-w-0">
+                    <h2
+                      className="m-0 font-semibold leading-tight"
+                      style={{ fontSize: 19, color: "var(--color-text-dark)" }}
+                    >
+                      {isEditMode ? "Edit User" : "Create New User"}
+                    </h2>
+                    <p
+                      className="m-0 mt-0.5"
+                      style={{ fontSize: 13, color: "var(--color-text-secondary)" }}
+                    >
+                      {isEditMode
+                        ? "Update user account and permissions"
+                        : "Add a new team member to your company"}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleClose}
+                  aria-label="Close"
+                  className="inline-flex items-center justify-center shrink-0 transition-colors hover:bg-(--color-surface-sunken)"
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 8,
+                    border: "1px solid var(--color-line)",
+                    color: "var(--color-text-secondary)",
+                  }}
+                >
+                  <X className="w-[18px] h-[18px]" />
+                </button>
+              </div>
+
+              {/* Personal information */}
+              <SectionLabel>Personal information</SectionLabel>
+              <div className="grid grid-cols-2 gap-4 items-start">
+                <FormField
+                  control={form.control}
+                  name="firstName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>First name {req}</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Juan" className="h-10" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="lastName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Last name {req}</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Dela Cruz"
+                          className="h-10"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Contact information */}
+              <div className="mt-7">
+                <SectionLabel>Contact information</SectionLabel>
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem className="mb-5">
+                      <FormLabel>Email address {req}</FormLabel>
+                      <div className="relative">
+                        <Mail
+                          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
+                          style={{ color: "var(--color-text-muted)" }}
+                        />
+                        <FormControl>
+                          <Input
+                            placeholder="juan@example.com"
+                            className="h-10 pl-9"
+                            disabled={isEditMode}
+                            {...field}
+                          />
+                        </FormControl>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone number</FormLabel>
+                      <div className="relative">
+                        <Phone
+                          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
+                          style={{ color: "var(--color-text-muted)" }}
+                        />
+                        <FormControl>
+                          <Input
+                            placeholder={PHONE_PLACEHOLDER}
+                            className="h-10 pl-9"
+                            maxLength={PHONE_MAX_LENGTH}
+                            {...field}
+                            onChange={(e) =>
+                              field.onChange(formatPhoneOnChange(e.target.value))
+                            }
+                          />
+                        </FormControl>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Role & access */}
+              <div className="mt-7">
+                <SectionLabel>Role &amp; access</SectionLabel>
+                <FormField
+                  control={form.control}
+                  name="roleId"
+                  render={({ field }) => (
+                    <FormItem className="mb-5">
+                      <FormLabel>Role {req}</FormLabel>
+                      <Select
+                        value={field.value || undefined}
+                        onValueChange={field.onChange}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="h-10 w-full">
+                            <SelectValue placeholder="Select role" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {roles.map((role) => (
+                            <SelectItem key={role.roleId} value={role.roleId}>
+                              <Shield className="w-4 h-4" />
+                              {role.roleName}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Status {req}</FormLabel>
+                      <StatusToggle
+                        value={field.value}
+                        onChange={field.onChange}
+                      />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Security — create mode only */}
+              {!isEditMode && (
+                <div className="mt-7">
+                  <SectionLabel>Security</SectionLabel>
+                  <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Temporary password {req}</FormLabel>
+                        <div className="relative">
+                          <Lock
+                            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
+                            style={{ color: "var(--color-text-muted)" }}
+                          />
+                          <FormControl>
+                            <Input
+                              type={showPassword ? "text" : "password"}
+                              placeholder="Enter temporary password"
+                              className="h-10 pl-9 pr-9"
+                              {...field}
+                            />
+                          </FormControl>
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword((s) => !s)}
+                            aria-label={
+                              showPassword ? "Hide password" : "Show password"
+                            }
+                            className="icon-btn absolute right-2 top-1/2 h-6 w-6 -translate-y-1/2"
+                          >
+                            {showPassword ? (
+                              <EyeOff className="w-4 h-4" />
+                            ) : (
+                              <Eye className="w-4 h-4" />
+                            )}
+                          </button>
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <PasswordStrengthIndicator password={password} />
+
+                  <p
+                    className="mt-3"
+                    style={{ fontSize: 12, color: "var(--color-text-muted)" }}
+                  >
+                    User will be prompted to change this on first login.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div
+              className="flex justify-end gap-3 p-6 pt-5"
+              style={{
+                borderTop: "1px solid var(--color-line)",
+                paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))",
+              }}
             >
-              {isEditMode ? "Update User" : "Create User"}
-            </Button>
-          </span>
-        </Tooltip>
-      </div>
-    </Drawer>
+              <Button
+                type="button"
+                variant="outline"
+                size="lg"
+                onClick={handleClose}
+              >
+                Cancel
+              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="inline-flex">
+                    <Button
+                      type="submit"
+                      size="lg"
+                      disabled={saveDisabled || isPending}
+                    >
+                      {isPending ? (
+                        <Loader2 className="animate-spin" />
+                      ) : (
+                        <Plus />
+                      )}
+                      {isEditMode ? "Update User" : "Create User"}
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {saveDisabled && (
+                  <TooltipContent>No changes to save yet</TooltipContent>
+                )}
+              </Tooltip>
+            </div>
+          </form>
+        </Form>
+      </SheetContent>
+    </Sheet>
   );
-}
+};
+
+export default UserFormDrawer;

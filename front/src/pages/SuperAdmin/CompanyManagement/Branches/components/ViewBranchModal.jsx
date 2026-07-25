@@ -1,6 +1,12 @@
-import { Button, Modal } from "antd";
 import { MapPin, Pencil, X } from "lucide-react";
 import dayjs from "dayjs";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import SectionLabel from "../../../../../components/SectionLabel";
 import { decodeHTML } from "../../../../../utils/decode-html";
 import { formatPhoneDisplay } from "../../../../../utils/phoneFormat";
@@ -42,35 +48,19 @@ const ViewBranchModal = ({ open, onClose, branch, onEdit }) => {
   const active = branch.status === "Active";
 
   return (
-    <Modal
+    <Dialog
       open={open}
-      onCancel={onClose}
-      width={640}
-      closable={false}
-      title={null}
-      footer={
-        <div
-          className="pt-4 flex justify-end gap-3"
-          style={{ borderTop: "1px solid var(--color-line)" }}
-        >
-          <Button onClick={onClose} size="large">
-            Close
-          </Button>
-          {onEdit && (
-            <Button
-              type="primary"
-              icon={<Pencil className="w-4 h-4" />}
-              onClick={() => onEdit(branch)}
-              size="large"
-            >
-              Edit branch
-            </Button>
-          )}
-        </div>
-      }
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
     >
-      {/* Header — accent chip + title + subtitle + bordered X */}
-      <div className="flex items-start justify-between gap-3 mb-7">
+      <DialogContent
+        showCloseButton={false}
+        className="sm:max-w-[640px] max-h-[85vh] overflow-y-auto"
+      >
+        <DialogTitle className="sr-only">Branch details</DialogTitle>
+        {/* Header — accent chip + title + subtitle + bordered X */}
+        <div className="flex items-start justify-between gap-3 mb-7">
         <div className="flex items-center gap-3 min-w-0">
           <span className="inline-flex items-center justify-center w-11 h-11 rounded-xl shrink-0 bg-(image:--gradient-primary)">
             <MapPin className="w-[22px] h-[22px] text-white" />
@@ -168,7 +158,23 @@ const ViewBranchModal = ({ open, onClose, branch, onEdit }) => {
         />
         <DetailRow label="Branch ID" value={branch.branchId} mono />
       </div>
-    </Modal>
+
+        <DialogFooter
+          className="mt-8 pt-4"
+          style={{ borderTop: "1px solid var(--color-line)" }}
+        >
+          <Button variant="outline" size="lg" onClick={onClose}>
+            Close
+          </Button>
+          {onEdit && (
+            <Button size="lg" onClick={() => onEdit(branch)}>
+              <Pencil className="w-4 h-4" />
+              Edit branch
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
 

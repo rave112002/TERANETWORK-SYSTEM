@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 /**
  * Common validation patterns
  */
@@ -19,155 +21,34 @@ export const patterns = {
 };
 
 /**
- * Validation rules for Ant Design Form
+ * Strong-password zod validator. Requirements: at least 1 lowercase, 1
+ * uppercase, 1 digit, 1 special char (!@#$%^&)(+=.-), and `min` length
+ * (default 8). Errors aggregate into a single message.
  */
-export const validationRules = {
-  /**
-   * Required field validation
-   */
-  required: (msg = "This field is required") => ({
-    required: true,
-    message: msg,
-  }),
-
-  /**
-   * Email validation
-   */
-  email: (msg = "Please enter a valid email") => ({
-    type: "email",
-    message: msg,
-  }),
-
-  /**
-   * URL validation
-   */
-  url: (msg = "Please enter a valid URL") => ({
-    type: "url",
-    message: msg,
-  }),
-
-  /**
-   * Minimum length validation
-   */
-  minLength: (min, msg) => ({
-    min,
-    message: msg || `Minimum ${min} characters required`,
-  }),
-
-  /**
-   * Maximum length validation
-   */
-  maxLength: (max, msg) => ({
-    max,
-    message: msg || `Maximum ${max} characters allowed`,
-  }),
-
-  /**
-   * Pattern validation
-   */
-  pattern: (regex, msg) => ({
-    pattern: regex,
-    message: msg,
-  }),
-
-  /**
-   * Phone number validation — canonical PH mobile `09XX XXXX XXX`
-   */
-  phone: (msg = "Enter a valid mobile number, e.g. 0912 3456 789") => ({
-    pattern: patterns.phone,
-    message: msg,
-  }),
-
-  /**
-   * Strong password validation
-   * Requirements:
-   * - At least 1 lowercase letter
-   * - At least 1 uppercase letter
-   * - At least 1 digit
-   * - At least 1 special character (!@#$%^&)(+=.-)
-   * - Minimum length (default 8)
-   */
-  strongPassword: (min = 8) => ({
-    validator: (_, value) => {
-      if (!value) {
-        return Promise.reject(new Error("Please input your password!"));
-      }
-
-      const errors = [];
-
-      if (!patterns.passwordSmallLetter.test(value)) {
-        errors.push("at least 1 lowercase letter");
-      }
-
-      if (!patterns.passwordCapitalLetter.test(value)) {
-        errors.push("at least 1 uppercase letter");
-      }
-
-      if (!patterns.passwordNumber.test(value)) {
-        errors.push("at least 1 digit");
-      }
-
-      if (!patterns.passwordSpecialChar.test(value)) {
-        errors.push("at least 1 special character (!@#$%^&)(+=.-)");
-      }
-
-      if (value.length < min) {
-        errors.push(`at least ${min} characters`);
-      }
-
-      if (errors.length === 0) {
-        return Promise.resolve();
-      } else {
-        return Promise.reject(
-          new Error(`Password must contain ${errors.join(", ")}`),
-        );
-      }
-    },
-  }),
-
-  /**
-   * Number range validation
-   */
-  numberRange: (min, max, msg) => ({
-    type: "number",
-    min,
-    max,
-    message: msg || `Value must be between ${min} and ${max}`,
-  }),
-
-  /**
-   * Confirm password validation
-   */
-  confirmPassword: (getFieldValue, msg = "Passwords do not match") => ({
-    validator: (_, value) =>
-      !value || getFieldValue("password") === value
-        ? Promise.resolve()
-        : Promise.reject(new Error(msg)),
-  }),
-
-  /**
-   * Custom validation function
-   */
-  custom: (fn) => ({
-    validator: fn,
-  }),
-
-  /**
-   * No whitespace validation
-   */
-  noWhitespace: (msg = "Whitespace is not allowed") => ({
-    whitespace: true,
-    message: msg,
-  }),
-};
+export const zStrongPassword = (min = 8) =>
+  z.string().superRefine((value, ctx) => {
+    if (!value) {
+      ctx.addIssue({ code: "custom", message: "Please input your password!" });
+      return;
+    }
+    const errors = [];
+    if (!patterns.passwordSmallLetter.test(value))
+      errors.push("at least 1 lowercase letter");
+    if (!patterns.passwordCapitalLetter.test(value))
+      errors.push("at least 1 uppercase letter");
+    if (!patterns.passwordNumber.test(value)) errors.push("at least 1 digit");
+    if (!patterns.passwordSpecialChar.test(value))
+      errors.push("at least 1 special character (!@#$%^&)(+=.-)");
+    if (value.length < min) errors.push(`at least ${min} characters`);
+    if (errors.length)
+      ctx.addIssue({
+        code: "custom",
+        message: `Password must contain ${errors.join(", ")}`,
+      });
+  });
 
 /**
- * Combine multiple validation rules
- */
-export const combineRules = (...rules) => rules.filter(Boolean);
-
-/**
- * Check password strength and return details
+ * Check password strength and return details (drives PasswordStrengthIndicator).
  */
 export const checkPasswordStrength = (password) => {
   if (!password) {

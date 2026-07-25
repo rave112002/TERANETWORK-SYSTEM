@@ -5,7 +5,7 @@ import { z } from "zod";
  *
  * Three shapes all mean "no value" for an optional field mapped to a NULLable
  * column, and all three must be accepted:
- *   - `""`        Ant Design forms and multipart/form-data send this for cleared
+ *   - `""`        HTML forms and multipart/form-data send this for cleared
  *                 fields; a query string sends it for any rendered-but-unset param
  *   - `null`      what a JSON client sends to explicitly clear a field (our own
  *                 form drawers post `value || null`)
