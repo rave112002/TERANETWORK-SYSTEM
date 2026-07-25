@@ -1,4 +1,5 @@
 import process from "node:process";
+import { fileURLToPath, URL } from "node:url";
 
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
@@ -22,6 +23,12 @@ export default defineConfig(({ mode }) => {
           brotliSize: true,
         }),
     ].filter(Boolean),
+    resolve: {
+      alias: {
+        // shadcn/ui components import via `@/…`; also usable in app code.
+        "@": fileURLToPath(new URL("./src", import.meta.url)),
+      },
+    },
     server: {
       host: true,
       port: 5173,
@@ -45,7 +52,6 @@ export default defineConfig(({ mode }) => {
           manualChunks: {
             // Vendor chunks for better caching
             "react-vendor": ["react", "react-dom", "react-router"],
-            "antd-vendor": ["antd", "@ant-design/icons"],
             "query-vendor": ["@tanstack/react-query"],
             "utils-vendor": ["axios", "dayjs", "zustand"],
           },
@@ -65,8 +71,6 @@ export default defineConfig(({ mode }) => {
         "react",
         "react-dom",
         "react-router",
-        "antd",
-        "@ant-design/icons",
         "@tanstack/react-query",
         "axios",
         "dayjs",

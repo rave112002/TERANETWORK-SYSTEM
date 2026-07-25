@@ -1,4 +1,4 @@
-import { HomeOutlined } from "@ant-design/icons";
+import { Home } from "lucide-react";
 import { Building2, MapPin, Settings, Users } from "lucide-react";
 import { Suspense, lazy } from "react";
 import { Route, Routes } from "react-router";
@@ -29,7 +29,7 @@ const SuperAdminRoute = () => {
       route: "/dashboard",
       name: "Dashboard",
       label: "Dashboard",
-      icon: <HomeOutlined className="h-5 w-5" />,
+      icon: <Home className="h-5 w-5" />,
       component: (
         <Suspense fallback={<ComponentLoader />}>
           <Dashboard />

@@ -1,38 +1,101 @@
-# UI Form Design — "Modern" Drawer Pattern
+# UI Form Design — "Modern" Sheet Form Pattern
 
 When building or editing any create/edit form, follow this pattern.
 
-> Reference implementation: **`src/pages/Admin/UserManagement/Roles/components/RoleFormDrawer.jsx`**.
-> Canonical spec: **`modern-module-pattern.md`** §5.
+> Reference implementation: **`src/pages/Admin/UserManagement/Roles/components/RoleFormDrawer.jsx`**
+> (simple) and **`.../Users/components/UserFormDrawer.jsx`** (phone, password, select, grid).
+> Forms use **react-hook-form + zod** inside a shadcn **`<Sheet>`**.
 
 ---
 
 ## When to use
 
 Apply for drawer-based create/edit forms in admin modules. Skip for inline edits, single-field
-filters, wizards (use Ant `Steps`), and read-only detail views.
+filters, and read-only detail views (those use a `<Dialog>` — see UI Design System).
 
 ---
 
 ## The architectural rule (NON-NEGOTIABLE)
 
-**The form file owns the Drawer. The parent is dumb.**
+**The form file owns the Sheet. The parent is dumb.**
 
 **Form file** (`XFormDrawer.jsx`):
 
-- Imports `Drawer` from `antd`; the component name ends in `FormDrawer`.
+- Imports `Sheet`, `SheetContent`, `SheetTitle` from `@/components/ui/sheet`; the component name
+  ends in `FormDrawer`.
 - Props are exactly `{ open, onClose, onSuccess, entity? }` — in that order. No `onCancel`,
   no `visible`, no `isEditMode` from outside. `entity` presence flips edit mode internally.
-- Renders `<Drawer open={open} onClose={handleClose} width={800} closable={false} styles={{ body: { padding: 24 } }}>`
-  as its root.
+- Renders a right-side sheet as its root:
+
+```jsx
+<Sheet open={open} onOpenChange={(next) => { if (!next) handleClose(); }}>
+  <SheetContent
+    side="right"
+    showCloseButton={false}          {/* we render our own bordered X */}
+    className="w-full gap-0 p-0 sm:max-w-[800px]"
+    style={{ background: "var(--color-surface)" }}
+  >
+    <SheetTitle className="sr-only">{isEditMode ? "Edit X" : "Create New X"}</SheetTitle>
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} autoComplete="off" className="flex h-full flex-col">
+        <div className="flex-1 overflow-y-auto p-6">{/* header + fields */}</div>
+        <div className="p-6 pt-5 …footer…">{/* Cancel + submit */}</div>
+      </form>
+    </Form>
+  </SheetContent>
+</Sheet>
+```
 
 **Parent**: holds `open` state and renders
 `<XFormDrawer open={...} onClose={...} onSuccess={...} entity={...} />`. It **never** wraps the
-form in its own Drawer.
+form in its own Sheet. A `SheetTitle` (visually hidden with `sr-only`) is required for
+accessibility — Radix warns without one.
 
-**If you find a presentational form** (no Drawer import, props like `{ entity, onSuccess, onCancel }`),
-**convert it**: add the Drawer, rename to `XFormDrawer`, switch to the props contract, add a
-`handleClose` that resets the form then calls `onClose`, and update the parent.
+---
+
+## Form setup — react-hook-form + zod
+
+One `zod` schema per form, wired through `zodResolver`. `defaultValues` are always concrete (never
+`undefined`), and hydration/reset go through `form.reset()`.
+
+```jsx
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+
+const roleSchema = z.object({
+  roleName: z.string().trim().min(3, "Role name must be at least 3 characters").max(50, "…"),
+  // optional: validate length only once something is typed (empty string passes)
+  description: z
+    .string()
+    .max(500, "…")
+    .refine((v) => v === "" || v.length >= 10, "Description must be at least 10 characters"),
+  status: z.enum(["Active", "Inactive"]),
+});
+
+const EMPTY = { roleName: "", description: "", status: "Active" };
+
+const form = useForm({ resolver: zodResolver(roleSchema), defaultValues: EMPTY });
+const { formState: { isDirty } } = form;
+```
+
+### Required-ness must match the backend
+
+**A field is required in the schema only if the backend actually requires it** — DB column
+`NOT NULL` or the API rejects it when missing. Check `back/database/schema.sql` and the controller;
+don't guess. Known-optional fields — never make these required: `description` (`TEXT NULL`),
+`phone` (`VARCHAR(20) NULL`). Validate **shape, not presence** on optional fields with the
+`.refine((v) => v === "" || …)` idiom above.
+
+### Required asterisks are manual
+
+shadcn's `<FormLabel>` does **not** auto-render a `*`. For required fields add one explicitly so
+users see it:
+
+```jsx
+const req = <span style={{ color: "var(--color-error)" }}>*</span>;
+<FormLabel>Role name {req}</FormLabel>
+```
 
 ---
 
@@ -40,7 +103,8 @@ form in its own Drawer.
 
 ### 1. Header — accent chip + title + subtitle + bordered X
 
-`closable={false}`; we render our own X (this is the one place a gradient is allowed — the chip).
+We render our own X (`showCloseButton={false}` on `SheetContent`); the gradient chip is the one
+place a gradient is allowed.
 
 ```jsx
 <div className="flex items-start justify-between gap-3 mb-7">
@@ -49,196 +113,176 @@ form in its own Drawer.
       <Shield className="w-[22px] h-[22px] text-white" />
     </span>
     <div className="min-w-0">
-      <h2
-        className="m-0 font-semibold leading-tight"
-        style={{ fontSize: 19, color: "var(--color-text-dark)" }}
-      >
+      <h2 className="m-0 font-semibold leading-tight" style={{ fontSize: 19, color: "var(--color-text-dark)" }}>
         {isEditMode ? "Edit Role" : "Create New Role"}
       </h2>
-      <p
-        className="m-0 mt-0.5"
-        style={{ fontSize: 13, color: "var(--color-text-secondary)" }}
-      >
-        {isEditMode
-          ? "Update role information"
-          : "Define a new role for your company"}
+      <p className="m-0 mt-0.5" style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
+        {isEditMode ? "Update role information" : "Define a new role for your company"}
       </p>
     </div>
   </div>
   <button
+    type="button"
     onClick={handleClose}
     aria-label="Close"
     className="inline-flex items-center justify-center shrink-0 transition-colors hover:bg-(--color-surface-sunken)"
-    style={{
-      width: 32,
-      height: 32,
-      borderRadius: 8,
-      border: "1px solid var(--color-line)",
-      color: "var(--color-text-secondary)",
-    }}
+    style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid var(--color-line)", color: "var(--color-text-secondary)" }}
   >
     <X className="w-[18px] h-[18px]" />
   </button>
 </div>
 ```
 
-### 2. Sections — `SectionLabel`, not `<Divider>`
+### 2. Sections — `SectionLabel`, not a divider
 
 ```jsx
-import SectionLabel from "../../../../../components/SectionLabel";
+import SectionLabel from "…/components/SectionLabel";
 
-<div>
-  <SectionLabel>Role details</SectionLabel>
-  {/* fields */}
-</div>
+<SectionLabel>Role details</SectionLabel>
+{/* fields */}
 <div className="mt-7">
   <SectionLabel>Access status</SectionLabel>
   {/* fields */}
 </div>
 ```
 
-### 3. Fields
+### 3. Fields — `<FormField>` + shadcn inputs
 
-Ant `Form` `layout="vertical"` `requiredMark`; `size="large"` on inputs; a lucide icon `prefix`
-where it clarifies; `showCount maxLength` on textareas. Concrete placeholders
-(`"e.g., Branch Manager"`). Rely on `rules` for validation messages. Disable identifier fields
-(email/username/slug) in edit mode.
-
-### 3a. Required-ness must match the backend
-
-**A field is required in the form only if the backend actually requires it** — i.e. the DB column is
-`NOT NULL` or the API rejects it when missing. Check `back/database/schema.sql` and the controller
-before marking anything required; don't guess.
-
-Known-optional fields — **never mark these required**:
-
-| Field | Why |
-| ----- | --- |
-| `description` | every `description` column is `TEXT NULL`; the API writes `description \|\| null` |
-| `phone` | every `phone` column is `VARCHAR(20) NULL`; the API writes `phone \|\| null` |
-
-Validate **shape, not presence**, on optional fields — the rule only fires once the user types:
+Each field is a `FormField` render prop giving you `field` (`value`, `onChange`, `onBlur`, `name`,
+`ref`). Inputs are `h-10` (the large control height). Wrap in `FormControl` so the
+label/error/aria wiring works.
 
 ```jsx
-// ✅ optional, but must be sane when provided
-<Form.Item label="Description" name="description"
-  rules={[{ min: 10, message: "Description must be at least 10 characters" }]}>
-  <TextArea rows={4} showCount maxLength={500} />
-</Form.Item>
+<FormField
+  control={form.control}
+  name="roleName"
+  render={({ field }) => (
+    <FormItem className="mb-5">
+      <FormLabel>Role name {req}</FormLabel>
+      {/* icon-prefix pattern: the relative wrapper is OUTSIDE FormControl, so the id/aria
+          land on the <input>, not the wrapper div. */}
+      <div className="relative">
+        <Shield className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
+          style={{ color: "var(--color-text-muted)" }} />
+        <FormControl>
+          <Input placeholder="e.g., Branch Manager" className="h-10 pl-9" {...field} />
+        </FormControl>
+      </div>
+      <FormMessage />
+    </FormItem>
+  )}
+/>
 ```
 
-(async-validator skips `min`/`max`/`pattern`/`type` on an empty value when the rule isn't
-`required`, so an untouched optional field passes.)
+- **Textarea + counter** (`showCount` replacement): render a manual `{value.length}/max` beside
+  `<FormMessage/>`.
+- **Disable identifier fields** (email/username/slug) in edit mode: `disabled={isEditMode}`.
+- **Password fields** use the shared `PasswordInput` (`@/…/components/PasswordInput`) — input +
+  show/hide toggle. For strength UI, `form.watch("password")` → `<PasswordStrengthIndicator />`,
+  and validate with `zStrongPassword(8)` from `utils/validation`.
 
-### 3c. Phone fields use the shared helpers — never a hand-rolled placeholder
+### 3a. Phone fields — shared helpers, never a hand-rolled placeholder
 
-Every phone in the app is a PH mobile stored as **`09XX XXXX XXX`** (11 digits, grouped 4-4-3).
-The hint the user sees is always the concrete example **`0912 3456 789`** — never the `09XX…`
-mask. All four pieces come from `src/utils/phoneFormat.js`, so a phone field is always:
+Every phone is a PH mobile stored as `09XX XXXX XXX` (grouped 4-4-3). The hint is always the
+concrete example `0912 3456 789`. All pieces come from `src/utils/phoneFormat.js`:
 
 ```jsx
-import {
-  PHONE_MAX_LENGTH,
-  PHONE_PLACEHOLDER,
-  handlePhoneInput,
-  phoneValidator,
-} from "../../../../utils/phoneFormat";
+import { PHONE_MAX_LENGTH, PHONE_PLACEHOLDER, formatPhoneOnChange, zPhone } from "…/utils/phoneFormat";
 
-<Form.Item name="phone" label="Phone" rules={[{ validator: phoneValidator }]}>
-  <Input
-    prefix={<Phone className="w-4 h-4 mr-2" style={{ color: "var(--color-text-muted)" }} />}
-    placeholder={PHONE_PLACEHOLDER}
-    size="large"
-    maxLength={PHONE_MAX_LENGTH}
-    onChange={(e) => handlePhoneInput(e, form)}
-  />
-</Form.Item>;
+// schema:  phone: zPhone,
+<FormField control={form.control} name="phone" render={({ field }) => (
+  <FormItem>
+    <FormLabel>Phone number</FormLabel>
+    <div className="relative">
+      <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
+        style={{ color: "var(--color-text-muted)" }} />
+      <FormControl>
+        <Input
+          placeholder={PHONE_PLACEHOLDER}
+          className="h-10 pl-9"
+          maxLength={PHONE_MAX_LENGTH}
+          {...field}
+          onChange={(e) => field.onChange(formatPhoneOnChange(e.target.value))}
+        />
+      </FormControl>
+    </div>
+    <FormMessage />
+  </FormItem>
+)} />
 ```
 
-- `handlePhoneInput` types the spaces in as the user goes, so the value is already canonical by
-  the time it's submitted — no `onBlur` reformat needed.
-- `PHONE_MAX_LENGTH` is 13 (11 digits + 2 spaces), so paste-in of a longer string is truncated.
-- `phoneValidator` checks **shape only** and passes on empty — phone is optional everywhere
-  (see the table above). If a form ever needs it mandatory, add a separate `{ required: true }`
-  rule so Ant still draws the `*` (per §3b).
-- **Displaying** a stored value (table cell, view modal) goes through `formatPhoneDisplay()` from
-  the same module, so legacy rows written before the convention still render grouped.
+`zPhone` passes on empty (phone is optional) and only checks the shape once typed;
+`formatPhoneOnChange` types the spaces in as the user goes. Display stored values with
+`formatPhoneDisplay()`.
 
-The backend's `optionalPhone()` normalises whatever it receives to the same canonical form, so
-the two sides can't drift.
-
-### 3b. If a field IS required, declare it — or you get an error with no `*`
-
-Ant only renders the required asterisk when a rule declares `required: true` (or the `Form.Item`
-has the `required` prop). A **custom `validator` that rejects empty** produces a "required" error
-next to a label with **no `*`** — which reads as a bug to users:
+### 3b. Select fields
 
 ```jsx
-// ❌ errors "Phone number is required" but shows no asterisk
-rules={[{ validator: phoneValidator }]}
-
-// ✅ required → Ant draws the `*`, the validator still does the checking
-<Form.Item name="password" label="Temporary password" required
-  rules={[validationRules.strongPassword(8)]}>
+<FormField control={form.control} name="roleId" render={({ field }) => (
+  <FormItem>
+    <FormLabel>Role {req}</FormLabel>
+    <Select value={field.value || undefined} onValueChange={field.onChange}>
+      <FormControl>
+        <SelectTrigger className="h-10 w-full"><SelectValue placeholder="Select role" /></SelectTrigger>
+      </FormControl>
+      <SelectContent>
+        {roles.map((r) => <SelectItem key={r.roleId} value={r.roleId}>{r.roleName}</SelectItem>)}
+      </SelectContent>
+    </Select>
+    <FormMessage />
+  </FormItem>
+)} />
 ```
 
-So: either the field is optional (loosen the validator), or it's required (declare it). Never a
-custom validator quietly enforcing presence.
+`SelectItem` values can't be empty strings (Radix throws). For an "All" filter option use a
+sentinel like `"all"` and map it to `""`. shadcn `Select` has **no type-ahead search**; if a list
+is long enough to need one, build a combobox from `popover` + `command` (both already installed).
 
 ### 4. `StatusToggle` for on/off choices — not a Select
 
-Controlled, so it drops straight into a `Form.Item`:
+`StatusToggle` (`@/…/components/StatusToggle`) is controlled, so bind it to the field directly
+(no `FormControl` needed — it's a custom control, not a native input):
 
 ```jsx
-import StatusToggle from "../../../../../components/StatusToggle";
-
-<Form.Item
-  name="status"
-  label="Status"
-  initialValue="Active"
-  rules={[{ required: true, message: "Please select status" }]}
->
-  <StatusToggle />
-</Form.Item>;
+<FormField control={form.control} name="status" render={({ field }) => (
+  <FormItem>
+    <FormLabel>Status {req}</FormLabel>
+    <StatusToggle value={field.value} onChange={field.onChange} />
+    <FormMessage />
+  </FormItem>
+)} />
 ```
 
-Pass `options` for non-status pairs:
-`[{ v: "On", dot: "var(--color-success)" }, { v: "Off", dot: "var(--color-text-muted)" }]`.
+Pass `options` for non-status pairs: `[{ v: "On", dot: "var(--color-success)" }, …]`.
 
 ### 5. Footer — hairline top border; Cancel + inverted primary
 
+The footer lives **inside** the `<form>`, so the primary button is `type="submit"`.
+
 ```jsx
 <div
-  className="mt-8 pt-5 flex justify-end gap-3"
-  style={{
-    borderTop: "1px solid var(--color-line)",
-    paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))",
-  }}
+  className="flex justify-end gap-3 p-6 pt-5"
+  style={{ borderTop: "1px solid var(--color-line)", paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
 >
-  <Button onClick={handleClose} size="large">
-    Cancel
-  </Button>
-  <Tooltip title={saveDisabled ? "No changes to save yet" : undefined}>
-    <span>
-      <Button
-        type="primary"
-        icon={<PlusOutlined />}
-        onClick={handleSubmit}
-        disabled={saveDisabled}
-        loading={createMutation.isPending || updateMutation.isPending}
-        size="large"
-      >
-        {isEditMode ? "Update Role" : "Create Role"}
-      </Button>
-    </span>
+  <Button type="button" variant="outline" size="lg" onClick={handleClose}>Cancel</Button>
+  <Tooltip>
+    <TooltipTrigger asChild>
+      {/* span keeps the tooltip working while the button is disabled */}
+      <span className="inline-flex">
+        <Button type="submit" size="lg" disabled={saveDisabled || isPending}>
+          {isPending ? <Loader2 className="animate-spin" /> : <Plus />}
+          {isEditMode ? "Update Role" : "Create Role"}
+        </Button>
+      </span>
+    </TooltipTrigger>
+    {saveDisabled && <TooltipContent>No changes to save yet</TooltipContent>}
   </Tooltip>
 </div>
 ```
 
-**Never** put an inline `background` on the primary button — the inverted style is global. The
-`paddingBottom` gives the buttons iOS home-indicator clearance (needs `viewport-fit=cover` in the
-viewport meta; it safely resolves to 24px elsewhere). The `<span>` wrapper keeps the Tooltip
-working while the button is disabled (a disabled button has `pointer-events: none`).
+The default `<Button>` variant **is** the inverted monochrome primary — never add an inline
+`background`. `variant="outline"` is the secondary (Cancel). React Query v5 mutations expose
+**`isPending`**, not `isLoading`.
 
 ---
 
@@ -251,137 +295,105 @@ const isEditMode = !!entity;
 
 useEffect(() => {
   if (!open) return;
-  if (entity) {
-    const values = {
-      roleName: entity.roleName,
-      description: entity.description,
-      status: entity.status,
-    };
-    form.setFieldsValue(values);
-    initialValuesRef.current = values; // baseline for the dirty check
-  } else {
-    form.resetFields();
-    const defaults = { status: "Active" };
-    form.setFieldsValue(defaults);
-    initialValuesRef.current = defaults;
-  }
+  form.reset(
+    entity
+      ? { roleName: entity.roleName ?? "", description: entity.description ?? "", status: entity.status ?? "Active" }
+      : EMPTY,
+  );
 }, [open, entity, form]);
 ```
 
-Map fields **explicitly** — never `form.setFieldsValue(entity)` (API responses carry extra keys).
+Map fields **explicitly** — never `form.reset(entity)` (API responses carry extra keys).
+`form.reset(values)` sets the baseline that the dirty check diffs against.
 
-### Internal close
-
-```jsx
-const handleClose = () => {
-  form.resetFields();
-  onClose();
-};
-```
-
-Cancel calls `handleClose` — never an `onCancel` prop.
-
-### Dirty check — disable save until something actually changed
-
-In **edit** mode disable the primary until dirty **and** guard the handler; in **create** mode
-leave it enabled (validation gates an empty form). Don't gate on `form.isFieldsTouched()` — it
-stays true after a value is changed back. Diff against the snapshot:
+### Dirty check — built in
 
 ```jsx
-const watchedValues = Form.useWatch([], form);
-const isDirty = useMemo(
-  () =>
-    !isFormEqual(
-      watchedValues ?? form.getFieldsValue(),
-      initialValuesRef.current,
-    ),
-  [watchedValues, form],
-);
-const saveDisabled = isEditMode && !isDirty;
+const { formState: { isDirty } } = form;
+const saveDisabled = isEditMode && !isDirty;   // create mode: always enabled, validation gates it
 ```
+
+RHF's `isDirty` replaces the old `Form.useWatch` + `isFormEqual` snapshot machinery — delete it.
+When a form also stages a file (image upload), combine: `const dirty = isDirty || !!logoFile`.
 
 ### Submit
 
+`form.handleSubmit(onSubmit)` runs validation first and **focuses the first invalid field itself**
+(no more `focusFirstError`). `onSubmit` only receives valid, typed values:
+
 ```jsx
-const handleSubmit = async () => {
-  if (isEditMode && !isDirty) {
-    message.info("No changes to save");
-    return;
-  }
+const onSubmit = async (values) => {
   try {
-    const values = await form.validateFields();
-    if (isEditMode)
-      await updateMutation.mutateAsync({ roleId: entity.roleId, data: values });
+    if (isEditMode) await updateMutation.mutateAsync({ roleId: entity.roleId, data: values });
     else await createMutation.mutateAsync(values);
-    form.resetFields();
-    onSuccess?.();
+    onSuccess?.();               // mutation onError already shows a toast
   } catch (error) {
-    if (error?.errorFields?.length) return focusFirstError(form, error);
     console.error("Form submission error:", error);
   }
 };
 ```
 
-`message` comes from `App.useApp()` (the project uses `@ant-design/v5-patch-for-react-19` — don't
-use the static `message` import). React Query v5: mutations expose **`isPending`**, not
-`isLoading`.
+Map the payload explicitly to the backend (no `...values` spread of unknown keys); write optional
+empty fields as `value || null` where the API expects null.
 
-### Focus the first error
-
-Because we submit imperatively, `<Form scrollToFirstError>` never fires — handle it:
+### Internal close
 
 ```jsx
-const focusFirstError = (form, error) => {
-  const first = error?.errorFields?.[0]?.name;
-  if (first)
-    form.scrollToField(first, {
-      behavior: "smooth",
-      block: "center",
-      focus: true,
-    });
-};
+const handleClose = () => { form.reset(EMPTY); onClose(); };
 ```
+
+Cancel and the bordered X both call `handleClose`. The Sheet's `onOpenChange(false)` (Esc /
+overlay click) also routes to it.
 
 ### Conditional sections
 
-Wrap create-only groups in `{!isEditMode && (...)}` — the `SectionLabel` goes inside the
-conditional so nothing dangles.
+Wrap create-only groups in `{!isEditMode && (…)}` with the `SectionLabel` inside the conditional.
+Build the schema with `useMemo` so create-only fields (e.g. `password`) are only validated in
+create mode:
+
+```jsx
+const schema = useMemo(
+  () => z.object(isEditMode ? baseShape : { ...baseShape, password: zStrongPassword(8) }),
+  [isEditMode],
+);
+```
 
 ---
 
 ## Variations
 
-- **Modal instead of Drawer** — for very short forms (1–2 sections, <5 fields) swap `<Drawer>` for
-  `<Modal width={520} footer={null}>`; component becomes `XFormModal`. Everything else identical.
-- **Wide/dense drawers** may go wider than 800 — the user-permissions matrix uses `width={1000}`.
-- **View/detail modals** use `width={640}`.
+- **Dialog instead of Sheet** — for very short forms (1–2 sections) swap `<Sheet>`/`<SheetContent>`
+  for `<Dialog>`/`<DialogContent className="sm:max-w-[520px]">`; component becomes `XFormModal`.
+- **Wide/dense sheets** go wider — the user-permissions matrix uses `sm:max-w-[1000px]`.
+- **Read-only detail modals** use `<Dialog>` + `DescriptionList` at `sm:max-w-[640px]` — see
+  `UserViewModal.jsx`.
 
 ---
 
 ## Image upload
 
-Keep the existing flow: `validateImageFile` + `getImageUrl` (`utils/upload.js`), `deleteFileApi`
-(`services/api/upload.js`), `beforeUpload={() => false}` + `showUploadList={false}` with your own
-preview, upload on submit via `FormData` through the `"multipart"` axios instance, and include the
-staged file in the dirty check (`valuesChanged || !!imageFile`). Style the preview/placeholder with
-tokens (`--color-surface-sunken`, `--color-line`) — no pastel or dashed-blue boxes.
+For image upload, use a hidden `<input type="file">` triggered by a `<Button type="button">`,
+keep `validateImageFile` + `getImageUrl` (`utils/upload.js`) and `deleteFileApi`
+(`services/api/upload.js`), preview via `FileReader`, and upload on submit via `FormData` through
+the `"multipart"` axios instance. Include the staged file in the dirty check
+(`isDirty || !!logoFile`). See `CompanyFormDrawer.jsx`.
 
 ---
 
 ## Checklist
 
-- [ ] Component named `XFormDrawer` and it imports `Drawer` itself
+- [ ] Component named `XFormDrawer`; imports `Sheet` itself; parent renders it with the props contract
 - [ ] Props exactly `{ open, onClose, onSuccess, entity? }` — no `onCancel`
-- [ ] `<Drawer width={800} closable={false} styles={{ body: { padding: 24 } }}>`
+- [ ] `<SheetContent side="right" showCloseButton={false} className="w-full gap-0 p-0 sm:max-w-[800px]">` + `sr-only` `<SheetTitle>`
+- [ ] `useForm({ resolver: zodResolver(schema), defaultValues })`; concrete defaults; `form.reset()` to hydrate
+- [ ] One zod schema; optional fields validate shape-not-presence; required-ness matches the backend (checked `schema.sql`/controller)
+- [ ] Required fields render an explicit `*` (shadcn doesn't add one)
 - [ ] Header: accent chip + title + subtitle + bordered X; copy switches on `isEditMode`
-- [ ] `SectionLabel` per group (no `<Divider>`, no dangling label in a conditional)
-- [ ] `size="large"` inputs; `showCount maxLength` on textareas; explicit placeholders
-- [ ] Required-ness matches the backend (checked `schema.sql`/controller) — `description` and `phone` are **optional**
-- [ ] Every required field declares `required` so Ant draws the `*` — no custom validator silently enforcing presence
+- [ ] `SectionLabel` per group; `<FormField>`/`<FormItem>`/`<FormLabel>`/`<FormControl>`/`<FormMessage>` per field
+- [ ] `h-10` inputs; icon prefix via relative wrapper outside `FormControl`; phone via `phoneFormat` helpers; password via `PasswordInput`
 - [ ] `StatusToggle` for on/off choices (not a Select)
-- [ ] Footer: Cancel + inverted primary (`+` icon), no inline `background`
-- [ ] Dirty check via snapshot diff; edit-mode disable + tooltip; `handleSubmit` guards `!isDirty`
+- [ ] Footer inside the `<form>`: Cancel (`variant="outline"`) + inverted primary (`type="submit"`, default variant, `+` icon), no inline `background`
+- [ ] Dirty check via `formState.isDirty`; edit-mode disable + tooltip (span wrapper)
 - [ ] `loading` bound to `createMutation.isPending || updateMutation.isPending`
-- [ ] Failed validation focuses the first invalid field
-- [ ] Payload mapped explicitly (no `...values` spread to the backend); dates via `dayjs`
-- [ ] No hardcoded hex; no shadow/gradient (except the header chip); no pastel
+- [ ] Payload mapped explicitly; empty optionals → `null` where the API expects it
+- [ ] No hardcoded hex; no shadow/gradient except the header chip

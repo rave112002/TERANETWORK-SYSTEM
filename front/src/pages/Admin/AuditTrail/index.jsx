@@ -1,26 +1,24 @@
-import { DownloadOutlined, FilterOutlined } from "@ant-design/icons";
-import {
-  Alert,
-  Button,
-  Col,
-  DatePicker,
-  Empty,
-  Input,
-  Row,
-  Select,
-  Spin,
-  Table,
-} from "antd";
 import { useState } from "react";
-import { Activity, Search, Trash2, Users } from "lucide-react";
+import dayjs from "dayjs";
+import { Activity, CircleAlert, Download, Filter, Loader2, Trash2, Users } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useAuditTrailHooks } from "./hooks";
 import AuditDetailModal from "./components/AuditDetailModal";
 import PageHeader from "../../../components/PageHeader";
 import PaginationFooter from "../../../components/PaginationFooter";
 import StatCard from "../../../components/StatCard";
 import RefreshButton from "../../../components/RefreshButton";
-
-const { RangePicker } = DatePicker;
+import SearchInput from "../../../components/SearchInput";
+import DataTable from "../../../components/DataTable";
 
 // Uppercase micro-label above a filter control.
 const FilterLabel = ({ children }) => (
@@ -78,17 +76,23 @@ const AuditTrailPage = () => {
     .size;
   const deletions = logs.filter((l) => l.action === "DELETE").length;
 
+  const fromStr = dateRange?.[0] ? dayjs(dateRange[0]).format("YYYY-MM-DD") : "";
+  const toStr = dateRange?.[1] ? dayjs(dateRange[1]).format("YYYY-MM-DD") : "";
+  const setRange = (from, to) => {
+    if (!from && !to) return setDateRange(null);
+    setDateRange([from ? dayjs(from) : null, to ? dayjs(to) : null]);
+  };
+
   if (error) {
     return (
       <div className="p-8">
-        <Alert
-          message="Error loading audit trail"
-          description={
-            error.message || "Failed to load audit logs. Please try again."
-          }
-          type="error"
-          showIcon
-        />
+        <Alert variant="destructive">
+          <CircleAlert />
+          <AlertTitle>Error loading audit trail</AlertTitle>
+          <AlertDescription>
+            {error.message || "Failed to load audit logs. Please try again."}
+          </AlertDescription>
+        </Alert>
       </div>
     );
   }
@@ -102,32 +106,26 @@ const AuditTrailPage = () => {
       />
 
       {/* 2. STAT CARDS */}
-      <Row gutter={[14, 14]}>
-        <Col xs={24} sm={12} lg={8}>
-          <StatCard
-            title="Total events"
-            value={totalEvents}
-            change="all time"
-            icon={<Activity className="w-4.25 h-4.25" strokeWidth={1.8} />}
-          />
-        </Col>
-        <Col xs={24} sm={12} lg={8}>
-          <StatCard
-            title="Users involved"
-            value={uniqueUsers}
-            change="on this page"
-            icon={<Users className="w-4.25 h-4.25" strokeWidth={1.8} />}
-          />
-        </Col>
-        <Col xs={24} sm={12} lg={8}>
-          <StatCard
-            title="Deletions"
-            value={deletions}
-            change="on this page"
-            icon={<Trash2 className="w-4.25 h-4.25" strokeWidth={1.8} />}
-          />
-        </Col>
-      </Row>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+        <StatCard
+          title="Total events"
+          value={totalEvents}
+          change="all time"
+          icon={<Activity className="w-4.25 h-4.25" strokeWidth={1.8} />}
+        />
+        <StatCard
+          title="Users involved"
+          value={uniqueUsers}
+          change="on this page"
+          icon={<Users className="w-4.25 h-4.25" strokeWidth={1.8} />}
+        />
+        <StatCard
+          title="Deletions"
+          value={deletions}
+          change="on this page"
+          icon={<Trash2 className="w-4.25 h-4.25" strokeWidth={1.8} />}
+        />
+      </div>
 
       {/* 3. TABLE CARD */}
       <div
@@ -142,33 +140,34 @@ const AuditTrailPage = () => {
           className="flex items-center justify-between gap-3 flex-wrap px-[18px] py-3.5"
           style={{ borderBottom: "1px solid var(--color-line)" }}
         >
-          <Input
-            placeholder="Filter events…"
-            prefix={
-              <Search
-                className="w-[15px] h-[15px]"
-                style={{ color: "var(--color-text-muted)" }}
-              />
-            }
+          <SearchInput
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            allowClear
-            style={{ width: 280 }}
+            onChange={setSearch}
+            placeholder="Filter events…"
           />
           <div className="flex items-center gap-2">
             <Button
-              icon={<DownloadOutlined />}
+              variant="outline"
+              size="sm"
               onClick={handleExport}
-              loading={isExporting}
+              disabled={isExporting}
             >
+              {isExporting ? (
+                <Loader2 className="animate-spin" />
+              ) : (
+                <Download />
+              )}
               Export CSV
             </Button>
             <RefreshButton onRefresh={refetch} isFetching={isFetching} />
             <Button
-              icon={<FilterOutlined />}
+              variant={
+                isFilterVisible || hasActiveFilters ? "default" : "outline"
+              }
+              size="sm"
               onClick={() => setIsFilterVisible(!isFilterVisible)}
-              type={isFilterVisible || hasActiveFilters ? "primary" : "default"}
             >
+              <Filter />
               Filters
             </Button>
           </div>
@@ -183,22 +182,41 @@ const AuditTrailPage = () => {
             <div className="flex flex-col gap-1.5">
               <FilterLabel>Module</FilterLabel>
               <Select
-                value={moduleFilter || undefined}
-                onChange={(value) => setModuleFilter(value || "")}
-                placeholder="All modules"
-                allowClear
-                style={{ width: 200 }}
-                options={moduleOptions}
-              />
+                value={moduleFilter || "all"}
+                onValueChange={(v) => setModuleFilter(v === "all" ? "" : v)}
+              >
+                <SelectTrigger className="h-10 w-[200px]">
+                  <SelectValue placeholder="All modules" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All modules</SelectItem>
+                  {moduleOptions.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex flex-col gap-1.5">
               <FilterLabel>Date range</FilterLabel>
-              <RangePicker
-                value={dateRange}
-                onChange={setDateRange}
-                allowClear
-                style={{ width: 260 }}
-              />
+              <div className="flex items-center gap-2">
+                <Input
+                  type="date"
+                  value={fromStr}
+                  max={toStr || undefined}
+                  onChange={(e) => setRange(e.target.value, toStr)}
+                  className="h-10 w-[150px]"
+                />
+                <span style={{ color: "var(--color-text-muted)" }}>–</span>
+                <Input
+                  type="date"
+                  value={toStr}
+                  min={fromStr || undefined}
+                  onChange={(e) => setRange(fromStr, e.target.value)}
+                  className="h-10 w-[150px]"
+                />
+              </div>
             </div>
             {hasActiveFilters && (
               <button
@@ -214,24 +232,19 @@ const AuditTrailPage = () => {
 
         {/* Table + custom pagination footer */}
         {isEmpty ? (
-          <div className="flex items-center justify-center py-20">
-            <Empty description="No audit logs found" />
+          <div className="flex items-center justify-center py-20 text-center">
+            <p style={{ fontSize: 13.5, color: "var(--color-text-muted)" }}>
+              No audit logs found
+            </p>
           </div>
         ) : (
           <>
-            <Table
+            <DataTable
               dataSource={logs}
               columns={columns}
               rowKey="auditId"
-              pagination={false}
-              loading={{
-                spinning: isLoading,
-                indicator: <Spin size="large" style={{ marginTop: 50 }} />,
-              }}
-              onChange={handleTableChange}
+              loading={isLoading}
               scroll={{ x: 1100 }}
-              size="middle"
-              className="border-none"
             />
             <PaginationFooter
               pagination={{

@@ -1,6 +1,7 @@
 import { Component } from "react";
-import { Button, Result } from "antd";
 import * as Sentry from "@sentry/react";
+import { Button } from "@/components/ui/button";
+import ResultState from "./ResultState";
 
 class ErrorBoundary extends Component {
   constructor(props) {
@@ -29,15 +30,11 @@ class ErrorBoundary extends Component {
           className="min-h-screen flex items-center justify-center"
           style={{ background: "var(--color-canvas)" }}
         >
-          <Result
+          <ResultState
             status="500"
             title="Something went wrong"
-            subTitle="We're sorry for the inconvenience. Please try refreshing the page."
-            extra={
-              <Button type="primary" onClick={this.handleReset}>
-                Go Home
-              </Button>
-            }
+            description="We're sorry for the inconvenience. Please try refreshing the page."
+            action={<Button onClick={this.handleReset}>Go Home</Button>}
           />
         </div>
       );

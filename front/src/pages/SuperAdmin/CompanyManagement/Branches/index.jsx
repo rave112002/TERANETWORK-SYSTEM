@@ -1,17 +1,14 @@
-import { FilterOutlined, PlusOutlined } from "@ant-design/icons";
-import {
-  Alert,
-  Button,
-  Col,
-  Empty,
-  Input,
-  Row,
-  Select,
-  Spin,
-  Table,
-} from "antd";
 import { useState } from "react";
-import { Building2, CheckCircle, MapPin, Search } from "lucide-react";
+import { Building2, CheckCircle, CircleAlert, Filter, MapPin, Plus } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useBranchHooks } from "./hooks";
 import BranchFormDrawer from "./components/BranchFormDrawer";
 import ViewBranchModal from "./components/ViewBranchModal";
@@ -19,6 +16,8 @@ import PageHeader from "../../../../components/PageHeader";
 import PaginationFooter from "../../../../components/PaginationFooter";
 import StatCard from "../../../../components/StatCard";
 import RefreshButton from "../../../../components/RefreshButton";
+import SearchInput from "../../../../components/SearchInput";
+import DataTable from "../../../../components/DataTable";
 
 const BranchesPage = () => {
   const {
@@ -62,12 +61,13 @@ const BranchesPage = () => {
   if (error) {
     return (
       <div className="p-8">
-        <Alert
-          message="Error loading branches"
-          description={error.message || "Failed to load branches."}
-          type="error"
-          showIcon
-        />
+        <Alert variant="destructive">
+          <CircleAlert />
+          <AlertTitle>Error loading branches</AlertTitle>
+          <AlertDescription>
+            {error.message || "Failed to load branches."}
+          </AlertDescription>
+        </Alert>
       </div>
     );
   }
@@ -79,43 +79,34 @@ const BranchesPage = () => {
         title="Branches"
         subtitle="Manage branches across all companies."
         actions={
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={handleOpenCreateDrawer}
-          >
+          <Button onClick={handleOpenCreateDrawer}>
+            <Plus />
             New branch
           </Button>
         }
       />
 
       {/* 2. STAT CARDS */}
-      <Row gutter={[14, 14]}>
-        <Col xs={24} sm={12} lg={8}>
-          <StatCard
-            title="Total branches"
-            value={totalBranches}
-            change="all time"
-            icon={<MapPin className="w-4.25 h-4.25" strokeWidth={1.8} />}
-          />
-        </Col>
-        <Col xs={24} sm={12} lg={8}>
-          <StatCard
-            title="Active branches"
-            value={activeBranches}
-            change="on this page"
-            icon={<CheckCircle className="w-4.25 h-4.25" strokeWidth={1.8} />}
-          />
-        </Col>
-        <Col xs={24} sm={12} lg={8}>
-          <StatCard
-            title="Main branches"
-            value={mainBranches}
-            change="on this page"
-            icon={<Building2 className="w-4.25 h-4.25" strokeWidth={1.8} />}
-          />
-        </Col>
-      </Row>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+        <StatCard
+          title="Total branches"
+          value={totalBranches}
+          change="all time"
+          icon={<MapPin className="w-4.25 h-4.25" strokeWidth={1.8} />}
+        />
+        <StatCard
+          title="Active branches"
+          value={activeBranches}
+          change="on this page"
+          icon={<CheckCircle className="w-4.25 h-4.25" strokeWidth={1.8} />}
+        />
+        <StatCard
+          title="Main branches"
+          value={mainBranches}
+          change="on this page"
+          icon={<Building2 className="w-4.25 h-4.25" strokeWidth={1.8} />}
+        />
+      </div>
 
       {/* 3. TABLE CARD */}
       <div
@@ -130,26 +121,21 @@ const BranchesPage = () => {
           className="flex items-center justify-between gap-3 flex-wrap px-[18px] py-3.5"
           style={{ borderBottom: "1px solid var(--color-line)" }}
         >
-          <Input
-            placeholder="Filter branches…"
-            prefix={
-              <Search
-                className="w-[15px] h-[15px]"
-                style={{ color: "var(--color-text-muted)" }}
-              />
-            }
+          <SearchInput
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            allowClear
-            style={{ width: 280 }}
+            onChange={setSearch}
+            placeholder="Filter branches…"
           />
           <div className="flex items-center gap-2">
             <RefreshButton onRefresh={refetch} isFetching={isFetching} />
             <Button
-              icon={<FilterOutlined />}
+              variant={
+                isFilterVisible || hasActiveFilters ? "default" : "outline"
+              }
+              size="sm"
               onClick={() => setIsFilterVisible(!isFilterVisible)}
-              type={isFilterVisible || hasActiveFilters ? "primary" : "default"}
             >
+              <Filter />
               Filters
             </Button>
           </div>
@@ -174,15 +160,21 @@ const BranchesPage = () => {
                 Company
               </span>
               <Select
-                value={companyFilter || undefined}
-                onChange={setCompanyFilter}
-                placeholder="All companies"
-                allowClear
-                style={{ width: 220 }}
-                options={orgOptions}
-                showSearch
-                optionFilterProp="label"
-              />
+                value={companyFilter || "all"}
+                onValueChange={(v) => setCompanyFilter(v === "all" ? "" : v)}
+              >
+                <SelectTrigger className="h-10 w-[220px]">
+                  <SelectValue placeholder="All companies" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All companies</SelectItem>
+                  {orgOptions.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex flex-col gap-1.5">
               <span
@@ -197,18 +189,20 @@ const BranchesPage = () => {
                 Status
               </span>
               <Select
-                value={statusFilter || undefined}
-                onChange={setStatusFilter}
-                placeholder="All statuses"
-                allowClear
-                style={{ width: 200 }}
-                options={[
-                  { value: "Active", label: "Active" },
-                  { value: "Inactive", label: "Inactive" },
-                  { value: "Suspended", label: "Suspended" },
-                  { value: "Deleted", label: "Deleted" },
-                ]}
-              />
+                value={statusFilter || "all"}
+                onValueChange={(v) => setStatusFilter(v === "all" ? "" : v)}
+              >
+                <SelectTrigger className="h-10 w-[200px]">
+                  <SelectValue placeholder="All statuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="Active">Active</SelectItem>
+                  <SelectItem value="Inactive">Inactive</SelectItem>
+                  <SelectItem value="Suspended">Suspended</SelectItem>
+                  <SelectItem value="Deleted">Deleted</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             {hasActiveFilters && (
               <button
@@ -224,32 +218,23 @@ const BranchesPage = () => {
 
         {/* Table + custom pagination footer */}
         {isEmpty ? (
-          <div className="flex items-center justify-center py-20">
-            <Empty description="No branches found">
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={handleOpenCreateDrawer}
-              >
-                New branch
-              </Button>
-            </Empty>
+          <div className="flex flex-col items-center justify-center gap-4 py-20 text-center">
+            <p style={{ fontSize: 13.5, color: "var(--color-text-muted)" }}>
+              No branches found
+            </p>
+            <Button onClick={handleOpenCreateDrawer}>
+              <Plus />
+              New branch
+            </Button>
           </div>
         ) : (
           <>
-            <Table
+            <DataTable
               dataSource={branches}
               columns={columns}
               rowKey="branchId"
-              pagination={false}
-              loading={{
-                spinning: isLoading,
-                indicator: <Spin size="large" style={{ marginTop: 50 }} />,
-              }}
-              onChange={handleTableChange}
+              loading={isLoading}
               scroll={{ x: 900 }}
-              size="middle"
-              className="border-none"
             />
             <PaginationFooter
               pagination={pagination}

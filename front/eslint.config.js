@@ -32,4 +32,13 @@ export default [
       ],
     },
   },
+  {
+    // Generated shadcn/ui primitives export variant helpers (buttonVariants,
+    // badgeVariants) and hooks (useFormField) alongside their components — a
+    // deliberate part of the shadcn design. Don't flag fast-refresh here.
+    files: ["src/components/ui/**/*.{js,jsx}"],
+    rules: {
+      "react-refresh/only-export-components": "off",
+    },
+  },
 ];

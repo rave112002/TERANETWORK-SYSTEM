@@ -1,10 +1,10 @@
+import { toast } from "sonner";
 import {
   keepPreviousData,
   useMutation,
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { message } from "antd";
 import {
   getBranchesApi,
   getBranchByIdApi,
@@ -35,11 +35,11 @@ export const useCreateBranch = () => {
   return useMutation({
     mutationFn: createBranchApi,
     onSuccess: () => {
-      message.success("Branch created successfully");
+      toast.success("Branch created successfully");
       queryClient.invalidateQueries({ queryKey: ["superadmin-branches"] });
     },
     onError: (error) => {
-      message.error(error.response?.data?.message || "Failed to create branch");
+      toast.error(error.response?.data?.message || "Failed to create branch");
     },
   });
 };
@@ -50,11 +50,11 @@ export const useUpdateBranch = () => {
     mutationFn: ({ branchId, branchData }) =>
       updateBranchApi(branchId, branchData),
     onSuccess: () => {
-      message.success("Branch updated successfully");
+      toast.success("Branch updated successfully");
       queryClient.invalidateQueries({ queryKey: ["superadmin-branches"] });
     },
     onError: (error) => {
-      message.error(error.response?.data?.message || "Failed to update branch");
+      toast.error(error.response?.data?.message || "Failed to update branch");
     },
   });
 };
@@ -64,11 +64,11 @@ export const useDeleteBranch = () => {
   return useMutation({
     mutationFn: deleteBranchApi,
     onSuccess: () => {
-      message.success("Branch deleted successfully");
+      toast.success("Branch deleted successfully");
       queryClient.invalidateQueries({ queryKey: ["superadmin-branches"] });
     },
     onError: (error) => {
-      message.error(error.response?.data?.message || "Failed to delete branch");
+      toast.error(error.response?.data?.message || "Failed to delete branch");
     },
   });
 };

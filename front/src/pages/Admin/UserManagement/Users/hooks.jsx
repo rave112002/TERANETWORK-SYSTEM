@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo } from "react";
-import { App, Button, Dropdown } from "antd";
-import { Eye, MoreVertical, Pencil, Trash2, UserCog } from "lucide-react";
+import { confirm } from "../../../../store/confirmStore";
+import { Eye, Pencil, Trash2, UserCog } from "lucide-react";
+import RowActions from "../../../../components/RowActions";
 import { useDebounce } from "../../../../hooks/useDebounce";
 import { usePermissions } from "../../../../hooks/usePermissions";
 import { decodeHTML } from "../../../../utils/decode-html";
@@ -11,7 +12,6 @@ import {
 } from "../../../../services/requests/admin/user";
 
 export const useUserHooks = () => {
-  const { modal } = App.useApp();
   const { hasPermission } = usePermissions();
   const canWrite = hasPermission("users", "list", "write");
 
@@ -80,20 +80,20 @@ export const useUserHooks = () => {
 
   // Destructive action gets an explicit confirm step.
   const handleDeleteRequest = useCallback(
-    (record) => {
+    async (record) => {
       const label =
         `${decodeHTML(record.firstName) || ""} ${decodeHTML(record.lastName) || ""}`.trim() ||
         decodeHTML(record.email);
-      modal.confirm({
+      const ok = await confirm({
         title: "Delete user",
-        content: `Delete "${label}"? This can't be undone.`,
-        okText: "Delete",
-        okButtonProps: { danger: true },
+        description: `Delete "${label}"? This can't be undone.`,
+        confirmText: "Delete",
         cancelText: "Cancel",
-        onOk: () => handleDelete(record),
+        danger: true,
       });
+      if (ok) handleDelete(record);
     },
-    [modal, handleDelete],
+    [handleDelete],
   );
 
   const handleBulkDelete = useCallback(async () => {
@@ -316,19 +316,7 @@ export const useUserHooks = () => {
         key: "actions",
         width: 60,
         align: "right",
-        render: (_, record) => (
-          <Dropdown
-            menu={{ items: getActionItems(record) }}
-            trigger={["click"]}
-            placement="bottomRight"
-          >
-            <Button
-              type="text"
-              icon={<MoreVertical className="w-4 h-4" />}
-              className="hover:bg-(--color-surface-sunken)"
-            />
-          </Dropdown>
-        ),
+        render: (_, record) => <RowActions items={getActionItems(record)} />,
       },
     ],
     [getActionItems, currentPage, pageSize],

@@ -1,4 +1,4 @@
-import { HomeOutlined, UserOutlined } from "@ant-design/icons";
+import { Home, User } from "lucide-react";
 import { FileText, Settings } from "lucide-react";
 import { Suspense, lazy } from "react";
 import { Route, Routes } from "react-router";
@@ -25,7 +25,7 @@ const AdminRoute = () => {
       route: "/dashboard",
       name: "Dashboard",
       label: "Dashboard",
-      icon: <HomeOutlined className="h-5 w-5" />,
+      icon: <Home className="h-5 w-5" />,
       component: (
         <Suspense fallback={<ComponentLoader />}>
           <ProtectedRoute module="dashboard" accessLevel="read">
@@ -41,7 +41,7 @@ const AdminRoute = () => {
       key: "user-management",
       name: "User Management",
       label: "User Management",
-      icon: <UserOutlined className="h-5 w-5" />,
+      icon: <User className="h-5 w-5" />,
       permission: {
         anyOf: [
           { module: "users", submodule: "list", accessLevel: "read" },

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { message } from "antd";
+import { toast } from "sonner";
 import { getSettingsApi, updateSettingsApi } from "../../api/admin/settings";
 
 export const useGetSettings = () =>
@@ -14,11 +14,11 @@ export const useUpdateSettings = () => {
   return useMutation({
     mutationFn: updateSettingsApi,
     onSuccess: () => {
-      message.success("Settings saved");
+      toast.success("Settings saved");
       queryClient.invalidateQueries({ queryKey: ["settings"] });
     },
     onError: (error) => {
-      message.error(error.response?.data?.message || "Failed to save settings");
+      toast.error(error.response?.data?.message || "Failed to save settings");
     },
   });
 };

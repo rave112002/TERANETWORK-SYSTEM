@@ -1,9 +1,9 @@
-import { Spin } from "antd";
+import Spinner from "./Spinner";
 
 export const ComponentLoader = () => {
   return (
     <div className="flex items-center justify-center min-h-screen">
-      <Spin size="large" />
+      <Spinner size="large" />
     </div>
   );
 };
@@ -11,7 +11,7 @@ export const ComponentLoader = () => {
 export const PageLoader = () => {
   return (
     <div className="flex items-center justify-center h-64">
-      <Spin size="large" />
+      <Spinner size="large" />
     </div>
   );
 };

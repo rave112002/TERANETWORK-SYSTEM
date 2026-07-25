@@ -170,7 +170,7 @@ export const deleteItemApi = async (itemId) => {
 
 ```js
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { message } from "antd";
+import { toast } from "sonner";
 import {
   getItemsApi,
   getItemByIdApi,
@@ -205,11 +205,11 @@ export const useCreateItem = () => {
   return useMutation({
     mutationFn: createItemApi,
     onSuccess: () => {
-      message.success("Item created successfully");
+      toast.success("Item created successfully");
       queryClient.invalidateQueries({ queryKey: ["items"] });
     },
     onError: (error) => {
-      message.error(error.response?.data?.message || "Failed to create item");
+      toast.error(error.response?.data?.message || "Failed to create item");
     },
   });
 };
@@ -221,12 +221,12 @@ export const useUpdateItem = () => {
   return useMutation({
     mutationFn: ({ itemId, itemData }) => updateItemApi(itemId, itemData),
     onSuccess: (data, variables) => {
-      message.success("Item updated successfully");
+      toast.success("Item updated successfully");
       queryClient.invalidateQueries({ queryKey: ["items"] });
       queryClient.invalidateQueries({ queryKey: ["items", variables.itemId] });
     },
     onError: (error) => {
-      message.error(error.response?.data?.message || "Failed to update item");
+      toast.error(error.response?.data?.message || "Failed to update item");
     },
   });
 };
@@ -238,11 +238,11 @@ export const useDeleteItem = () => {
   return useMutation({
     mutationFn: deleteItemApi,
     onSuccess: () => {
-      message.success("Item deleted successfully");
+      toast.success("Item deleted successfully");
       queryClient.invalidateQueries({ queryKey: ["items"] });
     },
     onError: (error) => {
-      message.error(error.response?.data?.message || "Failed to delete item");
+      toast.error(error.response?.data?.message || "Failed to delete item");
     },
   });
 };

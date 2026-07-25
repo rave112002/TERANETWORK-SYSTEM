@@ -35,13 +35,17 @@ Group imports in this order, separated by blank lines:
 // 1. React & core libraries
 import { useState, useCallback, useMemo, useEffect } from "react";
 
-// 2. Third-party libraries (antd, lucide, tanstack, dayjs, etc.)
-import { Button, Table, Input, Select } from "antd";
+// 2. Third-party libraries (lucide, tanstack, dayjs, etc.)
 import { Users, Search, MoreVertical } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
 import dayjs from "dayjs";
 
-// 3. Internal — components, hooks, utils, services (relative paths)
+// 3. shadcn/ui primitives (always via the @/ alias)
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+
+// 4. Internal — components, hooks, utils, services (relative paths)
 import StatCard from "../../../../components/StatCard";
 import { usePermissions } from "../../../../hooks/usePermissions";
 import { useGetUsers } from "../../../../services/requests/admin/user";
@@ -51,15 +55,22 @@ import { useGetUsers } from "../../../../services/requests/admin/user";
 
 ## Import Paths
 
-- **Always use relative paths.** No `@/` alias is configured in this project.
-- Keep paths as short as possible by referencing from the current file's location.
+- A `@/` alias → `src/` is configured (in `vite.config.js` and `jsconfig.json`). It was
+  added for shadcn/ui, whose generated components import via `@/components/ui/…` and
+  `@/lib/utils`.
+- **Use `@/` for shadcn/ui imports** (`@/components/ui/*`, `@/lib/utils`) — never rewrite
+  those to relative paths, or `npx shadcn add` will fight you.
+- **App code may use either**, but prefer `@/` for cross-tree imports and relative paths
+  for near neighbours (`./`, `../`). Keep paths short.
 
 ```jsx
-// ✅ Correct
-import StatCard from "../../../components/StatCard";
+// ✅ shadcn/ui — always the alias
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
-// ❌ Wrong — no alias configured
+// ✅ app code — alias or relative both fine
 import StatCard from "@/components/StatCard";
+import StatCard from "../../../components/StatCard";
 ```
 
 ---
@@ -69,19 +80,24 @@ import StatCard from "@/components/StatCard";
 | Purpose        | Use                     | Never use                      |
 | -------------- | ----------------------- | ------------------------------ |
 | Dates          | `dayjs`                 | `moment`, `date-fns`           |
-| Icons          | `lucide-react`          | Ant icons in page UI           |
+| Icons          | `lucide-react`          | other icon packs               |
 | State (global) | `zustand`               | Redux, Context for state       |
 | Server state   | `@tanstack/react-query` | SWR, manual fetching           |
 | HTTP           | `axios`                 | fetch (except in tests)        |
-| UI components  | `antd` v5               | Material UI, Chakra            |
+| UI components  | `shadcn/ui` (`@/components/ui/*`) | Material UI, Chakra, other kits |
+| Forms          | `react-hook-form` + `zod` (`zodResolver`) | Formik, manual state |
+| Toasts         | `sonner` (`toast.*`)    | `alert()`, custom toasts       |
+| Confirm dialogs | `confirm()` (`src/store/confirmStore`) | `window.confirm`, ad-hoc modals |
+| Tables         | `@tanstack/react-table` via the shared `DataTable` | raw `<table>`, other grids |
 | Styling        | Tailwind CSS v4         | Styled-components, CSS modules |
 | Routing        | `react-router` v7       | Reach Router, Next.js          |
-| Animation      | `framer-motion`         | react-spring                   |
 | Charts         | `recharts`              | Chart.js, D3 directly          |
 
-### Ant Design Icons Exception
+### shadcn/ui only
 
-Ant Design `*Outlined` icons (`PlusOutlined`, `FilterOutlined`, `ReloadOutlined`, `DeleteOutlined`) may **only** be used inside Ant `<Button icon={...}>` slots — because Ant button styling expects them. Everywhere else (page UI, table cells, dropdown menus, headers), use `lucide-react`.
+Every UI primitive is shadcn/ui from `@/components/ui/*`, with lucide-react icons everywhere —
+don't pull in another component or icon library. If a shadcn component you need isn't in
+`src/components/ui/` yet, add it with `npx shadcn@latest add <name>` (run from `front/`).
 
 ---
 
@@ -134,7 +150,7 @@ for the token cheat-sheet.
 1. **Global auth state** → Zustand stores (`src/store/authStore.js`)
 2. **Server state** → React Query (via `src/services/requests/`)
 3. **Page-level UI state** → In the page's `hooks.jsx` (useState)
-4. **Form state** → Ant Design `Form.useForm()`
+4. **Form state** → `react-hook-form` (`useForm({ resolver: zodResolver(schema) })`)
 5. **Cross-component UI state** → React Context (sparingly — only for things like socket)
 
 Never put server data in Zustand. Never use React Query for auth tokens.
@@ -143,9 +159,12 @@ Never put server data in Zustand. Never use React Query for auth tokens.
 
 ## Error Handling
 
-- **API errors:** Let React Query handle via `onError` in mutations. Show `message.error(...)`.
-- **Page-level errors:** Return early with `<Alert type="error">` (see UI Design System).
-- **Form validation:** Use Ant Form `rules` — never manual validation.
+- **API errors:** Let React Query handle via `onError` in mutations. Show
+  `toast.error(...)` (`import { toast } from "sonner"`).
+- **Page-level errors:** Return early with a shadcn `<Alert variant="destructive">` (icon +
+  `<AlertTitle>` + `<AlertDescription>`) — see UI Design System.
+- **Form validation:** Use a `zod` schema via `zodResolver` — never manual validation. Field
+  errors render through shadcn `<FormMessage />`.
 - **Unhandled errors:** Caught by `<ErrorBoundary>` at the app root.
 - **No try/catch in API files** — errors propagate to React Query naturally.
 
@@ -221,7 +240,7 @@ const total = data?.pagination?.total ?? 0;
 - **No barrel exports** (`index.js` re-exports). Import directly from the file.
 - **No prop spreading for forms** — always explicit field mapping.
 - **One component per file.** Tiny internal helpers (like a styled wrapper) are okay.
-- **No inline styles for colors** — use CSS variables. Exception: Ant button `background` gradient.
+- **No inline styles for colors** — use CSS variables. Exception: the drawer header accent-chip gradient (`--gradient-primary`).
 - **Debounce search inputs** — always 500ms via `useDebounce` hook.
 - **Prefer `useCallback`** for handlers passed to memoized children or used in dependency arrays.
 - **Prefer `useMemo`** for expensive computations, column definitions, and stat card arrays.

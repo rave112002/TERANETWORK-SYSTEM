@@ -9,7 +9,7 @@ The repository is a **monorepo of two independent apps**:
 
 | Path               | App                         | Stack                                                                                          |
 | ------------------ | --------------------------- | ---------------------------------------------------------------------------------------------- |
-| [`front/`](front/) | React SPA (the two portals) | React 19 · Vite · Ant Design v5 · Tailwind CSS v4 · Zustand · TanStack Query · React Router v7 |
+| [`front/`](front/) | React SPA (the two portals) | React 19 · Vite · shadcn/ui (Radix + Tailwind) · Tailwind CSS v4 · Zustand · TanStack Query · react-hook-form + zod · React Router v7 |
 | [`back/`](back/)   | REST API server             | Node · Express · MySQL (`mysql2`) · Passport JWT · Zod                                         |
 
 > Conventions for each side are documented in [`front/CLAUDE.md`](front/CLAUDE.md) → [`front/docs/`](front/docs/)
@@ -40,7 +40,7 @@ The repository is a **monorepo of two independent apps**:
    Browser               │  front/  (Vite SPA)         │
    ┌───────────────┐     │  /admin/*     Admin portal  │
    │ SuperAdmin UI │◀───▶│  /superadmin/* SuperAdmin   │
-   │ Admin UI      │     │  Zustand · React Query · AntD│
+   │ Admin UI      │     │  Zustand · Query · shadcn/ui│
    └───────────────┘     └──────────────┬──────────────┘
                                          │  HTTPS + JWT (Bearer) + CSRF
                                          ▼
@@ -102,7 +102,7 @@ The repository is a **monorepo of two independent apps**:
 │       │   ├── api/           ← raw axios calls (per portal/module)
 │       │   └── requests/      ← TanStack Query hooks (mirror api/)
 │       ├── store/             ← Zustand (authStore, themeStore)
-│       └── theme/ · index.css ← Ant theme + Tailwind v4 design tokens
+│       └── index.css          ← Tailwind v4 + Modern design tokens (shadcn token bridge)
 └── back/                      ← Express API
     ├── CLAUDE.md  · docs/     ← backend conventions (6 topic docs)
     ├── .env.example
@@ -295,7 +295,7 @@ keep-alive, slow-query logging) and is injected as `req.db`:
 - **UI system — "Modern"** — monochrome surfaces + hairline borders + one green accent used sparingly;
   structure comes from borders, not shadows, and the primary button is inverted monochrome (never the
   accent, never a gradient). Every color is a token in `src/index.css` (light/dark); type is **Onest**
-  + **JetBrains Mono** (micro-data only), Ant Design v5, Tailwind v4, `lucide-react` icons. The
+  + **JetBrains Mono** (micro-data only), shadcn/ui components, Tailwind v4, `lucide-react` icons. The
   copy-paste spec is [`front/docs/modern-module-pattern.md`](front/docs/modern-module-pattern.md) and
   `front/src/pages/Admin/UserManagement/Roles/` is the reference implementation. See
   [`front/docs/ui-design-system.md`](front/docs/ui-design-system.md) and [`front/docs/ui-form-design.md`](front/docs/ui-form-design.md).

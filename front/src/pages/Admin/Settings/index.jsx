@@ -1,6 +1,34 @@
-import { Alert, App, Button, Form, Input, Select, Spin, Tooltip } from "antd";
-import { Building2, Calendar, Clock, Mail } from "lucide-react";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { Building2, Calendar, CircleAlert, Clock, Loader2, Mail } from "lucide-react";
+
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
+import Spinner from "../../../components/Spinner";
 import PageHeader from "../../../components/PageHeader";
 import SectionLabel from "../../../components/SectionLabel";
 import StatusToggle from "../../../components/StatusToggle";
@@ -17,58 +45,54 @@ const DATE_FORMAT_OPTIONS = [
   { value: "MM/DD/YYYY", label: "MM/DD/YYYY  (01/05/2025)" },
 ];
 
-const WEEK_START_OPTIONS = [{ v: "Monday" }, { v: "Sunday" }];
+const WEEK_START_OPTIONS = [
+  { v: "Monday", dot: "var(--color-text-muted)" },
+  { v: "Sunday", dot: "var(--color-text-muted)" },
+];
 
-const isFormEqual = (a = {}, b = {}) => {
-  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
-  for (const k of keys) {
-    if (JSON.stringify(a[k] ?? "") !== JSON.stringify(b[k] ?? "")) return false;
-  }
-  return true;
+const schema = z.object({
+  companyDisplayName: z.string().max(100, "Must be 100 characters or fewer"),
+  supportEmail: z
+    .string()
+    .refine(
+      (v) => v === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
+      "Please enter a valid email",
+    ),
+  dateFormat: z.string(),
+  timezone: z.string(),
+  weekStartsOn: z.string(),
+});
+
+const EMPTY = {
+  companyDisplayName: "",
+  supportEmail: "",
+  dateFormat: "MMM D, YYYY",
+  timezone: "",
+  weekStartsOn: "Monday",
 };
 
 const SettingsPage = () => {
-  const [form] = Form.useForm();
-  const { message } = App.useApp();
   const { hasPermission } = usePermissions();
   const canWrite = hasPermission("settings", null, "write");
 
   const { data, isLoading, error } = useGetSettings();
   const updateMutation = useUpdateSettings();
-  const initialValuesRef = useRef({});
-
   const settings = data?.data?.settings;
 
+  const form = useForm({ resolver: zodResolver(schema), defaultValues: EMPTY });
+  const {
+    formState: { isDirty },
+  } = form;
+
   useEffect(() => {
-    if (settings) {
-      form.setFieldsValue(settings);
-      initialValuesRef.current = settings;
-    }
+    if (settings) form.reset({ ...EMPTY, ...settings });
   }, [settings, form]);
 
-  const watchedValues = Form.useWatch([], form);
-  const isDirty = useMemo(
-    () =>
-      !isFormEqual(
-        watchedValues ?? form.getFieldsValue(),
-        initialValuesRef.current,
-      ),
-    [watchedValues, form],
-  );
-
-  const handleSubmit = async () => {
-    if (!isDirty) {
-      message.info("No changes to save");
-      return;
-    }
-    const values = await form.validateFields();
+  const onSubmit = (values) => {
     updateMutation.mutate(values, {
       onSuccess: (response) => {
         const saved = response?.data?.settings;
-        if (saved) {
-          form.setFieldsValue(saved);
-          initialValuesRef.current = saved;
-        }
+        if (saved) form.reset({ ...EMPTY, ...saved });
       },
     });
   };
@@ -76,12 +100,11 @@ const SettingsPage = () => {
   if (error) {
     return (
       <div className="p-8">
-        <Alert
-          type="error"
-          showIcon
-          message="Failed to load settings"
-          description={error.message}
-        />
+        <Alert variant="destructive">
+          <CircleAlert />
+          <AlertTitle>Failed to load settings</AlertTitle>
+          <AlertDescription>{error.message}</AlertDescription>
+        </Alert>
       </div>
     );
   }
@@ -103,119 +126,170 @@ const SettingsPage = () => {
       >
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
-            <Spin size="large" />
+            <Spinner size="large" />
           </div>
         ) : (
           <div className="px-[18px] py-5">
-            <Form
-              form={form}
-              layout="vertical"
-              onFinish={handleSubmit}
-              disabled={!canWrite}
-              requiredMark={false}
-            >
-              <div>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} autoComplete="off">
                 <SectionLabel>General</SectionLabel>
-                <Form.Item
+                <FormField
+                  control={form.control}
                   name="companyDisplayName"
-                  label="Company display name"
-                  rules={[
-                    { max: 100, message: "Must be 100 characters or fewer" },
-                  ]}
-                >
-                  <Input
-                    prefix={
-                      <Building2
-                        className="w-4 h-4 mr-2"
-                        style={{ color: "var(--color-text-muted)" }}
-                      />
-                    }
-                    placeholder="e.g., Acme Corp"
-                    size="large"
-                  />
-                </Form.Item>
-
-                <Form.Item
+                  render={({ field }) => (
+                    <FormItem className="mb-5">
+                      <FormLabel>Company display name</FormLabel>
+                      <div className="relative">
+                        <Building2
+                          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
+                          style={{ color: "var(--color-text-muted)" }}
+                        />
+                        <FormControl>
+                          <Input
+                            placeholder="e.g., Acme Corp"
+                            className="h-10 pl-9"
+                            disabled={!canWrite}
+                            {...field}
+                          />
+                        </FormControl>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
                   name="supportEmail"
-                  label="Support email"
-                  rules={[
-                    { type: "email", message: "Please enter a valid email" },
-                  ]}
-                >
-                  <Input
-                    prefix={
-                      <Mail
-                        className="w-4 h-4 mr-2"
-                        style={{ color: "var(--color-text-muted)" }}
-                      />
-                    }
-                    placeholder="support@example.com"
-                    size="large"
-                  />
-                </Form.Item>
-              </div>
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Support email</FormLabel>
+                      <div className="relative">
+                        <Mail
+                          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
+                          style={{ color: "var(--color-text-muted)" }}
+                        />
+                        <FormControl>
+                          <Input
+                            placeholder="support@example.com"
+                            className="h-10 pl-9"
+                            disabled={!canWrite}
+                            {...field}
+                          />
+                        </FormControl>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <div className="mt-7">
-                <SectionLabel>Localization</SectionLabel>
-                <Form.Item name="dateFormat" label="Date format">
-                  <Select size="large" options={DATE_FORMAT_OPTIONS} />
-                </Form.Item>
-
-                <Form.Item name="timezone" label="Timezone">
-                  <Input
-                    prefix={
-                      <Clock
-                        className="w-4 h-4 mr-2"
-                        style={{ color: "var(--color-text-muted)" }}
-                      />
-                    }
-                    placeholder="e.g., Asia/Manila"
-                    size="large"
+                <div className="mt-7">
+                  <SectionLabel>Localization</SectionLabel>
+                  <FormField
+                    control={form.control}
+                    name="dateFormat"
+                    render={({ field }) => (
+                      <FormItem className="mb-5">
+                        <FormLabel>Date format</FormLabel>
+                        <Select
+                          value={field.value || undefined}
+                          onValueChange={field.onChange}
+                          disabled={!canWrite}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="h-10 w-full">
+                              <SelectValue placeholder="Select a format" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {DATE_FORMAT_OPTIONS.map((o) => (
+                              <SelectItem key={o.value} value={o.value}>
+                                {o.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                </Form.Item>
-
-                <Form.Item name="weekStartsOn" label="Week starts on">
-                  <StatusToggle
-                    options={WEEK_START_OPTIONS.map((o) => ({
-                      v: o.v,
-                      dot: "var(--color-text-muted)",
-                    }))}
+                  <FormField
+                    control={form.control}
+                    name="timezone"
+                    render={({ field }) => (
+                      <FormItem className="mb-5">
+                        <FormLabel>Timezone</FormLabel>
+                        <div className="relative">
+                          <Clock
+                            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
+                            style={{ color: "var(--color-text-muted)" }}
+                          />
+                          <FormControl>
+                            <Input
+                              placeholder="e.g., Asia/Manila"
+                              className="h-10 pl-9"
+                              disabled={!canWrite}
+                              {...field}
+                            />
+                          </FormControl>
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                </Form.Item>
-              </div>
-
-              {canWrite && (
-                <div
-                  className="mt-7 pt-5 flex items-center gap-2 justify-end"
-                  style={{ borderTop: "1px solid var(--color-line)" }}
-                >
-                  <Calendar
-                    className="w-3.5 h-3.5"
-                    style={{ color: "var(--color-text-muted)" }}
+                  <FormField
+                    control={form.control}
+                    name="weekStartsOn"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Week starts on</FormLabel>
+                        <StatusToggle
+                          value={field.value}
+                          onChange={field.onChange}
+                          options={WEEK_START_OPTIONS}
+                        />
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                  <span
-                    className="mr-auto"
-                    style={{ fontSize: 12.5, color: "var(--color-text-muted)" }}
-                  >
-                    Applies to your current branch.
-                  </span>
-                  <Tooltip
-                    title={!isDirty ? "No changes to save yet" : undefined}
-                  >
-                    <span>
-                      <Button
-                        type="primary"
-                        htmlType="submit"
-                        disabled={!isDirty}
-                        loading={updateMutation.isPending}
-                        size="large"
-                      >
-                        Save Changes
-                      </Button>
-                    </span>
-                  </Tooltip>
                 </div>
-              )}
+
+                {canWrite && (
+                  <div
+                    className="mt-7 pt-5 flex items-center gap-2 justify-end"
+                    style={{ borderTop: "1px solid var(--color-line)" }}
+                  >
+                    <Calendar
+                      className="w-3.5 h-3.5"
+                      style={{ color: "var(--color-text-muted)" }}
+                    />
+                    <span
+                      className="mr-auto"
+                      style={{ fontSize: 12.5, color: "var(--color-text-muted)" }}
+                    >
+                      Applies to your current branch.
+                    </span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="inline-flex">
+                          <Button
+                            type="submit"
+                            size="lg"
+                            disabled={!isDirty || updateMutation.isPending}
+                          >
+                            {updateMutation.isPending && (
+                              <Loader2 className="animate-spin" />
+                            )}
+                            Save Changes
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      {!isDirty && (
+                        <TooltipContent>No changes to save yet</TooltipContent>
+                      )}
+                    </Tooltip>
+                  </div>
+                )}
+              </form>
             </Form>
           </div>
         )}

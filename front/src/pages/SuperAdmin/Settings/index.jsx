@@ -1,5 +1,6 @@
-import { Alert, Spin } from "antd";
-import { Boxes, Clock, Database, GitBranch, Server, Timer } from "lucide-react";
+import { Boxes, CircleAlert, Clock, Database, GitBranch, Server, Timer } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import Spinner from "../../../components/Spinner";
 import PageHeader from "../../../components/PageHeader";
 import { useGetSystemInfo } from "../../../services/requests/superadmin/system";
 
@@ -58,15 +59,14 @@ const SystemSettings = () => {
       />
 
       {error ? (
-        <Alert
-          type="error"
-          showIcon
-          message="Failed to load system information"
-          description={error.message}
-        />
+        <Alert variant="destructive">
+          <CircleAlert />
+          <AlertTitle>Failed to load system information</AlertTitle>
+          <AlertDescription>{error.message}</AlertDescription>
+        </Alert>
       ) : isLoading ? (
         <div className="flex items-center justify-center py-20">
-          <Spin size="large" />
+          <Spinner size="large" />
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">

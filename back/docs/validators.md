@@ -17,8 +17,8 @@ server/src/validators/
 > **Current state:** every mutating controller is validated. Validator files:
 > `auth`, `admin-users`, `roles`, `permissions`, `user-permissions`, `audit-trail`,
 > `companies`, `branches`, `superadmin-users`, `upload`, plus shared helpers in
-> `_helpers.js` (`emptyToUndefined` / `optionalString` / `optionalEmail` — Ant Design
-> forms and multipart both send `""` for cleared optional fields). When you add a new
+> `_helpers.js` (`emptyToUndefined` / `optionalString` / `optionalEmail` — HTML forms
+> and multipart both send `""` for cleared optional fields). When you add a new
 > controller, create a sibling `<name>.validator.js`. If two portals share a controller
 > base name, disambiguate the file (e.g. `admin-users.validator.js`).
 >
@@ -133,7 +133,7 @@ export const listUsersQuerySchema = z.object({
 ## Shared helpers — `validators/_helpers.js`
 
 Never hand-roll an optional field. Clients send **three different things** for "no value":
-Ant Design forms send `""`, JSON payloads send `null`, and a cleared field may be omitted
+HTML forms send `""`, JSON payloads send `null`, and a cleared field may be omitted
 entirely. Every helper below normalises all three to `undefined` before the inner schema runs,
 so a "cleared" field never trips a type error.
 
@@ -177,7 +177,7 @@ omitted key all mean "no number" and all pass. The controller writes `phone || n
 2. **String length limits** must match the database column size (e.g., `varchar(50)` → `.max(50)`).
 3. **Enum fields** must use `z.enum([...])` matching the database ENUM values exactly.
 4. **Optional/nullable** fields use a `_helpers.js` helper (`optionalString` / `optionalEmail` /
-   `optionalPhone`) — a bare `.optional().nullable()` still rejects the `""` that Ant Design
+   `optionalPhone`) — a bare `.optional().nullable()` still rejects the `""` that HTML
    forms actually send.
 5. **Required fields** use `.min(1, "Field is required")` — match NOT NULL constraints.
 6. **Query params** that are numbers use `z.coerce.number()` (query strings are always strings).

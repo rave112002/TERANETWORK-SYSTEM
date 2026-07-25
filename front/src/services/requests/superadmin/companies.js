@@ -1,10 +1,10 @@
+import { toast } from "sonner";
 import {
   keepPreviousData,
   useMutation,
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { message } from "antd";
 import {
   getCompaniesApi,
   getCompanyByIdApi,
@@ -40,11 +40,11 @@ export const useCreateCompany = () => {
   return useMutation({
     mutationFn: createCompanyApi,
     onSuccess: () => {
-      message.success("Company created successfully");
+      toast.success("Company created successfully");
       queryClient.invalidateQueries({ queryKey: ["companies"] });
     },
     onError: (error) => {
-      message.error(
+      toast.error(
         error.response?.data?.message || "Failed to create company",
       );
     },
@@ -59,14 +59,14 @@ export const useUpdateCompany = () => {
     mutationFn: ({ companyId, companyData }) =>
       updateCompanyApi(companyId, companyData),
     onSuccess: (data, variables) => {
-      message.success("Company updated successfully");
+      toast.success("Company updated successfully");
       queryClient.invalidateQueries({ queryKey: ["companies"] });
       queryClient.invalidateQueries({
         queryKey: ["companies", variables.companyId],
       });
     },
     onError: (error) => {
-      message.error(
+      toast.error(
         error.response?.data?.message || "Failed to update company",
       );
     },
@@ -80,11 +80,11 @@ export const useDeleteCompany = () => {
   return useMutation({
     mutationFn: deleteCompanyApi,
     onSuccess: () => {
-      message.success("Company deleted successfully");
+      toast.success("Company deleted successfully");
       queryClient.invalidateQueries({ queryKey: ["companies"] });
     },
     onError: (error) => {
-      message.error(
+      toast.error(
         error.response?.data?.message || "Failed to delete company",
       );
     },

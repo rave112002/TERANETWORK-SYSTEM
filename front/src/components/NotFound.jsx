@@ -1,6 +1,6 @@
-import { Button } from "antd";
 import { Compass } from "lucide-react";
 import { useNavigate } from "react-router";
+import { Button } from "@/components/ui/button";
 
 /**
  * Styled 404 for use inside a portal layout's content area.
@@ -50,7 +50,7 @@ const NotFound = ({ homePath = "/" }) => {
         >
           The page you&apos;re looking for doesn&apos;t exist or may have been moved.
         </p>
-        <Button type="primary" size="large" onClick={() => navigate(homePath)}>
+        <Button size="lg" onClick={() => navigate(homePath)}>
           Back to dashboard
         </Button>
       </div>

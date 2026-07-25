@@ -41,8 +41,10 @@ override). To re-theme, change the values there — everything follows.
 | `--color-success` / `--color-warning` / `--color-error` | status, constant across themes |
 | `--radius-card` 14 · `--radius-control` 9 | radii                              |
 
-The accent also lives in `src/theme/antdTheme.js` as `COMPANY_PRIMARY` (`#22c55e`) because Ant
-Design needs a JS value. Keep the two in sync.
+shadcn's semantic tokens (`--background`, `--card`, `--primary`, `--border`, `--ring`, …) are
+bridged onto these Modern tokens in the `@theme inline` block of `src/index.css`, so shadcn
+components inherit the design in both themes with no per-component theming. To re-theme, change
+the Modern token values here — the bridge follows.
 
 ### Type
 
@@ -55,10 +57,10 @@ Design needs a JS value. Keep the two in sync.
 
 ### Dark mode
 
-Class-based: a `.dark` class on `<html>` swaps the semantic tokens. Ant switches via
-`darkAlgorithm`. State lives in `src/store/themeStore.js`; drop in `<ThemeToggle />` anywhere.
-Because every surface/text color is a token, dark mode needs no per-page work — **just don't
-hardcode**.
+Class-based: a `.dark` class on `<html>` swaps the semantic tokens (the bridged shadcn tokens
+follow automatically). State lives in `src/store/themeStore.js`; drop in `<ThemeToggle />`
+anywhere, and `<Toaster theme={mode} />` in `App.jsx` keeps toasts in sync. Because every
+surface/text color is a token, dark mode needs no per-page work — **just don't hardcode**.
 
 ---
 
@@ -68,16 +70,19 @@ hardcode**.
 2. Page header is `<PageHeader title subtitle actions />` — a plain title + subtitle. No gradient
    tile, no icon chip, no colored banner.
 3. Cards/panels/table card: `background: var(--color-surface)`, `1px solid var(--color-line)`,
-   `borderRadius: var(--radius-card)` — **no shadow**. Ant `<Card>` is globally flattened.
-4. **Never** put an inline `background` on `type="primary"`. The inverted style is global
-   (`.ant-btn-primary` in `index.css`).
+   `borderRadius: var(--radius-card)` — **no shadow**. Build them as plain `<div>`s with these
+   tokens (there is no Card component).
+4. **Never** put an inline `background` on the primary button. The default shadcn `<Button>`
+   variant *is* the inverted monochrome primary (via the token bridge); `variant="outline"` is
+   the secondary and `variant="destructive"` is danger.
 5. The accent is for bars, ticks, focus rings and chips — **never a button fill**.
 6. The list table's toolbar lives **inside** the card, not in a floating action bar.
 7. `Table pagination={false}` — always use `<PaginationFooter />`.
-8. All icons come from `lucide-react`. Ant `*Outlined` icons are allowed **only** inside
-   `<Button icon={...}>`.
+8. All icons come from `lucide-react`, as button/label children
+   (`<Button><Plus />New</Button>`). lucide-react only.
 9. **Never hardcode a hex** on a themed surface — use tokens.
-10. Shadows only on genuinely floating layers (dropdown, modal, drawer) — Ant provides those.
+10. Shadows only on genuinely floating layers (dropdown-menu, dialog, sheet) — the shadcn
+    primitives provide those.
 11. Never `rounded-full` on layout containers — only pills/dots.
 
 ---
@@ -88,12 +93,21 @@ hardcode**.
 | --------- | ------ | ------- |
 | `PageHeader` | `components/PageHeader.jsx` | `<PageHeader title subtitle actions />` |
 | `StatCard` | `components/StatCard.jsx` | `<StatCard title value change icon />` — label + dim icon, big value + unit. Flat. |
+| `DataTable` | `components/DataTable.jsx` | the list table (TanStack + shadcn). Takes `columns`/`dataSource`/`rowKey`/`rowSelection`/`loading`/`scroll`; pagination stays external |
+| `SearchInput` | `components/SearchInput.jsx` | the 280px toolbar filter input (search icon + clear) — the `Input allowClear` replacement |
+| `RowActions` | `components/RowActions.jsx` | the ⋮ row-actions menu; takes the `getActionItems` array |
 | `PaginationFooter` | `components/PaginationFooter.jsx` | `<PaginationFooter pagination onChange noun nounPlural />` |
 | `SectionLabel` | `components/SectionLabel.jsx` | uppercase micro-label + accent tick (form groups) |
 | `StatusToggle` | `components/StatusToggle.jsx` | segmented on/off control (use instead of a Select) |
+| `PasswordInput` | `components/PasswordInput.jsx` | password field + show/hide toggle (the `Input.Password` replacement) |
+| `DescriptionList` | `components/DescriptionList.jsx` | bordered label/value list for read-only view dialogs (the `Descriptions` replacement) |
+| `Spinner` | `components/Spinner.jsx` | centered loading spinner (the `Spin` replacement) |
+| `ResultState` | `components/ResultState.jsx` | 403/404/500/error state panel (the `Result` replacement) |
+| `ConfirmDialog` + `confirm()` | `store/confirmStore.js` | imperative confirm — `const ok = await confirm({ title, description, danger })` (the `Modal.confirm` replacement) |
 
 Shared CSS classes (in `index.css`): `.pager-btn`, `.pager-active`, `.pager-size`, `.nav-item`,
-`.icon-btn`, plus global `.ant-table-thead > tr > th` (11.5px/500) and flat `.ant-card`.
+`.icon-btn`. (There are no component-library overrides — table-header type and card flatness live
+in `DataTable` and page markup.)
 
 > `StatCard` no longer takes `color` / `bgColor` / `textColor`. It's flat by design.
 
@@ -110,39 +124,40 @@ Shared CSS classes (in `index.css`): `.pager-btn`, `.pager-active`, `.pager-size
     subtitle="Manage roles and the permissions attached to them."
     actions={
       canWrite && (
-        <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+        <Button onClick={handleCreate}>
+          <Plus />
           New role
         </Button>
       )
     }
   />
 
-  <Row gutter={[14, 14]}>
-    <Col xs={24} sm={12} lg={8}>
-      <StatCard
-        title="Total roles"
-        value={totalRoles}
-        change="all time"
-        icon={<Shield className="w-4.25 h-4.25" strokeWidth={1.8} />}
-      />
-    </Col>
+  {/* stat cards — CSS grid, not Row/Col */}
+  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+    <StatCard
+      title="Total roles"
+      value={totalRoles}
+      change="all time"
+      icon={<Shield className="w-4.25 h-4.25" strokeWidth={1.8} />}
+    />
     {/* …two more — 3 equal columns… */}
-  </Row>
+  </div>
 
   <div
     className="bg-surface overflow-hidden"
     style={{ border: "1px solid var(--color-line)", borderRadius: "var(--radius-card)" }}
   >
-    {/* Toolbar: filter Input (280px) left · Refresh + Filters right */}
-    {/* Optional filter row */}
-    {/* <Table pagination={false} /> + <PaginationFooter noun="role" /> */}
+    {/* Toolbar: <SearchInput> (280px) left · <RefreshButton> + Filters right */}
+    {/* Optional filter row (shadcn <Select>) */}
+    {/* <DataTable loading={isLoading} scroll={{ x }} /> + <PaginationFooter noun="role" /> */}
   </div>
 
-  {/* Drawers at the bottom */}
+  {/* Form drawers (Sheet) at the bottom */}
 </div>
 ```
 
-Full markup: `modern-module-pattern.md` §2 and `Roles/index.jsx`.
+Full markup: `modern-module-pattern.md` §2 and `Roles/index.jsx`. The default `<Button>` variant is
+the inverted primary; the Filters toggle uses `variant={active ? "default" : "outline"}`.
 
 ---
 
@@ -177,10 +192,17 @@ Full column spec: `modern-module-pattern.md` §3.
 ## Error state
 
 ```jsx
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { CircleAlert } from "lucide-react";
+
 if (error) {
   return (
     <div className="p-8">
-      <Alert message="Error loading roles" description={error.message} type="error" showIcon />
+      <Alert variant="destructive">
+        <CircleAlert />
+        <AlertTitle>Error loading roles</AlertTitle>
+        <AlertDescription>{error.message}</AlertDescription>
+      </Alert>
     </div>
   );
 }
@@ -195,4 +217,5 @@ color; separate destructive actions (divider + `danger`); confirm before delete.
 
 **Don't** — gradient buttons/headers/icon chips; `shadow-*` on static surfaces; pastel tints or
 `bg-primary-pale`; `bg-white` / `bg-gray-*` / `text-slate-*` (they don't theme); a colored primary
-button; an inline `background` on `type="primary"`; Ant's default pager on a list table.
+button; an inline `background` on the primary button; a raw `<table>` instead of `DataTable`;
+pulling in another component library.
