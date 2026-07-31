@@ -32,7 +32,7 @@ filters, and read-only detail views (those use a `<Dialog>` — see UI Design Sy
   <SheetContent
     side="right"
     showCloseButton={false}          {/* we render our own bordered X */}
-    className="w-full gap-0 p-0 sm:max-w-[800px]"
+    className="w-full gap-0 p-0 sm:max-w-200"
     style={{ background: "var(--color-surface)" }}
   >
     <SheetTitle className="sr-only">{isEditMode ? "Edit X" : "Create New X"}</SheetTitle>
@@ -110,7 +110,7 @@ place a gradient is allowed.
 <div className="flex items-start justify-between gap-3 mb-7">
   <div className="flex items-center gap-3 min-w-0">
     <span className="inline-flex items-center justify-center w-11 h-11 rounded-xl shrink-0 bg-(image:--gradient-primary)">
-      <Shield className="w-[22px] h-[22px] text-white" />
+      <Shield className="w-5.5 h-5.5 text-white" />
     </span>
     <div className="min-w-0">
       <h2 className="m-0 font-semibold leading-tight" style={{ fontSize: 19, color: "var(--color-text-dark)" }}>
@@ -128,7 +128,7 @@ place a gradient is allowed.
     className="inline-flex items-center justify-center shrink-0 transition-colors hover:bg-(--color-surface-sunken)"
     style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid var(--color-line)", color: "var(--color-text-secondary)" }}
   >
-    <X className="w-[18px] h-[18px]" />
+    <X className="w-4.5 h-4.5" />
   </button>
 </div>
 ```
@@ -363,9 +363,9 @@ const schema = useMemo(
 ## Variations
 
 - **Dialog instead of Sheet** — for very short forms (1–2 sections) swap `<Sheet>`/`<SheetContent>`
-  for `<Dialog>`/`<DialogContent className="sm:max-w-[520px]">`; component becomes `XFormModal`.
-- **Wide/dense sheets** go wider — the user-permissions matrix uses `sm:max-w-[1000px]`.
-- **Read-only detail modals** use `<Dialog>` + `DescriptionList` at `sm:max-w-[640px]` — see
+  for `<Dialog>`/`<DialogContent className="sm:max-w-130">`; component becomes `XFormModal`.
+- **Wide/dense sheets** go wider — the user-permissions matrix uses `sm:max-w-250`.
+- **Read-only detail modals** use `<Dialog>` + `DescriptionList` at `sm:max-w-160` — see
   `UserViewModal.jsx`.
 
 ---
@@ -384,7 +384,7 @@ the `"multipart"` axios instance. Include the staged file in the dirty check
 
 - [ ] Component named `XFormDrawer`; imports `Sheet` itself; parent renders it with the props contract
 - [ ] Props exactly `{ open, onClose, onSuccess, entity? }` — no `onCancel`
-- [ ] `<SheetContent side="right" showCloseButton={false} className="w-full gap-0 p-0 sm:max-w-[800px]">` + `sr-only` `<SheetTitle>`
+- [ ] `<SheetContent side="right" showCloseButton={false} className="w-full gap-0 p-0 sm:max-w-200">` + `sr-only` `<SheetTitle>`
 - [ ] `useForm({ resolver: zodResolver(schema), defaultValues })`; concrete defaults; `form.reset()` to hydrate
 - [ ] One zod schema; optional fields validate shape-not-presence; required-ness matches the backend (checked `schema.sql`/controller)
 - [ ] Required fields render an explicit `*` (shadcn doesn't add one)

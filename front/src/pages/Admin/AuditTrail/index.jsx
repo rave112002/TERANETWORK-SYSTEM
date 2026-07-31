@@ -137,7 +137,7 @@ const AuditTrailPage = () => {
       >
         {/* Toolbar */}
         <div
-          className="flex items-center justify-between gap-3 flex-wrap px-[18px] py-3.5"
+          className="flex items-center justify-between gap-3 flex-wrap px-4.5 py-3.5"
           style={{ borderBottom: "1px solid var(--color-line)" }}
         >
           <SearchInput
@@ -176,7 +176,7 @@ const AuditTrailPage = () => {
         {/* Filter row */}
         {isFilterVisible && (
           <div
-            className="flex items-end gap-3 flex-wrap px-[18px] py-3.5"
+            className="flex items-end gap-3 flex-wrap px-4.5 py-3.5"
             style={{ borderBottom: "1px solid var(--color-line)" }}
           >
             <div className="flex flex-col gap-1.5">
@@ -185,7 +185,7 @@ const AuditTrailPage = () => {
                 value={moduleFilter || "all"}
                 onValueChange={(v) => setModuleFilter(v === "all" ? "" : v)}
               >
-                <SelectTrigger className="h-10 w-[200px]">
+                <SelectTrigger className="h-10 w-50">
                   <SelectValue placeholder="All modules" />
                 </SelectTrigger>
                 <SelectContent>
@@ -206,7 +206,7 @@ const AuditTrailPage = () => {
                   value={fromStr}
                   max={toStr || undefined}
                   onChange={(e) => setRange(e.target.value, toStr)}
-                  className="h-10 w-[150px]"
+                  className="h-10 w-37.5"
                 />
                 <span style={{ color: "var(--color-text-muted)" }}>–</span>
                 <Input
@@ -214,7 +214,7 @@ const AuditTrailPage = () => {
                   value={toStr}
                   min={fromStr || undefined}
                   onChange={(e) => setRange(fromStr, e.target.value)}
-                  className="h-10 w-[150px]"
+                  className="h-10 w-37.5"
                 />
               </div>
             </div>

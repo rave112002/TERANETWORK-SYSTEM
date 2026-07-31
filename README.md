@@ -12,9 +12,10 @@ The repository is a **monorepo of two independent apps**:
 | [`front/`](front/) | React SPA (the two portals) | React 19 · Vite · shadcn/ui (Radix + Tailwind) · Tailwind CSS v4 · Zustand · TanStack Query · react-hook-form + zod · React Router v7 |
 | [`back/`](back/)   | REST API server             | Node · Express · MySQL (`mysql2`) · Passport JWT · Zod                                         |
 
-> Conventions for each side are documented in [`front/CLAUDE.md`](front/CLAUDE.md) → [`front/docs/`](front/docs/)
-> and [`back/CLAUDE.md`](back/CLAUDE.md) → [`back/docs/`](back/docs/). Those are the source of truth for
-> coding patterns; this README is the high-level map.
+> Coding conventions live in the [`frontend-conventions`](.claude/skills/frontend-conventions/SKILL.md)
+> and [`backend-conventions`](.claude/skills/backend-conventions/SKILL.md) skills — 14 topic docs
+> that are the source of truth for the project's patterns. This README is the high-level map. See
+> [Working with Claude Code](#working-with-claude-code).
 
 ---
 
@@ -29,6 +30,7 @@ The repository is a **monorepo of two independent apps**:
 - [Frontend](#frontend)
 - [API overview](#api-overview)
 - [Database schema](#database-schema)
+- [Working with Claude Code](#working-with-claude-code)
 - [Conventions & further reading](#conventions--further-reading)
 
 ---
@@ -56,7 +58,7 @@ The repository is a **monorepo of two independent apps**:
                                          ▼
                                 ┌─────────────────┐
                                 │   MySQL 8        │
-                                │  10 tables       │
+                                │  14 tables       │
                                 └─────────────────┘
 ```
 
@@ -89,8 +91,12 @@ The repository is a **monorepo of two independent apps**:
 .
 ├── README.md                  ← you are here
 ├── CLAUDE.md                  ← project map for AI agents
+├── .claude/skills/            ← Claude Code skills (checked in)
+│   ├── frontend-conventions/  ← 8 frontend topic docs, loaded on demand
+│   ├── backend-conventions/   ← 6 backend topic docs, loaded on demand
+│   └── new-module/            ← scaffolds a CRUD module end to end
 ├── front/                     ← React SPA
-│   ├── CLAUDE.md  · docs/     ← frontend conventions (7 topic docs)
+│   ├── CLAUDE.md              ← stack + pointer to frontend-conventions
 │   └── src/
 │       ├── pages/             ← Admin/ and SuperAdmin/ portal modules
 │       │   └── <Module>/      ← index.jsx (view) · hooks.jsx (logic) · components/
@@ -104,7 +110,7 @@ The repository is a **monorepo of two independent apps**:
 │       ├── store/             ← Zustand (authStore, themeStore)
 │       └── index.css          ← Tailwind v4 + Modern design tokens (shadcn token bridge)
 └── back/                      ← Express API
-    ├── CLAUDE.md  · docs/     ← backend conventions (6 topic docs)
+    ├── CLAUDE.md              ← stack + pointer to backend-conventions
     ├── .env.example
     ├── database/              ← schema.sql (the baseline) + migrations/ (empty until needed)
     ├── scripts/               ← keys / db:setup / db:reset / db:check
@@ -142,9 +148,9 @@ cp .env.example .env          # then edit DB_*, ISSUER, AUDIENCE, CSRF_SECRET, L
 # Refuses to overwrite existing keys; pass --force to regenerate.
 npm run keys
 
-# ⚠️  Build the schema — this DROPS every existing table, then recreates them and
-#     seeds the permission set + a default SuperAdmin. Destructive: never run it
-#     against a database you care about.
+# Build the schema: applies the baseline + any pending migrations, then seeds the
+# permission set and a default SuperAdmin. Additive and re-runnable — existing
+# tables and data are left untouched, and seeds are skipped when already present.
 npm run db:setup
 
 npm run dev                   # nodemon on http://localhost:3000  (API under /api/v1)
@@ -214,8 +220,9 @@ users, roles, permissions, and settings.
 | `npm run dev`                                                | Start with nodemon (auto-reload)                                             |
 | `npm start`                                                  | Start the server (`server/bin/www.js`)                                       |
 | `npm run keys`                                               | Generate the RS256 JWT keypair into `auth-keys/` (`-- --force` to overwrite) |
-| `npm run db:setup`                                           | ⚠️ **Drops all tables**, recreates the schema, seeds permissions + SuperAdmin |
-| `npm run db:setup:clean`                                     | ⚠️ **Drops all tables**, recreates the schema, seeds SuperAdmin only         |
+| `npm run db:migrate`                                         | Apply the baseline + any pending migrations. Additive, safe                   |
+| `npm run db:setup`                                           | Migrate, **then** seed permissions + SuperAdmin. Additive, re-runnable, safe  |
+| `npm run db:setup:clean`                                     | ⚠️ **Drops all tables**, re-migrates from scratch, seeds permissions + SuperAdmin |
 | `npm run db:reset`                                           | ⚠️ Nuclear: drops the whole **database** and recreates it empty (no tables)  |
 | `npm run db:check`                                           | Verify DB connectivity / list tables + row counts (read-only, safe)          |
 | `npm run lint` · `lint:fix`                                  | ESLint                                                                       |
@@ -256,7 +263,7 @@ keep-alive, slow-query logging) and is injected as `req.db`:
 
 - `req.db.query(sql, params)` → returns **rows directly** (pooled, no transaction).
 - `req.db.beginTransaction()` → a connection; use `conn.execute(...)` (returns `[rows, fields]`), then
-  `req.db.commit(conn)` / `req.db.rollback(conn)`. See [`back/docs/db-patterns.md`](back/docs/db-patterns.md).
+  `req.db.commit(conn)` / `req.db.rollback(conn)`. See [`db-patterns.md`](.claude/skills/backend-conventions/references/db-patterns.md).
 
 ### Auth & RBAC
 
@@ -265,14 +272,14 @@ keep-alive, slow-query logging) and is injected as `req.db`:
   `branchId`, `roleId`, `type`, …).
 - **Authorization** — `checkPermission(module, submodule?, accessLevel?)` resolves the user's effective
   level (user override → role permission), enforcing `GET = read`, `POST/PUT/DELETE = write`.
-  SuperAdmin routes skip permission checks by design. See [`back/docs/permission-gating.md`](back/docs/permission-gating.md).
+  SuperAdmin routes skip permission checks by design. See [`permission-gating.md`](.claude/skills/backend-conventions/references/permission-gating.md).
 
 ### Validation, uploads, audit
 
 - **Validation** — Zod schemas applied via `validateBody` / `validateQuery` / `validateParams`
-  ([`back/docs/validators.md`](back/docs/validators.md)).
+  ([`validators.md`](.claude/skills/backend-conventions/references/validators.md)).
 - **Uploads** — stored under `public/uploads/{portal}/...`, tenant-scoped by `companyId`/`branchId`/`accountId`
-  ([`back/docs/file-uploads.md`](back/docs/file-uploads.md)).
+  ([`file-uploads.md`](.claude/skills/backend-conventions/references/file-uploads.md)).
 - **Audit trail** — [`auditTrail.middleware.js`](back/server/src/middlewares/auditTrail.middleware.js) intercepts
   successful state-changing responses on audited routes and writes a sanitized record to `audit_trail`.
 
@@ -285,20 +292,20 @@ keep-alive, slow-query logging) and is injected as `req.db`:
   gate access; `<ProtectedRoute module … accessLevel>` gates individual pages.
 - **State** — Zustand for auth (`useAdminAuthStore`, `useSuperAdminAuthStore`, persisted to
   `localStorage`) and theme; **TanStack Query** for all server state. Tokens attach via an axios
-  interceptor. See [`front/docs/auth-state.md`](front/docs/auth-state.md).
+  interceptor. See [`auth-state.md`](.claude/skills/frontend-conventions/references/auth-state.md).
 - **Page module pattern** — each page is a folder: `index.jsx` (presentational), `hooks.jsx` (a single
   hook owning data, columns, filters, pagination, and actions), and `components/`. See
-  [`front/docs/hooks-pattern.md`](front/docs/hooks-pattern.md) and [`front/docs/folder-structure.md`](front/docs/folder-structure.md).
+  [`hooks-pattern.md`](.claude/skills/frontend-conventions/references/hooks-pattern.md) and [`folder-structure.md`](.claude/skills/frontend-conventions/references/folder-structure.md).
 - **Data layer** — `services/api/` holds raw axios calls; `services/requests/` holds the matching
   React Query hooks (list queries use `placeholderData: keepPreviousData` for smooth paging). See
-  [`front/docs/api-guide.md`](front/docs/api-guide.md).
+  [`api-guide.md`](.claude/skills/frontend-conventions/references/api-guide.md).
 - **UI system — "Modern"** — monochrome surfaces + hairline borders + one green accent used sparingly;
   structure comes from borders, not shadows, and the primary button is inverted monochrome (never the
   accent, never a gradient). Every color is a token in `src/index.css` (light/dark); type is **Onest**
   + **JetBrains Mono** (micro-data only), shadcn/ui components, Tailwind v4, `lucide-react` icons. The
-  copy-paste spec is [`front/docs/modern-module-pattern.md`](front/docs/modern-module-pattern.md) and
+  copy-paste spec is [`modern-module-pattern.md`](.claude/skills/frontend-conventions/references/modern-module-pattern.md) and
   `front/src/pages/Admin/UserManagement/Roles/` is the reference implementation. See
-  [`front/docs/ui-design-system.md`](front/docs/ui-design-system.md) and [`front/docs/ui-form-design.md`](front/docs/ui-form-design.md).
+  [`ui-design-system.md`](.claude/skills/frontend-conventions/references/ui-design-system.md) and [`ui-form-design.md`](.claude/skills/frontend-conventions/references/ui-form-design.md).
 
 ---
 
@@ -351,19 +358,86 @@ need an incremental change on top of it. Fourteen tables:
 Every table has `id BIGINT AUTO_INCREMENT` (internal), `dateCreated` / `dateUpdated`
 (`DATETIME`, Asia/Manila local), and — where applicable — a `status` enum used for soft deletes.
 Foreign keys reference business IDs, not the numeric `id`.
-See [`back/docs/schema-conventions.md`](back/docs/schema-conventions.md).
+See [`schema-conventions.md`](.claude/skills/backend-conventions/references/schema-conventions.md).
+
+---
+
+## Working with Claude Code
+
+The project's conventions are packaged as three checked-in
+[Claude Code](https://claude.com/claude-code) skills under [`.claude/skills/`](.claude/skills/),
+so an agent loads only the docs a task actually needs instead of ~22k tokens of conventions in
+every session. Clone the repo and they work — no setup.
+
+| Skill | How it runs | Covers |
+| ----- | ----------- | ------ |
+| [`frontend-conventions`](.claude/skills/frontend-conventions/SKILL.md) | Automatic | Anything under `front/src` — code style, folder structure + route registration, the `hooks.jsx` contract, the API service layers, auth & permissions, the Modern design system, the Sheet form pattern. 8 topic docs. |
+| [`backend-conventions`](.claude/skills/backend-conventions/SKILL.md)   | Automatic | Anything under `back/server` or `back/database` — `req.user` and tenant scoping, query/transaction patterns, schema & ID rules, validators, permission gating, upload paths. 6 topic docs. |
+| [`new-module`](.claude/skills/new-module/SKILL.md)                     | `/new-module` | A whole CRUD module end to end. Drives the other two in the right order. |
+
+### The two convention skills fire on their own
+
+Just describe the work — Claude matches the task and reads only the relevant topic docs:
+
+> Add a status filter to the Users table
+>
+> Why is the roles list returning 403 for a user with the right role?
+
+You can also aim one at existing code: _"Use frontend-conventions to review
+`src/pages/Admin/Inventory/hooks.jsx`."_
+
+### `/new-module` scaffolds a vertical slice
+
+It builds in dependency order — table + migration → permission row → validator → controller →
+route wiring → `api/` + `requests/` services → `hooks.jsx` → form drawer → page → sidebar entry —
+then runs lint and build.
+
+```
+/new-module Suppliers — fields: name (varchar 100, required), contactPerson (varchar 100,
+optional), phone (optional), email (optional). Admin portal, permission `suppliers`, icon Truck.
+```
+
+It **stops and asks for the field list** if you don't give one — it won't guess your columns. It
+also never runs `db:migrate` on its own; the migration waits until you say so. Partial work is
+supported: _"just the backend for Suppliers"_, or _"add a `taxId` field to the existing Suppliers
+module."_
+
+### Adding a convention
+
+Put the new topic doc in the relevant skill's `references/` as `kebab-case.md`, then add a row to
+that skill's routing table in its `SKILL.md` — a doc that isn't in the table won't get read.
+Cross-cutting facts that apply to both sides belong in [`CLAUDE.md`](CLAUDE.md) at the root.
 
 ---
 
 ## Conventions & further reading
 
-The detailed, enforced coding patterns live next to the code:
+The 14 topic docs behind those skills, if you want to read them directly. They're plain Markdown —
+useful to a human even without an agent.
 
-- **Project map (for AI agents):** [`CLAUDE.md`](CLAUDE.md)
-- **Design spec:** [`front/docs/modern-module-pattern.md`](front/docs/modern-module-pattern.md) — the canonical, copy-paste
-  reference for a module's list page + create/edit drawer.
-- **Frontend:** [`front/CLAUDE.md`](front/CLAUDE.md) → [`front/docs/`](front/docs/) — code conventions, folder
-  structure, the table-page hook pattern, API/React-Query usage, auth & state, the UI design system,
-  and the Modern drawer form pattern.
-- **Backend:** [`back/CLAUDE.md`](back/CLAUDE.md) → [`back/docs/`](back/docs/) — authenticated-user context,
-  DB/transaction patterns, schema & ID conventions, validators, permission gating, and file uploads.
+**Project map:** [`CLAUDE.md`](CLAUDE.md) (root) · [`front/CLAUDE.md`](front/CLAUDE.md) ·
+[`back/CLAUDE.md`](back/CLAUDE.md)
+
+### Frontend — [`.claude/skills/frontend-conventions/references/`](.claude/skills/frontend-conventions/references/)
+
+| Doc | Covers |
+| --- | ------ |
+| [`code-conventions.md`](.claude/skills/frontend-conventions/references/code-conventions.md) | Naming, import order, the `@/` alias, mandated libraries, error handling, ESLint rules. Read first. |
+| [`folder-structure.md`](.claude/skills/frontend-conventions/references/folder-structure.md) | Where pages/modules/components/services live, and how to register a route. |
+| [`hooks-pattern.md`](.claude/skills/frontend-conventions/references/hooks-pattern.md) | The `hooks.jsx` contract every list page follows. |
+| [`api-guide.md`](.claude/skills/frontend-conventions/references/api-guide.md) | `api/` + `requests/` layers, the response envelope, query keys & invalidation. |
+| [`auth-state.md`](.claude/skills/frontend-conventions/references/auth-state.md) | Zustand auth stores, login/logout, `usePermissions`, `<ProtectedRoute>`. |
+| [`ui-design-system.md`](.claude/skills/frontend-conventions/references/ui-design-system.md) | The Modern system — tokens, dark mode, list-page skeleton, table columns. |
+| [`modern-module-pattern.md`](.claude/skills/frontend-conventions/references/modern-module-pattern.md) | The canonical copy-paste spec for a module's list page + drawer. |
+| [`ui-form-design.md`](.claude/skills/frontend-conventions/references/ui-form-design.md) | The Sheet form pattern — react-hook-form + zod, the props contract. |
+
+### Backend — [`.claude/skills/backend-conventions/references/`](.claude/skills/backend-conventions/references/)
+
+| Doc | Covers |
+| --- | ------ |
+| [`auth-context.md`](.claude/skills/backend-conventions/references/auth-context.md) | `req.user` fields and the multi-tenant scoping rules. |
+| [`db-patterns.md`](.claude/skills/backend-conventions/references/db-patterns.md) | `req.db.query` vs `conn.execute` return shapes, transactions, soft-delete filtering. |
+| [`schema-conventions.md`](.claude/skills/backend-conventions/references/schema-conventions.md) | Table structure, business IDs, UUIDs, timestamps, phone columns, FKs, migrations. |
+| [`validators.md`](.claude/skills/backend-conventions/references/validators.md) | Zod schemas, the `_helpers.js` optional-field wrappers, `optionalPhone()`. |
+| [`permission-gating.md`](.claude/skills/backend-conventions/references/permission-gating.md) | One permission per route group, the access hierarchy, the Owner-role rules. |
+| [`file-uploads.md`](.claude/skills/backend-conventions/references/file-uploads.md) | The portal-prefixed, tenant-scoped `public/uploads/` path convention. |

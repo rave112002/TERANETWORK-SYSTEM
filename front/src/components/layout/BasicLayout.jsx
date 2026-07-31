@@ -90,9 +90,9 @@ const BasicLayout = ({ navigations, store }) => {
               onClick={() => handleCollapse(!collapsed)}
             >
               {collapsed ? (
-                <PanelLeftOpen className="w-[18px] h-[18px]" />
+                <PanelLeftOpen className="w-4.5 h-4.5" />
               ) : (
-                <PanelLeftClose className="w-[18px] h-[18px]" />
+                <PanelLeftClose className="w-4.5 h-4.5" />
               )}
             </button>
 
@@ -150,14 +150,14 @@ const BasicLayout = ({ navigations, store }) => {
                     </AvatarFallback>
                   </Avatar>
                   {width > 640 && (
-                    <span className="text-sm font-medium max-w-[140px] truncate text-left leading-tight">
+                    <span className="text-sm font-medium max-w-35 truncate text-left leading-tight">
                       {userData &&
                         [userData.firstName, userData.lastName].join(" ")}
                     </span>
                   )}
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-[200px]">
+              <DropdownMenuContent align="end" className="min-w-50">
                 <div className="px-2 py-1.5">
                   <div
                     className="font-semibold"

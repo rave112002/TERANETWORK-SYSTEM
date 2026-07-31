@@ -2,6 +2,7 @@
   "name": "template",
   "version": "1.0.0",
   "description": "Template API",
+  "private": true,
   "type": "module",
   "scripts": {
     "start": "node ./server/bin/www.js",
@@ -10,8 +11,8 @@
     "pm2:prod": "sudo pm2 start ecosystem.config.cjs --env production",
     "pm2:reload": "sudo pm2 reload ecosystem.config.cjs",
     "pm2:stop": "sudo pm2 stop ecosystem.config.cjs",
-    "lint": "eslint server/**/*.js?(x)",
-    "lint:fix": "eslint server/**/*.js?(x) --fix",
+    "lint": "eslint \"server/**/*.{js,jsx}\"",
+    "lint:fix": "eslint \"server/**/*.{js,jsx}\" --fix",
     "format": "prettier --write \"server/**/*.js\"",
     "format:check": "prettier --check \"server/**/*.js\"",
     "db:setup": "node scripts/setup-database.js",
@@ -50,7 +51,10 @@
     "zod": "^4.1.13"
   },
   "devDependencies": {
+    "eslint": "^10.8.0",
     "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-security": "^4.0.1",
+    "globals": "^17.8.0",
     "nodemon": "^3.1.9",
     "prettier": "^3.7.4"
   },

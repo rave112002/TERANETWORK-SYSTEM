@@ -12,7 +12,7 @@ const ChartCard = ({ title, subtitle, action, children, height = 260 }) => (
     }}
   >
     <div
-      className="flex items-center justify-between gap-3 px-[18px] py-3.5"
+      className="flex items-center justify-between gap-3 px-4.5 py-3.5"
       style={{ borderBottom: "1px solid var(--color-line)" }}
     >
       <div className="min-w-0">

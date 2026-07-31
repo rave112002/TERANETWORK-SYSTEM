@@ -30,6 +30,20 @@ export default [
         "warn",
         { allowConstantExport: true },
       ],
+
+      // ── React Compiler rules (new in eslint-plugin-react-hooks v7) ──
+      // Downgraded to "warn" deliberately. v7 arrived as a forced peer bump of
+      // the eslint 9 → 10 security upgrade, and its new rules flag existing
+      // code — including `Roles/hooks.jsx` and the form drawers, which
+      // `modern-module-pattern.md` and `ui-form-design.md` hold up as the
+      // reference implementation. Fixing them means changing the documented
+      // pattern, so that's a deliberate follow-up rather than a side effect of
+      // a security patch. Findings stay visible; they just don't fail the run.
+      // Promote back to "error" once the code and those docs are updated.
+      "react-hooks/set-state-in-effect": "warn",
+      "react-hooks/use-memo": "warn",
+      "react-hooks/refs": "warn",
+      "react-hooks/preserve-manual-memoization": "warn",
     },
   },
   {

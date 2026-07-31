@@ -1,8 +1,16 @@
 # Frontend — (React 19 + Vite)
 
-Conventions for the admin/superadmin frontend. These are **non-negotiable** patterns — follow
-them when creating or editing any page, hook, component, API service, or form. Each section below
-is imported from `docs/`; read the relevant one before writing code in that area.
+## ⚠️ Before writing any code in `front/src`, load the `frontend-conventions` skill
+
+The conventions are **non-negotiable** and live in that skill's `references/`
+([`.claude/skills/frontend-conventions/`](../.claude/skills/frontend-conventions/SKILL.md)) —
+eight topic docs covering code style, folder structure and route registration, the `hooks.jsx`
+contract, the API service layers, auth/permissions, the design system, and the form pattern. The
+skill's table says which one to read for the area you're touching. Read it **before** writing, not
+after.
+
+Building a whole new CRUD module? Use the **`new-module`** skill instead — it drives this one plus
+the backend half in the right order.
 
 ## Stack
 
@@ -27,26 +35,9 @@ shadcn's semantic tokens (`--background`, `--card`, `--primary`, `--border`, `--
 bridged onto the Modern tokens in `src/index.css` (the `@theme inline` block), so shadcn
 components inherit this design in light and dark with no per-component theming.
 
-- **`docs/modern-module-pattern.md`** — the canonical, copy-paste spec for a module's
+- **`modern-module-pattern.md`** (in the skill) — the canonical, copy-paste spec for a module's
   list page + create/edit drawer. Read it before building either.
 - **`src/pages/Admin/UserManagement/Roles/`** — the reference implementation. Copy its shape.
 - Shared building blocks: `components/PageHeader.jsx`, `StatCard.jsx`, `DataTable.jsx`,
   `SearchInput.jsx`, `RowActions.jsx`, `PaginationFooter.jsx`, `SectionLabel.jsx`,
   `StatusToggle.jsx`, `PasswordInput.jsx`, `DescriptionList.jsx`, `Spinner.jsx`, `ResultState.jsx`.
-
-## Convention docs
-
-- **Code conventions** — naming, import order/style, library choices, error handling, ESLint rules. Read first.
-  @docs/code-conventions.md
-- **Folder structure** — where pages/modules/components/services live, and how to register a new route.
-  @docs/folder-structure.md
-- **Table page hooks pattern** — the `hooks.jsx` contract every list page follows (state, columns, actions, return shape).
-  @docs/hooks-pattern.md
-- **API service guide** — `api/` + `requests/` layers, backend response shape, React Query keys & invalidation.
-  @docs/api-guide.md
-- **Auth & state** — Zustand auth stores, login/logout flow, `usePermissions`, `<ProtectedRoute>`.
-  @docs/auth-state.md
-- **UI design system** — the Modern system: tokens, dark mode, inverted primary, flat cards, the list-page skeleton, table columns, pagination footer.
-  @docs/ui-design-system.md
-- **UI form design** — the Modern Sheet Form pattern (react-hook-form + zod; the form owns its `<Sheet>`; props are `{ open, onClose, onSuccess, entity? }`).
-  @docs/ui-form-design.md

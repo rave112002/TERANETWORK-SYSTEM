@@ -61,14 +61,14 @@ const AuditDetailModal = ({ open, onClose, log }) => {
     >
       <DialogContent
         showCloseButton={false}
-        className="sm:max-w-[640px] max-h-[85vh] overflow-y-auto"
+        className="sm:max-w-160 max-h-[85vh] overflow-y-auto"
       >
         <DialogTitle className="sr-only">Audit Event</DialogTitle>
         {/* Header — accent chip + title + subtitle + bordered X */}
         <div className="flex items-start justify-between gap-3 mb-7">
         <div className="flex items-center gap-3 min-w-0">
           <span className="inline-flex items-center justify-center w-11 h-11 rounded-xl shrink-0 bg-(image:--gradient-primary)">
-            <FileText className="w-[22px] h-[22px] text-white" />
+            <FileText className="w-5.5 h-5.5 text-white" />
           </span>
           <div className="min-w-0">
             <h2
@@ -97,7 +97,7 @@ const AuditDetailModal = ({ open, onClose, log }) => {
             color: "var(--color-text-secondary)",
           }}
         >
-          <X className="w-[18px] h-[18px]" />
+          <X className="w-4.5 h-4.5" />
         </button>
       </div>
 

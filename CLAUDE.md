@@ -7,16 +7,24 @@ Tenancy is enforced by scoping every Admin query to the authenticated user's `co
 
 ## Repository layout
 
-| Path     | What it is                                                             | Conventions live in                                |
-| -------- | ---------------------------------------------------------------------- | -------------------------------------------------- |
-| `front/` | React 19 + Vite client (shadcn/ui, Tailwind v4, Zustand, React Query) | [front/CLAUDE.md](front/CLAUDE.md) → `front/docs/` |
-| `back/`  | Node + Express API (MySQL via `mysql2`, Passport JWT, Zod)             | [back/CLAUDE.md](back/CLAUDE.md) → `back/docs/`    |
-| `docs/`  | Repo-level Markdown not tied to `front/` or `back/`                    | [docs/README.md](docs/README.md)                   |
+| Path              | What it is                                                            | Conventions live in                                                          |
+| ----------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `front/`          | React 19 + Vite client (shadcn/ui, Tailwind v4, Zustand, React Query) | [front/CLAUDE.md](front/CLAUDE.md) → `frontend-conventions` skill             |
+| `back/`           | Node + Express API (MySQL via `mysql2`, Passport JWT, Zod)            | [back/CLAUDE.md](back/CLAUDE.md) → `backend-conventions` skill                |
+| `docs/`           | Repo-level Markdown not tied to `front/` or `back/`                   | [docs/README.md](docs/README.md)                                             |
+| `.claude/skills/` | Claude Code skills checked into the repo                              | [.claude/skills/](.claude/skills/)                                           |
 
-When working inside `front/` or `back/`, the directory's own `CLAUDE.md` and its imported `docs/`
-apply — read them before writing code. They are the source of truth for the project's patterns
-(naming, folder structure, API/DB access, auth, permissions, UI). Treat the rules in those docs as
+### Skills
+
+The convention docs are packaged as skills so they load on demand instead of costing ~22k tokens
+in every session. **Load the relevant skill before writing code** — the rules in it are
 **non-negotiable** unless the user says otherwise.
+
+| Skill | Use it for |
+| ----- | ---------- |
+| [`frontend-conventions`](.claude/skills/frontend-conventions/SKILL.md) | Anything under `front/src` — pages, hooks, components, forms, services, stores, routes. 8 topic docs. |
+| [`backend-conventions`](.claude/skills/backend-conventions/SKILL.md) | Anything under `back/server` or `back/database` — controllers, routes, validators, migrations, uploads. 6 topic docs. |
+| [`new-module`](.claude/skills/new-module/SKILL.md) | A whole new CRUD module end to end: table + migration, permission row, validator, controller, routes, services, list page, form drawer, sidebar registration. Drives the other two in the right order. |
 
 ## Where new Markdown goes
 
@@ -24,7 +32,10 @@ apply — read them before writing code. They are the source of truth for the pr
   client or the API → put it in **[`docs/`](docs/)**, not at the repo root and not inside
   `front/` / `back/`. See [docs/README.md](docs/README.md) for what belongs there and the naming
   convention.
-- **Coding conventions** for a side stay next to that side's code: `front/docs/` and `back/docs/`.
+- **Coding conventions** for a side live in that side's skill:
+  `.claude/skills/frontend-conventions/references/` and
+  `.claude/skills/backend-conventions/references/`. One topic per file, `kebab-case.md`; add the
+  new file to the skill's routing table so it gets read.
 - The repo root keeps only its map files (`README.md`, `CLAUDE.md`).
 
 ## Cross-cutting facts

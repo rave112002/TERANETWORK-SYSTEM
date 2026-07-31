@@ -85,7 +85,7 @@ return (
     <div className="bg-surface overflow-hidden"
       style={{ border: "1px solid var(--color-line)", borderRadius: "var(--radius-card)" }}>
       {/* Toolbar: SearchInput (left) + Refresh / Filters (right) */}
-      <div className="flex items-center justify-between gap-3 flex-wrap px-[18px] py-3.5"
+      <div className="flex items-center justify-between gap-3 flex-wrap px-4.5 py-3.5"
         style={{ borderBottom: "1px solid var(--color-line)" }}>
         <SearchInput value={filters.search} onChange={handleSearch} placeholder="Filter roles…" />
         <div className="flex items-center gap-2">
@@ -210,7 +210,7 @@ page-size `DropdownMenu`. `onChange` is the hook's `handleTableChange`, called w
 
 Full pattern in **`ui-form-design.md`**; reference `RoleFormDrawer.jsx`. In short:
 
-- The form file owns a shadcn `<Sheet>` (`side="right"`, `sm:max-w-[800px]`, `showCloseButton={false}`
+- The form file owns a shadcn `<Sheet>` (`side="right"`, `sm:max-w-200`, `showCloseButton={false}`
   — we render our own bordered X). Props are exactly `{ open, onClose, onSuccess, entity? }`.
 - State is `react-hook-form` with a `zod` schema via `zodResolver`; hydrate with `form.reset()`,
   dirty-check with `formState.isDirty`, submit with `form.handleSubmit(onSubmit)`.
@@ -224,7 +224,7 @@ Full pattern in **`ui-form-design.md`**; reference `RoleFormDrawer.jsx`. In shor
 - **Footer** (inside the `<form>`) — hairline top border; Cancel (`variant="outline"`) + inverted
   primary (`type="submit"`, default variant, `+` icon), dirty-check disable + tooltip.
 
-Read-only **detail views** use a `<Dialog>` + `DescriptionList` at `sm:max-w-[640px]` (see
+Read-only **detail views** use a `<Dialog>` + `DescriptionList` at `sm:max-w-160` (see
 `UserViewModal.jsx`).
 
 ---

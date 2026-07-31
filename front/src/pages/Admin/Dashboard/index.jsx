@@ -21,7 +21,7 @@ const RecentActivity = ({ items }) => (
     }}
   >
     <div
-      className="flex items-center gap-2 px-[18px] py-3.5"
+      className="flex items-center gap-2 px-4.5 py-3.5"
       style={{ borderBottom: "1px solid var(--color-line)" }}
     >
       <Clock
@@ -41,7 +41,7 @@ const RecentActivity = ({ items }) => (
     </div>
 
     {items.length === 0 ? (
-      <div className="px-[18px] py-14 text-center">
+      <div className="px-4.5 py-14 text-center">
         <p
           className="m-0"
           style={{ fontSize: 13, color: "var(--color-text-muted)" }}
@@ -54,7 +54,7 @@ const RecentActivity = ({ items }) => (
         {items.map((item, i) => (
           <div
             key={item.auditId}
-            className="flex items-start justify-between gap-4 px-[18px] py-3"
+            className="flex items-start justify-between gap-4 px-4.5 py-3"
             style={
               i === 0
                 ? undefined

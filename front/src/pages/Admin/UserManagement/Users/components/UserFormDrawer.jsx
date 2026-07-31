@@ -166,7 +166,7 @@ const UserFormDrawer = ({ open, onClose, onSuccess, entity = null }) => {
       <SheetContent
         side="right"
         showCloseButton={false}
-        className="w-full gap-0 p-0 sm:max-w-[800px]"
+        className="w-full gap-0 p-0 sm:max-w-200"
         style={{ background: "var(--color-surface)" }}
       >
         <SheetTitle className="sr-only">
@@ -184,7 +184,7 @@ const UserFormDrawer = ({ open, onClose, onSuccess, entity = null }) => {
               <div className="flex items-start justify-between gap-3 mb-7">
                 <div className="flex items-center gap-3 min-w-0">
                   <span className="inline-flex items-center justify-center w-11 h-11 rounded-xl shrink-0 bg-(image:--gradient-primary)">
-                    <Users className="w-[22px] h-[22px] text-white" />
+                    <Users className="w-5.5 h-5.5 text-white" />
                   </span>
                   <div className="min-w-0">
                     <h2
@@ -216,7 +216,7 @@ const UserFormDrawer = ({ open, onClose, onSuccess, entity = null }) => {
                     color: "var(--color-text-secondary)",
                   }}
                 >
-                  <X className="w-[18px] h-[18px]" />
+                  <X className="w-4.5 h-4.5" />
                 </button>
               </div>
 

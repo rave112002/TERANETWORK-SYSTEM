@@ -24,7 +24,7 @@ const SettingsPanel = ({
     }}
   >
     <div
-      className="flex items-center gap-3 px-[18px] py-3.5"
+      className="flex items-center gap-3 px-4.5 py-3.5"
       style={{ borderBottom: "1px solid var(--color-line)" }}
     >
       <span className="shrink-0" style={{ color: "var(--color-text-muted)" }}>
@@ -45,7 +45,7 @@ const SettingsPanel = ({
         </p>
       </div>
     </div>
-    <div className="px-[18px] py-5">{children}</div>
+    <div className="px-4.5 py-5">{children}</div>
   </div>
 );
 

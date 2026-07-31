@@ -40,7 +40,7 @@ const UserViewModal = ({ open, onClose, user }) => {
         if (!next) onClose();
       }}
     >
-      <DialogContent className="sm:max-w-[640px]">
+      <DialogContent className="sm:max-w-160">
         <DialogHeader>
           <div className="flex items-center gap-3 min-w-0">
             <span

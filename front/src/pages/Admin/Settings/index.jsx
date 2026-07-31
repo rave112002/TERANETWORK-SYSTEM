@@ -129,7 +129,7 @@ const SettingsPage = () => {
             <Spinner size="large" />
           </div>
         ) : (
-          <div className="px-[18px] py-5">
+          <div className="px-4.5 py-5">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} autoComplete="off">
                 <SectionLabel>General</SectionLabel>

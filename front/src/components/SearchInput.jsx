@@ -18,7 +18,7 @@ const SearchInput = ({
     style={{ width, maxWidth: "100%" }}
   >
     <Search
-      className="pointer-events-none absolute left-3 top-1/2 h-[15px] w-[15px] -translate-y-1/2"
+      className="pointer-events-none absolute left-3 top-1/2 h-3.75 w-3.75 -translate-y-1/2"
       style={{ color: "var(--color-text-muted)" }}
     />
     <Input

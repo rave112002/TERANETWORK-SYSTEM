@@ -282,7 +282,7 @@ const NavGroup = ({
         <HoverCardContent
           side="right"
           align="start"
-          className="w-auto min-w-[180px] p-1.5"
+          className="w-auto min-w-45 p-1.5"
         >
           <div
             className="px-2 pb-1.5 mb-1 text-xs font-semibold uppercase tracking-wide"
@@ -493,7 +493,7 @@ const UserFooter = ({
         <DropdownMenuContent
           side="top"
           align={collapsed ? "end" : "start"}
-          className="min-w-[200px]"
+          className="min-w-50"
         >
           <DropdownMenuItem asChild>
             <Link to={`${basePath}/account-settings`} onClick={onNavigate}>
@@ -724,7 +724,7 @@ const Sidebar = ({
       >
         <SheetContent
           side="left"
-          className="w-[280px] max-w-[280px] gap-0 p-0"
+          className="w-70 max-w-70 gap-0 p-0"
           style={{ background: "var(--color-surface)" }}
         >
           <SheetTitle className="sr-only">Navigation</SheetTitle>

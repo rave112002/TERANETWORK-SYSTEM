@@ -13,10 +13,10 @@ clean) or inside `front/` / `back/` (those hold code conventions only).
 
 ## What does NOT belong here
 
-- **Coding conventions** for the client → [`front/docs/`](../front/docs/) (imported by
-  [`front/CLAUDE.md`](../front/CLAUDE.md)).
-- **Coding conventions** for the API → [`back/docs/`](../back/docs/) (imported by
-  [`back/CLAUDE.md`](../back/CLAUDE.md)).
+- **Coding conventions** for the client → the
+  [`frontend-conventions`](../.claude/skills/frontend-conventions/SKILL.md) skill's `references/`.
+- **Coding conventions** for the API → the
+  [`backend-conventions`](../.claude/skills/backend-conventions/SKILL.md) skill's `references/`.
 - The **high-level project map** → [`README.md`](../README.md) and [`CLAUDE.md`](../CLAUDE.md) at
   the root.
 

@@ -171,7 +171,7 @@ const PermissionsDrawer = ({ open, role, onClose }) => {
       <SheetContent
         side="right"
         showCloseButton={false}
-        className="w-full gap-0 p-0 sm:max-w-[800px]"
+        className="w-full gap-0 p-0 sm:max-w-200"
         style={{ background: "var(--color-surface)" }}
       >
         <SheetTitle className="sr-only">Manage Permissions</SheetTitle>
@@ -187,7 +187,7 @@ const PermissionsDrawer = ({ open, role, onClose }) => {
               aria-label="Close"
               className="icon-btn w-8 h-8 shrink-0"
             >
-              <X className="w-[18px] h-[18px]" />
+              <X className="w-4.5 h-4.5" />
             </button>
             <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl shrink-0 bg-(image:--gradient-primary)">
               <Key className="w-5 h-5 text-white" />
@@ -410,7 +410,7 @@ const PermissionsDrawer = ({ open, role, onClose }) => {
                                       )
                                     }
                                   >
-                                    <SelectTrigger size="sm" className="w-[140px]">
+                                    <SelectTrigger size="sm" className="w-35">
                                       <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>

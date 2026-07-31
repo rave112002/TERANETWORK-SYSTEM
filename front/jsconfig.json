@@ -1,6 +1,9 @@
 {
   "compilerOptions": {
-    "baseUrl": ".",
+    // No `baseUrl`: it's deprecated as of TS 6 and stops working in TS 7.
+    // Since TS 4.1 a relative `paths` entry resolves against this file's
+    // directory, so `./src/*` works on its own. Keep in sync with the `@`
+    // alias in vite.config.js and the aliases in components.json.
     "paths": {
       "@/*": ["./src/*"]
     }

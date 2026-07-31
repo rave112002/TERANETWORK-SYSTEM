@@ -7,8 +7,14 @@ Thumbs.db
 *.swp
 *.swo
 
-# Claude Code
-.claude/
+# Claude Code — skills under .claude/skills/ are checked in on purpose
+# (they hold the project's coding conventions). Local machine state is not.
+.claude/settings.local.json
+.claude/*.local.json
 
 # Node (safety net — front/ and back/ have their own .gitignore)
 node_modules/
+
+# Package
+front/package-lock.json
+back/package-lock.json

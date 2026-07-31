@@ -145,7 +145,7 @@ const UsersPage = () => {
       >
         {/* Toolbar */}
         <div
-          className="flex items-center justify-between gap-3 flex-wrap px-[18px] py-3.5"
+          className="flex items-center justify-between gap-3 flex-wrap px-4.5 py-3.5"
           style={{ borderBottom: "1px solid var(--color-line)" }}
         >
           <SearchInput
@@ -181,7 +181,7 @@ const UsersPage = () => {
         {/* Filter row */}
         {isFilterVisible && (
           <div
-            className="flex items-end gap-3 flex-wrap px-[18px] py-3.5"
+            className="flex items-end gap-3 flex-wrap px-4.5 py-3.5"
             style={{ borderBottom: "1px solid var(--color-line)" }}
           >
             <div className="flex flex-col gap-1.5">
@@ -200,7 +200,7 @@ const UsersPage = () => {
                 value={statusFilter || "all"}
                 onValueChange={(v) => handleStatusFilter(v === "all" ? "" : v)}
               >
-                <SelectTrigger className="h-10 w-[200px]">
+                <SelectTrigger className="h-10 w-50">
                   <SelectValue placeholder="All statuses" />
                 </SelectTrigger>
                 <SelectContent>

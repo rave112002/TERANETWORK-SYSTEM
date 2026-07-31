@@ -24,7 +24,7 @@ const RecentCompanies = ({ items = [] }) => (
     }}
   >
     <div
-      className="flex items-center gap-2 px-[18px] py-3.5"
+      className="flex items-center gap-2 px-4.5 py-3.5"
       style={{ borderBottom: "1px solid var(--color-line)" }}
     >
       <Building2
@@ -40,7 +40,7 @@ const RecentCompanies = ({ items = [] }) => (
     </div>
 
     {items.length === 0 ? (
-      <div className="px-[18px] py-14 text-center">
+      <div className="px-4.5 py-14 text-center">
         <p className="m-0" style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
           No companies yet
         </p>
@@ -53,7 +53,7 @@ const RecentCompanies = ({ items = [] }) => (
           return (
             <div
               key={c.companyId}
-              className="flex items-center justify-between gap-4 px-[18px] py-3"
+              className="flex items-center justify-between gap-4 px-4.5 py-3"
               style={
                 i === 0 ? undefined : { borderTop: "1px solid var(--color-line-soft)" }
               }

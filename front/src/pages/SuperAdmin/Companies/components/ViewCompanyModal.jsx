@@ -33,7 +33,7 @@ const DetailRow = ({ label, value, mono }) => (
       {label}
     </span>
     <span
-      className={`min-w-0 text-right break-words ${mono ? "font-mono" : ""}`}
+      className={`min-w-0 text-right wrap-break-words ${mono ? "font-mono" : ""}`}
       style={{
         fontSize: mono ? 12.5 : 13.5,
         color: "var(--color-text-dark)",
@@ -88,134 +88,134 @@ const ViewCompanyModal = ({ open, onClose, company, onEdit }) => {
     >
       <DialogContent
         showCloseButton={false}
-        className="sm:max-w-[640px] max-h-[85vh] overflow-y-auto"
+        className="sm:max-w-160 max-h-[85vh] overflow-y-auto"
       >
         <DialogTitle className="sr-only">Company details</DialogTitle>
         {/* Header — logo/accent chip + title + subtitle + bordered X */}
         <div className="flex items-start justify-between gap-3 mb-7">
-        <div className="flex items-center gap-3 min-w-0">
-          {company.logo ? (
+          <div className="flex items-center gap-3 min-w-0">
+            {company.logo ? (
+              <span
+                className="inline-flex items-center justify-center w-11 h-11 rounded-xl shrink-0 overflow-hidden"
+                style={{
+                  background: "var(--color-surface-sunken)",
+                  border: "1px solid var(--color-line)",
+                }}
+              >
+                <img
+                  src={company.logo}
+                  alt=""
+                  className="w-full h-full object-cover"
+                  width={56}
+                  height={56}
+                  loading="lazy"
+                  decoding="async"
+                />
+              </span>
+            ) : (
+              <span className="inline-flex items-center justify-center w-11 h-11 rounded-xl shrink-0 bg-(image:--gradient-primary)">
+                <Building2 className="w-5.5 h-5.5 text-white" />
+              </span>
+            )}
+            <div className="min-w-0">
+              <h2
+                className="m-0 font-semibold leading-tight truncate"
+                style={{ fontSize: 19, color: "var(--color-text-dark)" }}
+              >
+                {name || initial}
+              </h2>
+              <p
+                className="m-0 mt-0.5"
+                style={{ fontSize: 13, color: "var(--color-text-secondary)" }}
+              >
+                Company details
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="inline-flex items-center justify-center shrink-0 transition-colors hover:bg-(--color-surface-sunken)"
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              border: "1px solid var(--color-line)",
+              color: "var(--color-text-secondary)",
+            }}
+          >
+            <X className="w-4.5 h-4.5" />
+          </button>
+        </div>
+
+        {/* Status + plan */}
+        <div className="flex items-center gap-5 mb-7">
+          <span
+            className="inline-flex items-center gap-2"
+            style={{ fontSize: 13, color: "var(--color-text-secondary)" }}
+          >
             <span
-              className="inline-flex items-center justify-center w-11 h-11 rounded-xl shrink-0 overflow-hidden"
               style={{
-                background: "var(--color-surface-sunken)",
-                border: "1px solid var(--color-line)",
+                width: 7,
+                height: 7,
+                borderRadius: "50%",
+                background:
+                  STATUS_DOT[company.status] || "var(--color-text-muted)",
+                boxShadow: active ? "0 0 8px rgba(34,197,94,.5)" : "none",
               }}
-            >
-              <img
-                src={company.logo}
-                alt=""
-                className="w-full h-full object-cover"
-                width={56}
-                height={56}
-                loading="lazy"
-                decoding="async"
-              />
-            </span>
-          ) : (
-            <span className="inline-flex items-center justify-center w-11 h-11 rounded-xl shrink-0 bg-(image:--gradient-primary)">
-              <Building2 className="w-[22px] h-[22px] text-white" />
-            </span>
-          )}
-          <div className="min-w-0">
-            <h2
-              className="m-0 font-semibold leading-tight truncate"
-              style={{ fontSize: 19, color: "var(--color-text-dark)" }}
-            >
-              {name || initial}
-            </h2>
-            <p
-              className="m-0 mt-0.5"
-              style={{ fontSize: 13, color: "var(--color-text-secondary)" }}
-            >
-              Company details
-            </p>
+            />
+            {company.status || "Unknown"}
+          </span>
+          <span style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+            {company.subscriptionPlan || "No plan"}
+          </span>
+        </div>
+
+        {/* Company details */}
+        <div>
+          <SectionLabel>Company details</SectionLabel>
+          <DetailRow label="Company name" value={name} />
+          <DetailRow label="Email" value={company.email} />
+          <DetailRow label="Phone" value={formatPhoneDisplay(company.phone)} />
+          <DetailRow
+            label="Website"
+            value={
+              company.website ? (
+                <a
+                  href={company.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: "var(--color-link)" }}
+                >
+                  {company.website}
+                </a>
+              ) : null
+            }
+          />
+        </div>
+
+        {/* Usage */}
+        <div className="mt-7">
+          <SectionLabel>Usage</SectionLabel>
+          <div className="grid grid-cols-2 gap-3">
+            <MetricWell label="Branches" value={company.branches ?? 0} />
+            <MetricWell label="Staff members" value={company.staff ?? 0} />
           </div>
         </div>
-        <button
-          onClick={onClose}
-          aria-label="Close"
-          className="inline-flex items-center justify-center shrink-0 transition-colors hover:bg-(--color-surface-sunken)"
-          style={{
-            width: 32,
-            height: 32,
-            borderRadius: 8,
-            border: "1px solid var(--color-line)",
-            color: "var(--color-text-secondary)",
-          }}
-        >
-          <X className="w-[18px] h-[18px]" />
-        </button>
-      </div>
 
-      {/* Status + plan */}
-      <div className="flex items-center gap-5 mb-7">
-        <span
-          className="inline-flex items-center gap-2"
-          style={{ fontSize: 13, color: "var(--color-text-secondary)" }}
-        >
-          <span
-            style={{
-              width: 7,
-              height: 7,
-              borderRadius: "50%",
-              background:
-                STATUS_DOT[company.status] || "var(--color-text-muted)",
-              boxShadow: active ? "0 0 8px rgba(34,197,94,.5)" : "none",
-            }}
+        {/* Record */}
+        <div className="mt-7">
+          <SectionLabel>Record</SectionLabel>
+          <DetailRow
+            label="Created"
+            value={
+              company.createdAt
+                ? dayjs(company.createdAt).format("MMM D, YYYY")
+                : null
+            }
           />
-          {company.status || "Unknown"}
-        </span>
-        <span style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
-          {company.subscriptionPlan || "No plan"}
-        </span>
-      </div>
-
-      {/* Company details */}
-      <div>
-        <SectionLabel>Company details</SectionLabel>
-        <DetailRow label="Company name" value={name} />
-        <DetailRow label="Email" value={company.email} />
-        <DetailRow label="Phone" value={formatPhoneDisplay(company.phone)} />
-        <DetailRow
-          label="Website"
-          value={
-            company.website ? (
-              <a
-                href={company.website}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ color: "var(--color-link)" }}
-              >
-                {company.website}
-              </a>
-            ) : null
-          }
-        />
-      </div>
-
-      {/* Usage */}
-      <div className="mt-7">
-        <SectionLabel>Usage</SectionLabel>
-        <div className="grid grid-cols-2 gap-3">
-          <MetricWell label="Branches" value={company.branches ?? 0} />
-          <MetricWell label="Staff members" value={company.staff ?? 0} />
+          <DetailRow label="Company ID" value={company.id} mono />
         </div>
-      </div>
-
-      {/* Record */}
-      <div className="mt-7">
-        <SectionLabel>Record</SectionLabel>
-        <DetailRow
-          label="Created"
-          value={
-            company.createdAt
-              ? dayjs(company.createdAt).format("MMM D, YYYY")
-              : null
-          }
-        />
-        <DetailRow label="Company ID" value={company.id} mono />
-      </div>
 
         <DialogFooter
           className="mt-8 pt-4"
