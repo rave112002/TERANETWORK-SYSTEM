@@ -26,6 +26,7 @@ import {
 
 import SectionLabel from "../../../../../components/SectionLabel";
 import StatusToggle from "../../../../../components/StatusToggle";
+import { useDiscardGuard } from "../../../../../hooks/useDiscardGuard";
 import {
   createRole,
   updateRole,
@@ -61,7 +62,7 @@ const RoleFormDrawer = ({ open, onClose, onSuccess, entity = null }) => {
   });
 
   const {
-    formState: { isDirty },
+    formState: { isDirty, isSubmitSuccessful },
   } = form;
 
   // Hydrate on open; map fields explicitly (API responses carry extra keys).
@@ -110,6 +111,17 @@ const RoleFormDrawer = ({ open, onClose, onSuccess, entity = null }) => {
     onClose();
   };
 
+  // Escape / overlay click / X / Cancel all route through this, so unsaved edits
+  // can't be lost by any of the four.
+  const { guardedClose, markSaved } = useDiscardGuard({
+    open,
+    isDirty,
+    isSubmitSuccessful,
+    noun: "role",
+    onClose: handleClose,
+    label: "RoleFormDrawer",
+  });
+
   // RHF only calls this after validation passes and focuses the first error itself.
   const onSubmit = async (values) => {
     try {
@@ -121,6 +133,7 @@ const RoleFormDrawer = ({ open, onClose, onSuccess, entity = null }) => {
       } else {
         await createMutation.mutateAsync(values);
       }
+      markSaved(); // the parent closes us next — don't ask about saved changes
       onSuccess?.();
     } catch (error) {
       // mutation errors already surface a toast via onError
@@ -132,7 +145,7 @@ const RoleFormDrawer = ({ open, onClose, onSuccess, entity = null }) => {
     <Sheet
       open={open}
       onOpenChange={(next) => {
-        if (!next) handleClose();
+        if (!next) guardedClose();
       }}
     >
       <SheetContent
@@ -177,7 +190,7 @@ const RoleFormDrawer = ({ open, onClose, onSuccess, entity = null }) => {
                 </div>
                 <button
                   type="button"
-                  onClick={handleClose}
+                  onClick={guardedClose}
                   aria-label="Close"
                   className="inline-flex items-center justify-center shrink-0 transition-colors hover:bg-(--color-surface-sunken)"
                   style={{
@@ -285,7 +298,7 @@ const RoleFormDrawer = ({ open, onClose, onSuccess, entity = null }) => {
                 type="button"
                 variant="outline"
                 size="lg"
-                onClick={handleClose}
+                onClick={guardedClose}
               >
                 Cancel
               </Button>

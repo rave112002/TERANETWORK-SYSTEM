@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/tooltip";
 
 import SectionLabel from "../../../../../components/SectionLabel";
+import { useDiscardGuard } from "../../../../../hooks/useDiscardGuard";
 import {
   useCreateBranch,
   useUpdateBranch,
@@ -101,7 +102,7 @@ const BranchFormDrawer = ({ open, onClose, onSuccess, entity }) => {
 
   const form = useForm({ resolver: zodResolver(schema), defaultValues: EMPTY });
   const {
-    formState: { isDirty },
+    formState: { isDirty, isSubmitSuccessful },
   } = form;
 
   useEffect(() => {
@@ -128,6 +129,16 @@ const BranchFormDrawer = ({ open, onClose, onSuccess, entity }) => {
     onClose();
   };
 
+  // Escape / overlay click / X / Cancel all route through this.
+  const { guardedClose, markSaved } = useDiscardGuard({
+    open,
+    isDirty,
+    isSubmitSuccessful,
+    noun: "branch",
+    onClose: handleClose,
+    label: "BranchFormDrawer",
+  });
+
   const onSubmit = async (values) => {
     try {
       if (isEditMode) {
@@ -151,6 +162,7 @@ const BranchFormDrawer = ({ open, onClose, onSuccess, entity }) => {
           address: values.address || null,
         });
       }
+      markSaved(); // the parent closes us next — don't ask about saved changes
       onSuccess?.();
     } catch (err) {
       console.error("Branch form error:", err);
@@ -161,7 +173,7 @@ const BranchFormDrawer = ({ open, onClose, onSuccess, entity }) => {
     <Sheet
       open={open}
       onOpenChange={(next) => {
-        if (!next) handleClose();
+        if (!next) guardedClose();
       }}
     >
       <SheetContent
@@ -206,7 +218,7 @@ const BranchFormDrawer = ({ open, onClose, onSuccess, entity }) => {
                 </div>
                 <button
                   type="button"
-                  onClick={handleClose}
+                  onClick={guardedClose}
                   aria-label="Close"
                   className="inline-flex items-center justify-center shrink-0 transition-colors hover:bg-(--color-surface-sunken)"
                   style={{
@@ -417,7 +429,7 @@ const BranchFormDrawer = ({ open, onClose, onSuccess, entity }) => {
                 type="button"
                 variant="outline"
                 size="lg"
-                onClick={handleClose}
+                onClick={guardedClose}
               >
                 Cancel
               </Button>

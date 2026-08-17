@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Eye, EyeOff, Loader2, Lock, Mail, Phone, Plus, Shield, Users, X } from "lucide-react";
-
+import { Loader2, Mail, Phone, Plus, Shield, X } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -22,150 +21,129 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-
-import PasswordStrengthIndicator from "../../../../../components/PasswordStrengthIndicator";
-import SectionLabel from "../../../../../components/SectionLabel";
-import StatusToggle from "../../../../../components/StatusToggle";
-import { useDiscardGuard } from "../../../../../hooks/useDiscardGuard";
-import { getRoles } from "../../../../../services/api/admin/roles";
-import {
-  useCreateUser,
-  useUpdateUser,
-} from "../../../../../services/requests/admin/user";
-import { useAdminAuthStore } from "../../../../../store/authStore";
-import { zStrongPassword } from "../../../../../utils/validation";
+import DatePicker from "@/components/DatePicker";
+import PasswordInput from "@/components/PasswordInput";
+import SectionLabel from "@/components/SectionLabel";
+import StatusToggle from "@/components/StatusToggle";
+import { useDiscardGuard } from "@/hooks/useDiscardGuard";
 import {
   PHONE_MAX_LENGTH,
   PHONE_PLACEHOLDER,
   formatPhoneOnChange,
   zPhone,
-} from "../../../../../utils/phoneFormat";
+} from "@/utils/phoneFormat";
+import { zStrongPassword } from "@/utils/validation";
 
-const baseShape = {
-  firstName: z.string().trim().min(1, "First name is required"),
-  lastName: z.string().trim().min(1, "Last name is required"),
-  email: z
+/**
+ * A no-op version of the module form drawer, here purely so the landing-page
+ * gallery can preview the pattern: the form owns its Sheet, react-hook-form +
+ * zod drive validation, and submitting only fires a toast — no API call.
+ */
+const memberSchema = z.object({
+  fullName: z
     .string()
     .trim()
-    .min(1, "Email is required")
-    .email("Enter a valid email address"),
+    .min(3, "Full name must be at least 3 characters")
+    .max(50, "Full name must be at most 50 characters"),
+  email: z.string().trim().email("Enter a valid email address"),
   phone: zPhone,
-  roleId: z.string().min(1, "Please select a role"),
+  roleId: z.string().min(1, "Select a role"),
+  startDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Select a start date"),
+  password: zStrongPassword(8),
+  description: z
+    .string()
+    .max(500, "Description must be at most 500 characters")
+    .refine(
+      (v) => v === "" || v.length >= 10,
+      "Description must be at least 10 characters",
+    ),
   status: z.enum(["Active", "Inactive"]),
-};
+});
 
 const EMPTY = {
-  firstName: "",
-  lastName: "",
+  fullName: "",
   email: "",
   phone: "",
   roleId: "",
-  status: "Active",
+  startDate: "",
   password: "",
+  description: "",
+  status: "Active",
 };
+
+const ROLES = [
+  { roleId: "admin", roleName: "Administrator" },
+  { roleId: "manager", roleName: "Branch Manager" },
+  { roleId: "staff", roleName: "Staff" },
+];
 
 const req = <span style={{ color: "var(--color-error)" }}>*</span>;
 
-const UserFormDrawer = ({ open, onClose, onSuccess, entity = null }) => {
-  const { userData } = useAdminAuthStore();
-  const [showPassword, setShowPassword] = useState(false);
+const DemoFormDrawer = ({ open, onClose, onSuccess, entity }) => {
   const isEditMode = !!entity;
+  const [isPending, setIsPending] = useState(false);
 
-  const createUserMutation = useCreateUser();
-  const updateUserMutation = useUpdateUser();
-
-  const schema = useMemo(
-    () =>
-      z.object(
-        isEditMode ? baseShape : { ...baseShape, password: zStrongPassword(8) },
-      ),
-    [isEditMode],
-  );
-
-  const form = useForm({ resolver: zodResolver(schema), defaultValues: EMPTY });
+  const form = useForm({
+    resolver: zodResolver(memberSchema),
+    defaultValues: EMPTY,
+  });
   const {
     formState: { isDirty, isSubmitSuccessful },
   } = form;
-
-  const password = form.watch("password");
-
-  const { data: rolesData } = useQuery({
-    queryKey: ["roles", { status: "Active" }],
-    queryFn: () => getRoles({ status: "Active", pageSize: 100 }),
-  });
-  const roles = rolesData?.data?.roles || [];
+  const saveDisabled = isEditMode && !isDirty;
 
   useEffect(() => {
     if (!open) return;
-    setShowPassword(false);
     form.reset(
       entity
         ? {
-            firstName: entity.firstName ?? "",
-            lastName: entity.lastName ?? "",
+            fullName: entity.fullName ?? "",
             email: entity.email ?? "",
             phone: entity.phone ?? "",
             roleId: entity.roleId ?? "",
-            status: entity.status ?? "Active",
+            startDate: entity.startDate ?? "",
             password: "",
+            description: entity.description ?? "",
+            status: entity.status ?? "Active",
           }
         : EMPTY,
     );
   }, [open, entity, form]);
 
-  const isPending =
-    createUserMutation.isPending || updateUserMutation.isPending;
-  const saveDisabled = isEditMode && !isDirty;
-
   const handleClose = () => {
     form.reset(EMPTY);
-    setShowPassword(false);
     onClose();
   };
 
-  // Escape / overlay click / X / Cancel all route through this.
+  // Type something, then hit Escape or click the overlay to see the guard.
   const { guardedClose, markSaved } = useDiscardGuard({
     open,
     isDirty,
     isSubmitSuccessful,
-    noun: "user",
+    noun: "member",
     onClose: handleClose,
-    label: "UserFormDrawer",
+    label: "DemoFormDrawer",
   });
 
-  const onSubmit = async (values) => {
-    const payload = {
-      firstName: values.firstName,
-      lastName: values.lastName,
-      email: values.email,
-      phone: values.phone,
-      roleId: values.roleId,
-      status: values.status,
-      companyId: userData?.companyId,
-    };
-    try {
-      if (isEditMode) {
-        await updateUserMutation.mutateAsync({
-          userId: entity.accountId,
-          userData: payload,
-        });
-      } else {
-        await createUserMutation.mutateAsync({
-          ...payload,
-          password: values.password,
-        });
-      }
-      markSaved(); // the parent closes us next — don't ask about saved changes
+  const onSubmit = (values) => {
+    // Preview only — a real drawer would call its React Query mutation here.
+    setIsPending(true);
+    setTimeout(() => {
+      setIsPending(false);
+      toast.success(`Validated "${values.fullName}" — nothing was saved`);
+      markSaved();
+      form.reset(EMPTY);
       onSuccess?.();
-    } catch (error) {
-      console.error("Form submission error:", error);
-    }
+    }, 800);
   };
 
   return (
@@ -182,7 +160,7 @@ const UserFormDrawer = ({ open, onClose, onSuccess, entity = null }) => {
         style={{ background: "var(--color-surface)" }}
       >
         <SheetTitle className="sr-only">
-          {isEditMode ? "Edit User" : "Create New User"}
+          {isEditMode ? "Edit Member" : "Create New Member"}
         </SheetTitle>
 
         <Form {...form}>
@@ -192,26 +170,26 @@ const UserFormDrawer = ({ open, onClose, onSuccess, entity = null }) => {
             className="flex h-full flex-col"
           >
             <div className="flex-1 overflow-y-auto p-6">
-              {/* Header */}
               <div className="flex items-start justify-between gap-3 mb-7">
                 <div className="flex items-center gap-3 min-w-0">
                   <span className="inline-flex items-center justify-center w-11 h-11 rounded-xl shrink-0 bg-(image:--gradient-primary)">
-                    <Users className="w-5.5 h-5.5 text-white" />
+                    <Shield className="w-5.5 h-5.5 text-white" />
                   </span>
                   <div className="min-w-0">
                     <h2
                       className="m-0 font-semibold leading-tight"
                       style={{ fontSize: 19, color: "var(--color-text-dark)" }}
                     >
-                      {isEditMode ? "Edit User" : "Create New User"}
+                      {isEditMode ? "Edit Member" : "Create New Member"}
                     </h2>
                     <p
                       className="m-0 mt-0.5"
-                      style={{ fontSize: 13, color: "var(--color-text-secondary)" }}
+                      style={{
+                        fontSize: 13,
+                        color: "var(--color-text-secondary)",
+                      }}
                     >
-                      {isEditMode
-                        ? "Update user account and permissions"
-                        : "Add a new team member to your company"}
+                      Preview of the shared form pattern — nothing is saved.
                     </p>
                   </div>
                 </div>
@@ -232,31 +210,18 @@ const UserFormDrawer = ({ open, onClose, onSuccess, entity = null }) => {
                 </button>
               </div>
 
-              {/* Personal information */}
-              <SectionLabel>Personal information</SectionLabel>
-              <div className="grid grid-cols-2 gap-4 items-start">
+              <SectionLabel>Member details</SectionLabel>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
                 <FormField
                   control={form.control}
-                  name="firstName"
+                  name="fullName"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>First name {req}</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Juan" className="h-10" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="lastName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Last name {req}</FormLabel>
+                    <FormItem className="mb-5">
+                      <FormLabel>Full name {req}</FormLabel>
                       <FormControl>
                         <Input
-                          placeholder="Dela Cruz"
+                          placeholder="e.g., Maria Santos"
                           className="h-10"
                           {...field}
                         />
@@ -265,17 +230,13 @@ const UserFormDrawer = ({ open, onClose, onSuccess, entity = null }) => {
                     </FormItem>
                   )}
                 />
-              </div>
 
-              {/* Contact information */}
-              <div className="mt-7">
-                <SectionLabel>Contact information</SectionLabel>
                 <FormField
                   control={form.control}
                   name="email"
                   render={({ field }) => (
                     <FormItem className="mb-5">
-                      <FormLabel>Email address {req}</FormLabel>
+                      <FormLabel>Email {req}</FormLabel>
                       <div className="relative">
                         <Mail
                           className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
@@ -283,7 +244,7 @@ const UserFormDrawer = ({ open, onClose, onSuccess, entity = null }) => {
                         />
                         <FormControl>
                           <Input
-                            placeholder="juan@example.com"
+                            placeholder="name@company.com"
                             className="h-10 pl-9"
                             disabled={isEditMode}
                             {...field}
@@ -294,11 +255,12 @@ const UserFormDrawer = ({ open, onClose, onSuccess, entity = null }) => {
                     </FormItem>
                   )}
                 />
+
                 <FormField
                   control={form.control}
                   name="phone"
                   render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="mb-5">
                       <FormLabel>Phone number</FormLabel>
                       <div className="relative">
                         <Phone
@@ -321,11 +283,7 @@ const UserFormDrawer = ({ open, onClose, onSuccess, entity = null }) => {
                     </FormItem>
                   )}
                 />
-              </div>
 
-              {/* Role & access */}
-              <div className="mt-7">
-                <SectionLabel>Role &amp; access</SectionLabel>
                 <FormField
                   control={form.control}
                   name="roleId"
@@ -342,10 +300,9 @@ const UserFormDrawer = ({ open, onClose, onSuccess, entity = null }) => {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {roles.map((role) => (
-                            <SelectItem key={role.roleId} value={role.roleId}>
-                              <Shield className="w-4 h-4" />
-                              {role.roleName}
+                          {ROLES.map((r) => (
+                            <SelectItem key={r.roleId} value={r.roleId}>
+                              {r.roleName}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -354,6 +311,67 @@ const UserFormDrawer = ({ open, onClose, onSuccess, entity = null }) => {
                     </FormItem>
                   )}
                 />
+                <FormField
+                  control={form.control}
+                  name="startDate"
+                  render={({ field }) => (
+                    <FormItem className="mb-5">
+                      <FormLabel>Start date {req}</FormLabel>
+                      <FormControl>
+                        <DatePicker className="h-10" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem className="mb-5">
+                    <FormLabel>Notes</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        rows={3}
+                        placeholder="Optional — at least 10 characters once you start typing"
+                        {...field}
+                      />
+                    </FormControl>
+                    <div className="flex items-start justify-between gap-3">
+                      <FormMessage />
+                      <span
+                        className="shrink-0"
+                        style={{ fontSize: 12, color: "var(--color-text-muted)" }}
+                      >
+                        {field.value.length}/500
+                      </span>
+                    </div>
+                  </FormItem>
+                )}
+              />
+
+              <div className="mt-7">
+                <SectionLabel>Access</SectionLabel>
+
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem className="mb-5">
+                      <FormLabel>Password {req}</FormLabel>
+                      <FormControl>
+                        <PasswordInput
+                          placeholder="At least 8 characters"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
                 <FormField
                   control={form.control}
                   name="status"
@@ -369,63 +387,8 @@ const UserFormDrawer = ({ open, onClose, onSuccess, entity = null }) => {
                   )}
                 />
               </div>
-
-              {/* Security — create mode only */}
-              {!isEditMode && (
-                <div className="mt-7">
-                  <SectionLabel>Security</SectionLabel>
-                  <FormField
-                    control={form.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Temporary password {req}</FormLabel>
-                        <div className="relative">
-                          <Lock
-                            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
-                            style={{ color: "var(--color-text-muted)" }}
-                          />
-                          <FormControl>
-                            <Input
-                              type={showPassword ? "text" : "password"}
-                              placeholder="Enter temporary password"
-                              className="h-10 pl-9 pr-9"
-                              {...field}
-                            />
-                          </FormControl>
-                          <button
-                            type="button"
-                            onClick={() => setShowPassword((s) => !s)}
-                            aria-label={
-                              showPassword ? "Hide password" : "Show password"
-                            }
-                            className="icon-btn absolute right-2 top-1/2 h-6 w-6 -translate-y-1/2"
-                          >
-                            {showPassword ? (
-                              <EyeOff className="w-4 h-4" />
-                            ) : (
-                              <Eye className="w-4 h-4" />
-                            )}
-                          </button>
-                        </div>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <PasswordStrengthIndicator password={password} />
-
-                  <p
-                    className="mt-3"
-                    style={{ fontSize: 12, color: "var(--color-text-muted)" }}
-                  >
-                    User will be prompted to change this on first login.
-                  </p>
-                </div>
-              )}
             </div>
 
-            {/* Footer */}
             <div
               className="flex justify-end gap-3 p-6 pt-5"
               style={{
@@ -454,7 +417,7 @@ const UserFormDrawer = ({ open, onClose, onSuccess, entity = null }) => {
                       ) : (
                         <Plus />
                       )}
-                      {isEditMode ? "Update User" : "Create User"}
+                      {isEditMode ? "Update Member" : "Create Member"}
                     </Button>
                   </span>
                 </TooltipTrigger>
@@ -470,4 +433,4 @@ const UserFormDrawer = ({ open, onClose, onSuccess, entity = null }) => {
   );
 };
 
-export default UserFormDrawer;
+export default DemoFormDrawer;

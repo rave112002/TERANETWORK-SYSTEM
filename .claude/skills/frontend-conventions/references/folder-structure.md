@@ -33,7 +33,9 @@ src/pages/
 │   │   └── components/
 │   └── ...
 │
-└── LandingPage.jsx           # Public landing page (no module folder needed)
+└── LandingPage/              # Public landing page + the component gallery
+    ├── index.jsx             # Hero + section nav, composes the gallery sections
+    └── components/           # One file per gallery section (Showcase.jsx holds Section/Demo)
 ```
 
 ---

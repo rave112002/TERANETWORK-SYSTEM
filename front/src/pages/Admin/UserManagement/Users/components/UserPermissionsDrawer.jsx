@@ -23,6 +23,7 @@ import {
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import Spinner from "../../../../../components/Spinner";
 import DataTable from "../../../../../components/DataTable";
+import { useDiscardGuard } from "../../../../../hooks/useDiscardGuard";
 import {
   getUserPermissions,
   bulkUpdateUserPermissions,
@@ -162,6 +163,16 @@ const UserPermissionsDrawer = ({ open, user, onClose }) => {
     }
   };
 
+  // Not a react-hook-form, but `hasChanges` is the same signal — the matrix has
+  // edits that were never sent. Escape / overlay / X / Cancel all route here.
+  const { guardedClose } = useDiscardGuard({
+    open,
+    isDirty: hasChanges,
+    noun: "user's permissions",
+    onClose,
+    label: "UserPermissionsDrawer",
+  });
+
   const columns = [
     {
       title: "Module",
@@ -266,7 +277,7 @@ const UserPermissionsDrawer = ({ open, user, onClose }) => {
     <Sheet
       open={open}
       onOpenChange={(next) => {
-        if (!next) onClose();
+        if (!next) guardedClose();
       }}
     >
       <SheetContent
@@ -303,7 +314,7 @@ const UserPermissionsDrawer = ({ open, user, onClose }) => {
                 </div>
               </div>
               <button
-                onClick={onClose}
+                onClick={guardedClose}
                 aria-label="Close"
                 className="inline-flex items-center justify-center shrink-0 transition-colors hover:bg-(--color-surface-sunken)"
                 style={{
@@ -481,7 +492,7 @@ const UserPermissionsDrawer = ({ open, user, onClose }) => {
               <Button
                 variant="outline"
                 size="lg"
-                onClick={onClose}
+                onClick={guardedClose}
                 disabled={updateMutation.isPending}
               >
                 {hasNoRole ? "Close" : "Cancel"}

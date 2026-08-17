@@ -336,14 +336,39 @@ const onSubmit = async (values) => {
 Map the payload explicitly to the backend (no `...values` spread of unknown keys); write optional
 empty fields as `value || null` where the API expects null.
 
-### Internal close
+### Internal close — always behind the discard guard
 
 ```jsx
+import { useDiscardGuard } from "…/hooks/useDiscardGuard";
+
 const handleClose = () => { form.reset(EMPTY); onClose(); };
+
+const { guardedClose, markSaved } = useDiscardGuard({
+  open,
+  isDirty,                 // or `isDirty || !!logoFile` when a file is staged
+  isSubmitSuccessful,      // from formState — pull it out alongside isDirty
+  noun: "role",
+  onClose: handleClose,
+  label: "RoleFormDrawer", // names the drawer in the dev-time assertion
+});
 ```
 
-Cancel and the bordered X both call `handleClose`. The Sheet's `onOpenChange(false)` (Esc /
-overlay click) also routes to it.
+**`guardedClose` goes on all three**: the Sheet's `onOpenChange(false)` (Esc / overlay click), the
+bordered X, and the footer Cancel — `<Sheet>` routes Esc and the overlay through `onOpenChange`, so
+a guard on one of the three is a guard on none. A dirty form then asks *"Discard your changes?"*
+via the existing `confirm()`; a pristine one closes straight through.
+
+**Call `markSaved()` on the success path**, right before `onSuccess?.()` — the parent is what closes
+the drawer after a save, and without this the guard asks the user to discard changes that were just
+written. (`isSubmitSuccessful` alone isn't enough here: these drawers swallow mutation errors in a
+`catch`, which leaves RHF's flag `true` even when the API rejected.)
+
+The hook warns in development if a drawer is **dirty before a keystroke**. That means the zod schema
+and `form.reset()` disagree about the field list — fix the drawer, don't exempt it: the same
+mismatch makes the resolver reject the form, so Save silently does nothing.
+
+A drawer that isn't a react-hook-form (the permissions matrices) passes its own flag as `isDirty` —
+`hasChanges`, or a comparison of the current selection against what the server sent.
 
 ### Conditional sections
 
@@ -394,6 +419,7 @@ the `"multipart"` axios instance. Include the staged file in the dirty check
 - [ ] `StatusToggle` for on/off choices (not a Select)
 - [ ] Footer inside the `<form>`: Cancel (`variant="outline"`) + inverted primary (`type="submit"`, default variant, `+` icon), no inline `background`
 - [ ] Dirty check via `formState.isDirty`; edit-mode disable + tooltip (span wrapper)
+- [ ] `useDiscardGuard` wired: `guardedClose` on `onOpenChange` **and** the X **and** Cancel; `markSaved()` before `onSuccess?.()`
 - [ ] `loading` bound to `createMutation.isPending || updateMutation.isPending`
 - [ ] Payload mapped explicitly; empty optionals → `null` where the API expects it
 - [ ] No hardcoded hex; no shadow/gradient except the header chip

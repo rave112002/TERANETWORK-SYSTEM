@@ -31,6 +31,7 @@ import {
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 
 import SectionLabel from "../../../../components/SectionLabel";
+import { useDiscardGuard } from "../../../../hooks/useDiscardGuard";
 import { useCreateSuperAdminUser } from "../../../../services/requests/superadmin/users";
 import { useGetCompanies } from "../../../../services/requests/superadmin/companies";
 import { useGetBranches } from "../../../../services/requests/superadmin/branches";
@@ -109,6 +110,9 @@ const CreateUserDrawer = ({ open, onClose, onSuccess }) => {
   const [copiedField, setCopiedField] = useState(null);
 
   const form = useForm({ resolver: zodResolver(schema), defaultValues: EMPTY });
+  const {
+    formState: { isDirty, isSubmitSuccessful },
+  } = form;
   const selectedCompanyId = form.watch("companyId");
 
   const { data: orgsData } = useGetCompanies({ pageSize: 100 });
@@ -159,6 +163,16 @@ const CreateUserDrawer = ({ open, onClose, onSuccess }) => {
     onClose();
   };
 
+  // Escape / overlay click / X / Cancel all route through this.
+  const { guardedClose, markSaved } = useDiscardGuard({
+    open,
+    isDirty,
+    isSubmitSuccessful,
+    noun: "user",
+    onClose: handleClose,
+    label: "CreateUserDrawer",
+  });
+
   const onSubmit = async (values) => {
     const password = generatePassword(12);
     try {
@@ -169,6 +183,7 @@ const CreateUserDrawer = ({ open, onClose, onSuccess }) => {
         name: `${values.firstName} ${values.lastName}`,
       });
       setSuccessOpen(true);
+      markSaved(); // credentials dialog takes over — don't ask about saved changes
       form.reset(EMPTY);
     } catch (err) {
       console.error("Create user error:", err);
@@ -193,7 +208,7 @@ const CreateUserDrawer = ({ open, onClose, onSuccess }) => {
       <Sheet
         open={open}
         onOpenChange={(next) => {
-          if (!next) handleClose();
+          if (!next) guardedClose();
         }}
       >
         <SheetContent
@@ -234,7 +249,7 @@ const CreateUserDrawer = ({ open, onClose, onSuccess }) => {
                   </div>
                   <button
                     type="button"
-                    onClick={handleClose}
+                    onClick={guardedClose}
                     aria-label="Close"
                     className="inline-flex items-center justify-center shrink-0 transition-colors hover:bg-(--color-surface-sunken)"
                     style={{
@@ -432,7 +447,7 @@ const CreateUserDrawer = ({ open, onClose, onSuccess }) => {
                   type="button"
                   variant="outline"
                   size="lg"
-                  onClick={handleClose}
+                  onClick={guardedClose}
                 >
                   Cancel
                 </Button>

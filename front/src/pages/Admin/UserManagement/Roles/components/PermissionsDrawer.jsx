@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import Spinner from "../../../../../components/Spinner";
+import { useDiscardGuard } from "../../../../../hooks/useDiscardGuard";
 import { getPermissions } from "../../../../../services/api/admin/permissions";
 import {
   getRolePermissions,
@@ -56,10 +57,22 @@ const CircleCheck = ({ checked, onChange, label }) => (
   </button>
 );
 
+/**
+ * Stable serialisation of the permission map, so the dirty check survives key
+ * order changing as rows are ticked and unticked.
+ */
+const serialize = (map) =>
+  Object.entries(map)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([id, level]) => `${id}:${level}`)
+    .join("|");
+
 const PermissionsDrawer = ({ open, role, onClose }) => {
   const queryClient = useQueryClient();
   const [selectedPermissions, setSelectedPermissions] = useState({});
   const [collapsed, setCollapsed] = useState(() => new Set());
+  // What the server last gave us — the baseline the discard guard diffs against.
+  const [baseline, setBaseline] = useState("");
 
   const { data: permissionsData, isLoading: permissionsLoading } = useQuery({
     queryKey: ["permissions"],
@@ -81,8 +94,19 @@ const PermissionsDrawer = ({ open, role, onClose }) => {
         permissions[perm.permissionId] = perm.accessLevel || "write";
       });
       setSelectedPermissions(permissions);
+      setBaseline(serialize(permissions));
     }
   }, [rolePermissionsData]);
+
+  // No react-hook-form here, so the dirty check is the matrix against what the
+  // server sent. Escape / overlay click / X / Cancel all route through this.
+  const { guardedClose } = useDiscardGuard({
+    open,
+    isDirty: serialize(selectedPermissions) !== baseline,
+    noun: "role's permissions",
+    onClose,
+    label: "PermissionsDrawer",
+  });
 
   const saveMutation = useMutation({
     mutationFn: (permissions) => assignPermissions(role.roleId, permissions),
@@ -165,7 +189,7 @@ const PermissionsDrawer = ({ open, role, onClose }) => {
     <Sheet
       open={open}
       onOpenChange={(next) => {
-        if (!next) onClose();
+        if (!next) guardedClose();
       }}
     >
       <SheetContent
@@ -183,7 +207,7 @@ const PermissionsDrawer = ({ open, role, onClose }) => {
             style={{ borderBottom: "1px solid var(--color-line)" }}
           >
             <button
-              onClick={onClose}
+              onClick={guardedClose}
               aria-label="Close"
               className="icon-btn w-8 h-8 shrink-0"
             >
@@ -442,7 +466,7 @@ const PermissionsDrawer = ({ open, role, onClose }) => {
               paddingBottom: "calc(1rem + env(safe-area-inset-bottom))",
             }}
           >
-            <Button variant="outline" size="lg" onClick={onClose}>
+            <Button variant="outline" size="lg" onClick={guardedClose}>
               Cancel
             </Button>
             <Button

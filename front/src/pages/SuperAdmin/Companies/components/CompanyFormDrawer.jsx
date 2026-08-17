@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/tooltip";
 
 import SectionLabel from "../../../../components/SectionLabel";
+import { useDiscardGuard } from "../../../../hooks/useDiscardGuard";
 import {
   useCreateCompany,
   useUpdateCompany,
@@ -84,7 +85,7 @@ const CompanyFormDrawer = ({ open, onClose, onSuccess, entity = null }) => {
     defaultValues: EMPTY,
   });
   const {
-    formState: { isDirty },
+    formState: { isDirty, isSubmitSuccessful },
   } = form;
 
   useEffect(() => {
@@ -156,6 +157,17 @@ const CompanyFormDrawer = ({ open, onClose, onSuccess, entity = null }) => {
     onClose();
   };
 
+  // Escape / overlay click / X / Cancel all route through this. `dirty`, not
+  // `isDirty` — a staged logo is an unsaved change even if no field was typed in.
+  const { guardedClose, markSaved } = useDiscardGuard({
+    open,
+    isDirty: dirty,
+    isSubmitSuccessful,
+    noun: "company",
+    onClose: handleClose,
+    label: "CompanyFormDrawer",
+  });
+
   const onSubmit = async (values) => {
     const payload = { ...values };
     if (payload.phone) payload.phone = formatPhoneNumber(payload.phone);
@@ -189,6 +201,7 @@ const CompanyFormDrawer = ({ open, onClose, onSuccess, entity = null }) => {
           await createCompanyMutation.mutateAsync(payload);
         }
       }
+      markSaved(); // the parent closes us next — don't ask about saved changes
       onSuccess?.();
     } catch (error) {
       console.error("Form submission error:", error);
@@ -199,7 +212,7 @@ const CompanyFormDrawer = ({ open, onClose, onSuccess, entity = null }) => {
     <Sheet
       open={open}
       onOpenChange={(next) => {
-        if (!next) handleClose();
+        if (!next) guardedClose();
       }}
     >
       <SheetContent
@@ -244,7 +257,7 @@ const CompanyFormDrawer = ({ open, onClose, onSuccess, entity = null }) => {
                 </div>
                 <button
                   type="button"
-                  onClick={handleClose}
+                  onClick={guardedClose}
                   aria-label="Close"
                   className="inline-flex items-center justify-center shrink-0 transition-colors hover:bg-(--color-surface-sunken)"
                   style={{
@@ -481,7 +494,7 @@ const CompanyFormDrawer = ({ open, onClose, onSuccess, entity = null }) => {
                 type="button"
                 variant="outline"
                 size="lg"
-                onClick={handleClose}
+                onClick={guardedClose}
               >
                 Cancel
               </Button>
