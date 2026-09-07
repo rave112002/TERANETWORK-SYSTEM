@@ -77,6 +77,21 @@ const configurePassport = (db) => {
           });
         }
 
+        // Every branch this user may read. `user.branchId` stays their HOME
+        // branch (where records they create are filed); `branchIds` is the
+        // access boundary every scoped query uses. Migration 001 backfills a
+        // row per existing user, so the fallback below should never be needed —
+        // it exists so a missing assignment degrades to "own branch only"
+        // rather than locking the user out.
+        const branchRows = await db.query(
+          `SELECT branchId FROM user_branches
+           WHERE accountId = ? AND status = 'Active'`,
+          [user.accountId]
+        );
+        user.branchIds = branchRows.length
+          ? branchRows.map((r) => r.branchId)
+          : [user.branchId].filter(Boolean);
+
         // If user exists and is active, pass the user data to the next middleware
         return done(null, user);
       } catch (error) {

@@ -1,5 +1,5 @@
 import { Home, User } from "lucide-react";
-import { FileText, Settings } from "lucide-react";
+import { FileText, Network, Receipt, Server, Settings, UsersRound } from "lucide-react";
 import { Suspense, lazy } from "react";
 import { Route, Routes } from "react-router";
 import BasicLayout from "../../components/layout/BasicLayout";
@@ -18,6 +18,19 @@ const Roles = lazy(() => import("../../pages/Admin/UserManagement/Roles"));
 const SettingsPage = lazy(() => import("../../pages/Admin/Settings"));
 const AuditTrail = lazy(() => import("../../pages/Admin/AuditTrail"));
 const AccountSettings = lazy(() => import("../../pages/Admin/AccountSettings"));
+const Customers = lazy(() => import("../../pages/Admin/Customers"));
+const Plans = lazy(() => import("../../pages/Admin/Plans"));
+const Subscriptions = lazy(() => import("../../pages/Admin/Subscriptions"));
+const Topology = lazy(() => import("../../pages/Admin/Network/Topology"));
+const Olts = lazy(() => import("../../pages/Admin/Network/Olts"));
+const PonPorts = lazy(() => import("../../pages/Admin/Network/PonPorts"));
+const Splitters = lazy(() => import("../../pages/Admin/Network/Splitters"));
+const Naps = lazy(() => import("../../pages/Admin/Network/Naps"));
+const Onus = lazy(() => import("../../pages/Admin/Network/Onus"));
+const System = lazy(() => import("../../pages/Admin/System"));
+const Invoices = lazy(() => import("../../pages/Admin/Billing/Invoices"));
+const Payments = lazy(() => import("../../pages/Admin/Billing/Payments"));
+const Adjustments = lazy(() => import("../../pages/Admin/Billing/Adjustments"));
 
 const AdminRoute = () => {
   const navigations = [
@@ -100,6 +113,286 @@ const AdminRoute = () => {
       ],
     },
     {
+      key: "subscribers",
+      name: "Subscribers",
+      label: "Subscribers",
+      icon: <UsersRound className="h-5 w-5" />,
+      permission: {
+        anyOf: [
+          { module: "customers", submodule: null, accessLevel: "read" },
+          { module: "subscriptions", submodule: null, accessLevel: "read" },
+          { module: "plans", submodule: null, accessLevel: "read" },
+        ],
+      },
+      isFilter: true,
+      isShow: true,
+      children: [
+        {
+          route: "/customers",
+          name: "Customers",
+          label: "Customers",
+          component: (
+            <Suspense fallback={<ComponentLoader />}>
+              <ProtectedRoute module="customers" accessLevel="read">
+                <Customers />
+              </ProtectedRoute>
+            </Suspense>
+          ),
+          permission: {
+            module: "customers",
+            submodule: null,
+            accessLevel: "read",
+          },
+          isFilter: true,
+          isShow: true,
+        },
+        {
+          route: "/subscriptions",
+          name: "Subscriptions",
+          label: "Subscriptions",
+          component: (
+            <Suspense fallback={<ComponentLoader />}>
+              <ProtectedRoute module="subscriptions" accessLevel="read">
+                <Subscriptions />
+              </ProtectedRoute>
+            </Suspense>
+          ),
+          permission: {
+            module: "subscriptions",
+            submodule: null,
+            accessLevel: "read",
+          },
+          isFilter: true,
+          isShow: true,
+        },
+        {
+          route: "/plans",
+          name: "Service Plans",
+          label: "Service Plans",
+          component: (
+            <Suspense fallback={<ComponentLoader />}>
+              <ProtectedRoute module="plans" accessLevel="read">
+                <Plans />
+              </ProtectedRoute>
+            </Suspense>
+          ),
+          permission: {
+            module: "plans",
+            submodule: null,
+            accessLevel: "read",
+          },
+          isFilter: true,
+          isShow: true,
+        },
+      ],
+    },
+    {
+      key: "billing",
+      name: "Billing",
+      label: "Billing",
+      icon: <Receipt className="h-5 w-5" />,
+      permission: {
+        anyOf: [
+          { module: "billing", submodule: "invoices", accessLevel: "read" },
+          { module: "billing", submodule: "payments", accessLevel: "read" },
+          { module: "billing", submodule: "adjustments", accessLevel: "read" },
+        ],
+      },
+      isFilter: true,
+      isShow: true,
+      children: [
+        {
+          route: "/invoices",
+          name: "Invoices",
+          label: "Invoices",
+          component: (
+            <Suspense fallback={<ComponentLoader />}>
+              <ProtectedRoute module="billing" submodule="invoices" accessLevel="read">
+                <Invoices />
+              </ProtectedRoute>
+            </Suspense>
+          ),
+          permission: {
+            module: "billing",
+            submodule: "invoices",
+            accessLevel: "read",
+          },
+          isFilter: true,
+          isShow: true,
+        },
+        {
+          route: "/payments",
+          name: "Payments",
+          label: "Payments",
+          component: (
+            <Suspense fallback={<ComponentLoader />}>
+              <ProtectedRoute module="billing" submodule="payments" accessLevel="read">
+                <Payments />
+              </ProtectedRoute>
+            </Suspense>
+          ),
+          permission: {
+            module: "billing",
+            submodule: "payments",
+            accessLevel: "read",
+          },
+          isFilter: true,
+          isShow: true,
+        },
+        {
+          route: "/adjustments",
+          name: "Adjustments",
+          label: "Adjustments",
+          component: (
+            <Suspense fallback={<ComponentLoader />}>
+              <ProtectedRoute module="billing" submodule="adjustments" accessLevel="read">
+                <Adjustments />
+              </ProtectedRoute>
+            </Suspense>
+          ),
+          permission: {
+            module: "billing",
+            submodule: "adjustments",
+            accessLevel: "read",
+          },
+          isFilter: true,
+          isShow: true,
+        },
+      ],
+    },
+    {
+      key: "network",
+      name: "Network",
+      label: "Network",
+      icon: <Network className="h-5 w-5" />,
+      permission: {
+        anyOf: [
+          { module: "network", submodule: "topology", accessLevel: "read" },
+          { module: "network", submodule: "olts", accessLevel: "read" },
+          { module: "network", submodule: "naps", accessLevel: "read" },
+          { module: "network", submodule: "onus", accessLevel: "read" },
+        ],
+      },
+      isFilter: true,
+      isShow: true,
+      children: [
+        {
+          route: "/topology",
+          name: "Topology",
+          label: "Topology",
+          component: (
+            <Suspense fallback={<ComponentLoader />}>
+              <ProtectedRoute module="network" submodule="topology" accessLevel="read">
+                <Topology />
+              </ProtectedRoute>
+            </Suspense>
+          ),
+          permission: {
+            module: "network",
+            submodule: "topology",
+            accessLevel: "read",
+          },
+          isFilter: true,
+          isShow: true,
+        },
+        {
+          route: "/olts",
+          name: "OLTs",
+          label: "OLTs",
+          component: (
+            <Suspense fallback={<ComponentLoader />}>
+              <ProtectedRoute module="network" submodule="olts" accessLevel="read">
+                <Olts />
+              </ProtectedRoute>
+            </Suspense>
+          ),
+          permission: {
+            module: "network",
+            submodule: "olts",
+            accessLevel: "read",
+          },
+          isFilter: true,
+          isShow: true,
+        },
+        {
+          route: "/pon-ports",
+          name: "PON Ports",
+          label: "PON Ports",
+          component: (
+            <Suspense fallback={<ComponentLoader />}>
+              <ProtectedRoute module="network" submodule="pon_ports" accessLevel="read">
+                <PonPorts />
+              </ProtectedRoute>
+            </Suspense>
+          ),
+          permission: {
+            module: "network",
+            submodule: "pon_ports",
+            accessLevel: "read",
+          },
+          isFilter: true,
+          isShow: true,
+        },
+        {
+          route: "/splitters",
+          name: "Splitters",
+          label: "Splitters",
+          component: (
+            <Suspense fallback={<ComponentLoader />}>
+              <ProtectedRoute module="network" submodule="splitters" accessLevel="read">
+                <Splitters />
+              </ProtectedRoute>
+            </Suspense>
+          ),
+          permission: {
+            module: "network",
+            submodule: "splitters",
+            accessLevel: "read",
+          },
+          isFilter: true,
+          isShow: true,
+        },
+        {
+          route: "/naps",
+          name: "NAPs",
+          label: "NAPs",
+          component: (
+            <Suspense fallback={<ComponentLoader />}>
+              <ProtectedRoute module="network" submodule="naps" accessLevel="read">
+                <Naps />
+              </ProtectedRoute>
+            </Suspense>
+          ),
+          permission: {
+            module: "network",
+            submodule: "naps",
+            accessLevel: "read",
+          },
+          isFilter: true,
+          isShow: true,
+        },
+        {
+          route: "/onus",
+          name: "ONUs",
+          label: "ONUs",
+          component: (
+            <Suspense fallback={<ComponentLoader />}>
+              <ProtectedRoute module="network" submodule="onus" accessLevel="read">
+                <Onus />
+              </ProtectedRoute>
+            </Suspense>
+          ),
+          permission: {
+            module: "network",
+            submodule: "onus",
+            accessLevel: "read",
+          },
+          isFilter: true,
+          isShow: true,
+        },
+      ],
+    },
+    {
       route: "/settings",
       name: "Settings",
       label: "Settings",
@@ -112,6 +405,23 @@ const AdminRoute = () => {
         </Suspense>
       ),
       permission: { module: "settings", submodule: null, accessLevel: "read" },
+      isFilter: true,
+      isShow: true,
+      section: "system", // renders below the sidebar divider
+    },
+    {
+      route: "/system",
+      name: "System",
+      label: "System",
+      icon: <Server className="h-5 w-5" />,
+      component: (
+        <Suspense fallback={<ComponentLoader />}>
+          <ProtectedRoute module="system" accessLevel="read">
+            <System />
+          </ProtectedRoute>
+        </Suspense>
+      ),
+      permission: { module: "system", submodule: null, accessLevel: "read" },
       isFilter: true,
       isShow: true,
       section: "system", // renders below the sidebar divider

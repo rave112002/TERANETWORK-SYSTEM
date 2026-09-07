@@ -3,6 +3,7 @@ import { catchAsync, validateBody, validateQuery } from "../../../utils/catchAsy
 import { getCurrentTimestampLocal } from "../../../utils/dateUtils.js";
 import { hashPassword } from "../../../utils/hashing/argonHash.js";
 import {
+  assignBranchesSchema,
   createOwnerSchema,
   listUsersQuerySchema,
 } from "../../../validators/superadmin-users.validator.js";
@@ -198,7 +199,17 @@ router.post(
         [accountId, companyId, branchId, firstName, lastName, phone || null, roleId, now, now]
       );
 
-      // 7. Create credential (Argon2 embeds the salt in the encoded hash)
+      // 7. Mirror the home branch into user_branches — the access boundary.
+      //    Every user needs at least one row here or the `branchId IN (...)`
+      //    scope predicate matches nothing and they see none of their own data.
+      const [ubUuid] = await conn.execute(`SELECT UUID() as id`);
+      await conn.execute(
+        `INSERT INTO user_branches (userBranchId, accountId, branchId, status, dateCreated, dateUpdated)
+         VALUES (?, ?, ?, 'Active', ?, ?)`,
+        [ubUuid[0].id, accountId, branchId, now, now]
+      );
+
+      // 8. Create credential (Argon2 embeds the salt in the encoded hash)
       const hash = await hashPassword(password);
 
       await conn.execute(
@@ -210,6 +221,125 @@ router.post(
       await req.db.commit(conn);
 
       return res.sendSuccess("User created successfully", { accountId, roleId }, 201);
+    } catch (err) {
+      await req.db.rollback(conn);
+      throw err;
+    }
+  })
+);
+
+/**
+ * GET /:accountId/branches
+ * The branches a user is currently assigned to.
+ */
+router.get(
+  "/:accountId/branches",
+  catchAsync(async (req, res) => {
+    const { accountId } = req.params;
+
+    const [user] = await req.db.query(
+      `SELECT accountId, companyId, branchId FROM users
+       WHERE accountId = ? AND status != 'Deleted' LIMIT 1`,
+      [accountId]
+    );
+
+    if (!user) {
+      return res.sendError("User not found", 404);
+    }
+
+    const branches = await req.db.query(
+      `SELECT ub.branchId, b.name, b.isMainBranch
+       FROM user_branches ub
+       INNER JOIN branches b ON b.branchId = ub.branchId
+       WHERE ub.accountId = ? AND ub.status = 'Active'
+       ORDER BY b.name ASC`,
+      [accountId]
+    );
+
+    return res.sendSuccess("User branches retrieved successfully", {
+      branches,
+      homeBranchId: user.branchId,
+    });
+  })
+);
+
+/**
+ * PUT /:accountId/branches
+ * Replace a user's branch assignments. The first branch in the list becomes
+ * their home branch (where records they create are filed).
+ *
+ * Assignments are retired rather than deleted — who had access to which branch,
+ * and when, is worth keeping.
+ */
+router.put(
+  "/:accountId/branches",
+  validateBody(assignBranchesSchema),
+  catchAsync(async (req, res) => {
+    const { accountId } = req.params;
+    const { branchIds } = req.body;
+    const now = getCurrentTimestampLocal();
+    const wanted = [...new Set(branchIds)];
+
+    let conn;
+    try {
+      conn = await req.db.beginTransaction();
+
+      const [userRows] = await conn.execute(
+        `SELECT accountId, companyId FROM users
+         WHERE accountId = ? AND status != 'Deleted' LIMIT 1 FOR UPDATE`,
+        [accountId]
+      );
+
+      if (userRows.length === 0) {
+        await req.db.rollback(conn);
+        return res.sendError("User not found", 404);
+      }
+
+      // Every branch must exist and belong to the user's own company — a user
+      // must never be assigned across a company boundary.
+      const placeholders = wanted.map(() => "?").join(", ");
+      const [validBranches] = await conn.execute(
+        `SELECT branchId FROM branches
+         WHERE branchId IN (${placeholders}) AND companyId = ? AND status != 'Deleted'`,
+        [...wanted, userRows[0].companyId]
+      );
+
+      if (validBranches.length !== wanted.length) {
+        await req.db.rollback(conn);
+        return res.sendError(
+          "One or more branches do not exist or belong to another company",
+          400
+        );
+      }
+
+      await conn.execute(
+        `UPDATE user_branches SET status = 'Inactive', dateUpdated = ?
+         WHERE accountId = ? AND status = 'Active'`,
+        [now, accountId]
+      );
+
+      for (const branchId of wanted) {
+        const [ubUuid] = await conn.execute(`SELECT UUID() as id`);
+        await conn.execute(
+          `INSERT INTO user_branches (userBranchId, accountId, branchId, status, dateCreated, dateUpdated)
+           VALUES (?, ?, ?, 'Active', ?, ?)
+           ON DUPLICATE KEY UPDATE status = 'Active', dateUpdated = VALUES(dateUpdated)`,
+          [ubUuid[0].id, accountId, branchId, now, now]
+        );
+      }
+
+      await conn.execute(`UPDATE users SET branchId = ?, dateUpdated = ? WHERE accountId = ?`, [
+        wanted[0],
+        now,
+        accountId,
+      ]);
+
+      await req.db.commit(conn);
+
+      return res.sendSuccess("Branch assignments updated successfully", {
+        branchIds: wanted,
+        homeBranchId: wanted[0],
+      });
     } catch (err) {
       await req.db.rollback(conn);
       throw err;

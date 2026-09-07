@@ -5,6 +5,7 @@ import { upload, compressImage } from "../../../utils/file/uploads.js";
 import {
   createCompanySchema,
   updateCompanySchema,
+  updateCompanyProfileSchema,
   listCompaniesQuerySchema,
 } from "../../../validators/companies.validator.js";
 
@@ -105,6 +106,99 @@ router.get(
   })
 );
 
+/* ── Company profile ──────────────────────────────────────────────────────
+ * TERANETWORK runs as a single company with several branches (see
+ * docs/migration/00-decisions.md, D1). These two routes address "the" company
+ * without the caller having to know its ID, and expose only the branding and
+ * contact fields that customer-facing documents render — invoice PDFs and
+ * notification emails read them instead of hardcoding a name and logo.
+ *
+ * Registered BEFORE `/:companyId` — otherwise the parameterised route captures
+ * the literal path "profile".
+ */
+
+/**
+ * GET /profile
+ * The company's own profile. With one company this is unambiguous; if more than
+ * one ever exists, the oldest Active row is the primary.
+ */
+router.get(
+  "/profile",
+  catchAsync(async (req, res) => {
+    const [company] = await req.db.query(
+      `SELECT companyId, name, email, phone, website, logoUrl, address, tin,
+              status, dateCreated, dateUpdated
+       FROM companies
+       WHERE status != 'Deleted'
+       ORDER BY dateCreated ASC
+       LIMIT 1`
+    );
+
+    if (!company) {
+      return res.sendError("No company has been set up yet", 404);
+    }
+
+    return res.sendSuccess("Company profile retrieved successfully", { company });
+  })
+);
+
+/**
+ * PUT /profile
+ * Update the company's branding and contact details. Deliberately cannot change
+ * the subscription plan or status — that stays on PUT /:companyId.
+ */
+router.put(
+  "/profile",
+  validateBody(updateCompanyProfileSchema),
+  catchAsync(async (req, res) => {
+    const { name, email, phone, website, logoUrl, address, tin } = req.body;
+    const now = getCurrentTimestampLocal();
+
+    const [company] = await req.db.query(
+      `SELECT companyId FROM companies
+       WHERE status != 'Deleted' ORDER BY dateCreated ASC LIMIT 1`
+    );
+
+    if (!company) {
+      return res.sendError("No company has been set up yet", 404);
+    }
+
+    // `email` is UNIQUE across companies, so a collision is a 409 rather than a
+    // 500 from the driver.
+    const [clash] = await req.db.query(
+      `SELECT companyId FROM companies
+       WHERE email = ? AND companyId != ? AND status != 'Deleted' LIMIT 1`,
+      [email, company.companyId]
+    );
+
+    if (clash) {
+      return res.sendError("Another company already uses this email", 409);
+    }
+
+    await req.db.query(
+      `UPDATE companies
+       SET name = ?, email = ?, phone = ?, website = ?, logoUrl = ?,
+           address = ?, tin = ?, dateUpdated = ?
+       WHERE companyId = ?`,
+      [
+        name,
+        email,
+        phone || null,
+        website || null,
+        logoUrl || null,
+        address || null,
+        tin || null,
+        now,
+        company.companyId,
+      ]
+    );
+
+    return res.sendSuccess("Company profile updated successfully", {
+      companyId: company.companyId,
+    });
+  })
+);
+
 /**
  * GET /:companyId
  * Get single company (company)
@@ -115,8 +209,8 @@ router.get(
     const { companyId } = req.params;
 
     const companies = await req.db.query(
-      `SELECT 
-        companyId, name, email, phone, website, logoUrl,
+      `SELECT
+        companyId, name, email, phone, website, logoUrl, address, tin,
         subscriptionPlan, subscriptionStartDate, subscriptionEndDate,
         status, dateCreated, dateUpdated
       FROM companies

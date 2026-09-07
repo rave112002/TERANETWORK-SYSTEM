@@ -12,6 +12,13 @@ const router = express.Router();
 /**
  * GET /
  * Return the tenant's settings (stored values merged over defaults).
+ *
+ * Deliberately keyed on the user's HOME branch (`req.user.branchId`) rather
+ * than their full branch scope: `settings` holds one row per
+ * (companyId, branchId, settingKey), so a multi-branch user reading "the"
+ * settings has to be reading one specific branch's. Editing another branch's
+ * settings is a SuperAdmin action. See utils/branchScope.js for the
+ * scope-vs-home-branch distinction.
  */
 router.get(
   "/",
@@ -53,7 +60,7 @@ router.put(
             `INSERT INTO settings (companyId, branchId, settingKey, settingValue, dateCreated, dateUpdated)
              VALUES (?, ?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE settingValue = VALUES(settingValue), dateUpdated = VALUES(dateUpdated)`,
-            [companyId, branchId, key, value == null ? null : String(value), now, now]
+            [companyId, branchId, key, value === null || value === undefined ? null : String(value), now, now]
           );
         }
         await req.db.commit(conn);

@@ -5,6 +5,7 @@ import AdminRoute from "./pageRoutes/AdminRoute";
 import SuperAdminRoute from "./pageRoutes/SuperAdminRoute";
 
 const LandingPage = lazy(() => import("../pages/LandingPage"));
+const PayInvoice = lazy(() => import("../pages/Public/PayInvoice"));
 
 const RootRoutes = () => {
   return (
@@ -15,6 +16,17 @@ const RootRoutes = () => {
           element={
             <Suspense fallback={<ComponentLoader />}>
               <LandingPage />
+            </Suspense>
+          }
+        />
+        {/* The customer-facing payment page. Deliberately outside both
+            portals: it has no login, no sidebar and no auth store, and the
+            token in the URL is the only credential. */}
+        <Route
+          path="/pay/:token"
+          element={
+            <Suspense fallback={<ComponentLoader />}>
+              <PayInvoice />
             </Suspense>
           }
         />

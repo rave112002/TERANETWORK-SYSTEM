@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { Eye } from "lucide-react";
+import { Eye, MapPin } from "lucide-react";
 import RowActions from "../../../components/RowActions";
 import { useDebounce } from "../../../hooks/useDebounce";
 import { useGetSuperAdminUsers } from "../../../services/requests/superadmin/users";
@@ -20,6 +20,7 @@ export const useUserHooks = () => {
   const [pageSize, setPageSize] = useState(10);
   const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false);
   const [viewingUser, setViewingUser] = useState(null);
+  const [branchesUser, setBranchesUser] = useState(null);
 
   // Filter state
   const [search, setSearch] = useState("");
@@ -100,8 +101,16 @@ export const useUserHooks = () => {
     setViewingUser(null);
   }, []);
 
-  // ⋮ menu — SuperAdmin users are read-only here (no update/delete endpoint),
-  // so the primary action is the only item.
+  const handleManageBranches = useCallback((record) => {
+    setBranchesUser(record);
+  }, []);
+
+  const handleCloseBranchesDrawer = useCallback(() => {
+    setBranchesUser(null);
+  }, []);
+
+  // ⋮ menu — SuperAdmin users have no update/delete endpoint, so viewing and
+  // branch access are the available actions.
   const getActionItems = useCallback(
     (record) => [
       {
@@ -110,8 +119,14 @@ export const useUserHooks = () => {
         icon: <Eye className="w-4 h-4" />,
         onClick: () => handleView(record),
       },
+      {
+        key: "branches",
+        label: "Manage branch access",
+        icon: <MapPin className="w-4 h-4" />,
+        onClick: () => handleManageBranches(record),
+      },
     ],
-    [handleView],
+    [handleView, handleManageBranches],
   );
 
   // # (mono) · initial-avatar + name · secondary text · status dot · ⋮
@@ -290,6 +305,9 @@ export const useUserHooks = () => {
     handleCloseCreateDrawer,
     viewingUser,
     handleCloseViewModal,
+    branchesUser,
+    handleManageBranches,
+    handleCloseBranchesDrawer,
     search,
     setSearch,
     statusFilter,

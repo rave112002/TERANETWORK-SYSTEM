@@ -8,6 +8,8 @@ import {
 import {
   getSuperAdminUsersApi,
   createSuperAdminUserApi,
+  getUserBranchesApi,
+  updateUserBranchesApi,
 } from "../../api/superadmin/users";
 
 // Query: Get all users (SuperAdmin view)
@@ -32,6 +34,38 @@ export const useCreateSuperAdminUser = () => {
     },
     onError: (error) => {
       toast.error(error.response?.data?.message || "Failed to create user");
+    },
+  });
+};
+
+// Query: the branches a user is assigned to
+export const useGetUserBranches = (accountId) => {
+  return useQuery({
+    queryKey: ["superadmin-users", accountId, "branches"],
+    queryFn: () => getUserBranchesApi(accountId),
+    enabled: !!accountId,
+    staleTime: 5 * 60 * 1000,
+  });
+};
+
+// Mutation: replace a user's branch assignments
+export const useUpdateUserBranches = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ accountId, branchIds }) =>
+      updateUserBranchesApi(accountId, branchIds),
+    onSuccess: (_data, variables) => {
+      toast.success("Branch assignments updated");
+      queryClient.invalidateQueries({ queryKey: ["superadmin-users"] });
+      queryClient.invalidateQueries({
+        queryKey: ["superadmin-users", variables.accountId, "branches"],
+      });
+    },
+    onError: (error) => {
+      toast.error(
+        error.response?.data?.message || "Failed to update branch assignments",
+      );
     },
   });
 };

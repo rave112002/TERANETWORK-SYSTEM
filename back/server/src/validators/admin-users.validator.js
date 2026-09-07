@@ -1,5 +1,16 @@
 import { z } from "zod";
-import { optionalPhone, queryEnum, queryEnumDefault, queryInt } from "./_helpers.js";
+import { emptyToUndefined, optionalPhone, queryEnum, queryEnumDefault, queryInt } from "./_helpers.js";
+
+/**
+ * Branches to assign the user to (`user_branches`). Omitted means "the creating
+ * user's own home branch" — the common case, and what every pre-multi-branch
+ * client sends. The first entry becomes the user's home branch. Each ID is
+ * checked against the caller's own scope in the controller, so a branch the
+ * caller cannot see can never be assigned.
+ */
+const optionalBranchIds = emptyToUndefined(
+  z.array(z.string().min(1).max(50)).min(1, "Select at least one branch").max(50).optional()
+);
 
 // POST / — create an admin user (+ credential)
 export const createUserSchema = z.object({
@@ -9,6 +20,7 @@ export const createUserSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters").max(255),
   phone: optionalPhone(),
   roleId: z.string().min(1, "Role is required").max(50),
+  branchIds: optionalBranchIds,
 });
 
 // PUT /:userId — update an admin user
@@ -18,6 +30,7 @@ export const updateUserSchema = z.object({
   phone: optionalPhone(),
   roleId: z.string().min(1, "Role is required").max(50),
   status: z.enum(["Active", "Inactive", "Suspended"]).optional(),
+  branchIds: optionalBranchIds,
 });
 
 // GET / — list query params (unset filters arrive as "", see _helpers.js)

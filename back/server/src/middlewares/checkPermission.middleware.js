@@ -30,7 +30,7 @@ export const checkPermission = (module, submodule = null, accessLevel = "read") 
           JOIN permissions p ON up.permissionId = p.permissionId
           WHERE up.accountId = ? AND p.module = ? AND p.status = 'Active'
         `;
-        let userPermParams = [userId, module];
+        const userPermParams = [userId, module];
 
         if (submodule) {
           userPermQuery += " AND p.submodule = ?";
@@ -73,7 +73,7 @@ export const checkPermission = (module, submodule = null, accessLevel = "read") 
           JOIN permissions p ON rp.permissionId = p.permissionId
           WHERE rp.roleId = ? AND p.module = ? AND p.status = 'Active'
         `;
-        let rolePermParams = [roleId, module];
+        const rolePermParams = [roleId, module];
 
         if (submodule) {
           rolePermQuery += " AND p.submodule = ?";

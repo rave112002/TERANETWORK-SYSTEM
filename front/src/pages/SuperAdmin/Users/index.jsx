@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/select";
 import { useUserHooks } from "./hooks";
 import CreateUserDrawer from "./components/CreateUserDrawer";
+import UserBranchesDrawer from "./components/UserBranchesDrawer";
 import PageHeader from "../../../components/PageHeader";
 import PaginationFooter from "../../../components/PaginationFooter";
 import StatCard from "../../../components/StatCard";
@@ -39,6 +40,8 @@ const SuperAdminUsers = () => {
     setCompanyFilter,
     handleClearFilters,
     orgOptions,
+    branchesUser,
+    handleCloseBranchesDrawer,
   } = useUserHooks();
 
   const [isFilterVisible, setIsFilterVisible] = useState(false);
@@ -244,6 +247,12 @@ const SuperAdminUsers = () => {
         open={isCreateDrawerOpen}
         onClose={handleCloseCreateDrawer}
         onSuccess={handleCloseCreateDrawer}
+      />
+      <UserBranchesDrawer
+        open={!!branchesUser}
+        onClose={handleCloseBranchesDrawer}
+        onSuccess={handleCloseBranchesDrawer}
+        user={branchesUser}
       />
     </div>
   );

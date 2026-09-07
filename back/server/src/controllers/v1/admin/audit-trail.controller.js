@@ -3,6 +3,7 @@ import { catchAsync, validateQuery } from "../../../utils/catchAsync.js";
 import { checkPermission } from "../../../middlewares/checkPermission.middleware.js";
 import { listAuditQuerySchema } from "../../../validators/audit-trail.validator.js";
 import { getCurrentTimestampLocal } from "../../../utils/dateUtils.js";
+import { branchScope, getScopedBranchIds } from "../../../utils/branchScope.js";
 
 const router = express.Router();
 
@@ -28,11 +29,12 @@ const csvCell = (value) => {
  * @returns {{ whereClause: string, params: Array }}
  */
 const buildAuditFilter = (req) => {
-  const { companyId, branchId } = req.user;
+  const { companyId } = req.user;
   const { search = "", module, accountId, startDate, endDate } = req.query;
+  const scope = branchScope("a.branchId", getScopedBranchIds(req.user));
 
-  const params = [companyId, branchId];
-  let whereClause = "WHERE a.companyId = ? AND a.branchId = ?";
+  const params = [companyId, ...scope.params];
+  let whereClause = `WHERE a.companyId = ?${scope.clause}`;
 
   if (search) {
     whereClause += ` AND (a.action LIKE ? OR a.description LIKE ?)`;
@@ -186,8 +188,9 @@ router.get(
   "/:auditId",
   checkPermission("audit_trail", null, "read"),
   catchAsync(async (req, res) => {
-    const { companyId, branchId } = req.user;
+    const { companyId } = req.user;
     const { auditId } = req.params;
+    const scope = branchScope("a.branchId", getScopedBranchIds(req.user));
 
     const rows = await req.db.query(
       `SELECT
@@ -196,9 +199,9 @@ router.get(
         u.firstName, u.lastName
       FROM audit_trail a
       LEFT JOIN users u ON u.accountId = a.accountId
-      WHERE a.auditId = ? AND a.companyId = ? AND a.branchId = ?
+      WHERE a.auditId = ? AND a.companyId = ?${scope.clause}
       LIMIT 1`,
-      [auditId, companyId, branchId]
+      [auditId, companyId, ...scope.params]
     );
 
     if (rows.length === 0) {

@@ -4,6 +4,11 @@ import { getCurrentTimestampLocal } from "../../../utils/dateUtils.js";
 import { hashPassword } from "../../../utils/hashing/argonHash.js";
 import { checkPermission } from "../../../middlewares/checkPermission.middleware.js";
 import {
+  assertBranchInScope,
+  branchScope,
+  getScopedBranchIds,
+} from "../../../utils/branchScope.js";
+import {
   createUserSchema,
   updateUserSchema,
   listUsersQuerySchema,
@@ -29,12 +34,12 @@ router.get(
       sortBy = "dateCreated",
       sortOrder = "DESC",
     } = req.query;
-    const { companyId, branchId } = req.user;
+    const { companyId } = req.user;
+    const scope = branchScope("u.branchId", getScopedBranchIds(req.user));
 
     const offset = (page - 1) * pageSize;
-    const params = [companyId, branchId];
-    let whereClause =
-      "WHERE u.companyId = ? AND u.branchId = ? AND u.status != 'Deleted' AND r.roleName != 'Owner'";
+    const params = [companyId, ...scope.params];
+    let whereClause = `WHERE u.companyId = ?${scope.clause} AND u.status != 'Deleted' AND r.roleName != 'Owner'`;
 
     if (search) {
       whereClause += ` AND (u.firstName LIKE ? OR u.lastName LIKE ? OR c.email LIKE ?)`;
@@ -108,9 +113,11 @@ router.get(
   checkPermission("users", "list", "read"),
   catchAsync(async (req, res) => {
     const { userId } = req.params;
+    const { companyId } = req.user;
+    const scope = branchScope("u.branchId", getScopedBranchIds(req.user));
 
     const users = await req.db.query(
-      `SELECT 
+      `SELECT
         u.accountId,
         u.companyId,
         u.branchId,
@@ -128,16 +135,29 @@ router.get(
       FROM users u
       LEFT JOIN credentials c ON c.accountId = u.accountId
       LEFT JOIN roles r ON r.roleId = u.roleId
-      WHERE u.accountId = ? AND u.status != 'Deleted'
+      WHERE u.accountId = ? AND u.companyId = ?${scope.clause} AND u.status != 'Deleted'
       LIMIT 1`,
-      [userId]
+      [userId, companyId, ...scope.params]
     );
 
     if (users.length === 0) {
       return res.sendError("User not found", 404);
     }
 
-    return res.sendSuccess("User retrieved successfully", { user: users[0] });
+    // Every branch this user is assigned to, so the edit form can show the
+    // current assignment rather than just the home branch.
+    const assigned = await req.db.query(
+      `SELECT ub.branchId, b.name AS branchName
+       FROM user_branches ub
+       INNER JOIN branches b ON b.branchId = ub.branchId
+       WHERE ub.accountId = ? AND ub.status = 'Active'
+       ORDER BY b.name ASC`,
+      [userId]
+    );
+
+    return res.sendSuccess("User retrieved successfully", {
+      user: { ...users[0], branches: assigned, branchIds: assigned.map((b) => b.branchId) },
+    });
   })
 );
 
@@ -150,9 +170,16 @@ router.post(
   checkPermission("users", "list", "write"),
   validateBody(createUserSchema),
   catchAsync(async (req, res) => {
-    const { firstName, lastName, email, password, phone, roleId } = req.body;
-    const { companyId, branchId } = req.user;
+    const { firstName, lastName, email, password, phone, roleId, branchIds } = req.body;
+    const { companyId } = req.user;
     const now = getCurrentTimestampLocal();
+
+    // Default to the creator's own home branch. Anything explicit must be a
+    // branch the creator themselves has access to — otherwise an admin could
+    // seed a user into a branch they cannot see.
+    const targetBranchIds = branchIds?.length ? [...new Set(branchIds)] : [req.user.branchId];
+    targetBranchIds.forEach((id) => assertBranchInScope(req.user, id));
+    const homeBranchId = targetBranchIds[0];
 
     let conn;
     try {
@@ -179,8 +206,19 @@ router.post(
       await conn.execute(
         `INSERT INTO users (accountId, companyId, branchId, firstName, lastName, phone, roleId, status, dateCreated, dateUpdated)
          VALUES (?, ?, ?, ?, ?, ?, ?, 'Active', ?, ?)`,
-        [accountId, companyId, branchId, firstName, lastName, phone || null, roleId, now, now]
+        [accountId, companyId, homeBranchId, firstName, lastName, phone || null, roleId, now, now]
       );
+
+      // Branch assignments — the access boundary. The home branch is always one
+      // of them, so `branchId IN (...)` needs no special case.
+      for (const targetBranchId of targetBranchIds) {
+        const [ubUuid] = await conn.execute(`SELECT UUID() as id`);
+        await conn.execute(
+          `INSERT INTO user_branches (userBranchId, accountId, branchId, status, dateCreated, dateUpdated)
+           VALUES (?, ?, ?, 'Active', ?, ?)`,
+          [ubUuid[0].id, accountId, targetBranchId, now, now]
+        );
+      }
 
       // Create credential (Argon2 embeds the salt in the encoded hash)
       const hash = await hashPassword(password);
@@ -211,21 +249,72 @@ router.put(
   validateBody(updateUserSchema),
   catchAsync(async (req, res) => {
     const { userId } = req.params;
-    const { firstName, lastName, phone, roleId, status } = req.body;
+    const { firstName, lastName, phone, roleId, status, branchIds } = req.body;
+    const { companyId } = req.user;
     const now = getCurrentTimestampLocal();
+    const scope = branchScope("branchId", getScopedBranchIds(req.user));
 
-    const result = await req.db.query(
-      `UPDATE users 
-       SET firstName = ?, lastName = ?, phone = ?, roleId = ?, status = ?, dateUpdated = ?
-       WHERE accountId = ? AND status != 'Deleted'`,
-      [firstName, lastName, phone || null, roleId, status || "Active", now, userId]
-    );
+    // Omitting branchIds leaves the current assignment alone. Sending it
+    // replaces the assignment wholesale, and the first entry becomes the new
+    // home branch.
+    const nextBranchIds = branchIds?.length ? [...new Set(branchIds)] : null;
+    if (nextBranchIds) nextBranchIds.forEach((id) => assertBranchInScope(req.user, id));
 
-    if (result.affectedRows === 0) {
-      return res.sendError("User not found", 404);
+    let conn;
+    try {
+      conn = await req.db.beginTransaction();
+
+      const [result] = await conn.execute(
+        `UPDATE users
+         SET firstName = ?, lastName = ?, phone = ?, roleId = ?, status = ?,
+             branchId = COALESCE(?, branchId), dateUpdated = ?
+         WHERE accountId = ? AND companyId = ?${scope.clause} AND status != 'Deleted'`,
+        [
+          firstName,
+          lastName,
+          phone || null,
+          roleId,
+          status || "Active",
+          nextBranchIds ? nextBranchIds[0] : null,
+          now,
+          userId,
+          companyId,
+          ...scope.params,
+        ]
+      );
+
+      if (result.affectedRows === 0) {
+        await req.db.rollback(conn);
+        return res.sendError("User not found", 404);
+      }
+
+      if (nextBranchIds) {
+        // Retire assignments that are no longer wanted rather than deleting
+        // them — who had access to what, and when, is worth keeping.
+        await conn.execute(
+          `UPDATE user_branches SET status = 'Inactive', dateUpdated = ?
+           WHERE accountId = ? AND status = 'Active'`,
+          [now, userId]
+        );
+
+        for (const targetBranchId of nextBranchIds) {
+          const [ubUuid] = await conn.execute(`SELECT UUID() as id`);
+          await conn.execute(
+            `INSERT INTO user_branches (userBranchId, accountId, branchId, status, dateCreated, dateUpdated)
+             VALUES (?, ?, ?, 'Active', ?, ?)
+             ON DUPLICATE KEY UPDATE status = 'Active', dateUpdated = VALUES(dateUpdated)`,
+            [ubUuid[0].id, userId, targetBranchId, now, now]
+          );
+        }
+      }
+
+      await req.db.commit(conn);
+
+      return res.sendSuccess("User updated successfully");
+    } catch (err) {
+      await req.db.rollback(conn);
+      throw err;
     }
-
-    return res.sendSuccess("User updated successfully");
   })
 );
 
@@ -238,7 +327,9 @@ router.delete(
   checkPermission("users", "list", "write"),
   catchAsync(async (req, res) => {
     const { userId } = req.params;
+    const { companyId } = req.user;
     const now = getCurrentTimestampLocal();
+    const scope = branchScope("branchId", getScopedBranchIds(req.user));
 
     let conn;
     try {
@@ -246,14 +337,22 @@ router.delete(
 
       // Soft delete user
       const [userResult] = await conn.execute(
-        `UPDATE users SET status = 'Deleted', dateUpdated = ? WHERE accountId = ? AND status != 'Deleted'`,
-        [now, userId]
+        `UPDATE users SET status = 'Deleted', dateUpdated = ?
+         WHERE accountId = ? AND companyId = ?${scope.clause} AND status != 'Deleted'`,
+        [now, userId, companyId, ...scope.params]
       );
 
       if (userResult.affectedRows === 0) {
         await req.db.rollback(conn);
         return res.sendError("User not found", 404);
       }
+
+      // Retire their branch assignments so a deleted account cannot be revived
+      // with stale access.
+      await conn.execute(
+        `UPDATE user_branches SET status = 'Deleted', dateUpdated = ? WHERE accountId = ?`,
+        [now, userId]
+      );
 
       // Soft delete credential
       await conn.execute(

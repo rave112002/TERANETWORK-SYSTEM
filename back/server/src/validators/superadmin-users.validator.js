@@ -18,6 +18,20 @@ export const createOwnerSchema = z.object({
   branchId: z.string().min(1, "branchId is required").max(50),
 });
 
+/**
+ * PUT /:accountId/branches — replace a user's branch assignments.
+ *
+ * At least one branch is required: a user with no assignment can read nothing
+ * (the scope predicate fails closed), which is a broken account rather than a
+ * restricted one. Deactivate the user instead.
+ */
+export const assignBranchesSchema = z.object({
+  branchIds: z
+    .array(z.string().min(1).max(50))
+    .min(1, "Assign at least one branch")
+    .max(50),
+});
+
 // GET / — cross-tenant user list query params (unset filters arrive as "")
 export const listUsersQuerySchema = z.object({
   page: queryInt(1),

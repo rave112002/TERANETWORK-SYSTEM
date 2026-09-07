@@ -31,7 +31,6 @@ import {
   RateLimiterMemory,
   RateLimiterMySQL,
   RateLimiterRedis,
-  RateLimiterUnion,
 } from "rate-limiter-flexible";
 import { logger } from "../../config/logger.js";
 

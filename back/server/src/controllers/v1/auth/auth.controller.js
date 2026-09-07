@@ -224,7 +224,7 @@ router.post(
     let decoded;
     try {
       decoded = verifyRefreshToken(refreshToken);
-    } catch (error) {
+    } catch (_error) {
       throw new APIError("Invalid or expired refresh token", 401, ERROR_CODES.TOKEN_INVALID);
     }
 

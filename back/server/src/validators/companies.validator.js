@@ -38,6 +38,23 @@ export const updateCompanySchema = z.object({
   status: emptyToUndefined(z.enum(COMPANY_STATUSES).optional()),
 });
 
+/**
+ * PUT /profile — the company's own branding and contact details.
+ *
+ * Separate from `updateCompanySchema` on purpose: this is the identity that
+ * invoice PDFs and customer emails render, not the platform-side subscription
+ * record, so it deliberately cannot touch `subscriptionPlan` or `status`.
+ */
+export const updateCompanyProfileSchema = z.object({
+  name: z.string().min(1, "Company name is required").max(100),
+  email: z.string().min(1, "Email is required").email("Invalid email address").max(100),
+  phone: optionalPhone(),
+  website: optionalString(255),
+  logoUrl: optionalString(255),
+  address: optionalString(500),
+  tin: optionalString(20),
+});
+
 // GET / — list query params (unset filters arrive as "", see _helpers.js)
 export const listCompaniesQuerySchema = z.object({
   page: queryInt(1),

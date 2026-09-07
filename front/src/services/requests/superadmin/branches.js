@@ -13,12 +13,15 @@ import {
   deleteBranchApi,
 } from "../../api/superadmin/branches";
 
-export const useGetBranches = (filters = {}) => {
+// `options` lets a caller gate the fetch (`{ enabled: false }`) — e.g. a drawer
+// that should not query until it is open and knows which company to ask about.
+export const useGetBranches = (filters = {}, options = {}) => {
   return useQuery({
     queryKey: ["superadmin-branches", filters],
     queryFn: () => getBranchesApi(filters),
     staleTime: 5 * 60 * 1000,
     placeholderData: keepPreviousData, // keep old rows visible while paginating/filtering
+    ...options,
   });
 };
 

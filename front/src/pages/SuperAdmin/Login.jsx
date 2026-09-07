@@ -2,7 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Mail, ShieldCheck } from "lucide-react";
+import { Mail } from "lucide-react";
 import { NavLink } from "react-router";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,9 +49,8 @@ const Login = () => {
   return (
     <AuthLayout portal="superadmin">
       <AuthHeading
-        icon={ShieldCheck}
-        title="SuperAdmin Access"
-        subtitle="Sign in with your superadmin credentials"
+        title="Welcome back"
+        subtitle="Sign in with your superadmin credentials."
       />
 
       <Form {...form}>
@@ -123,18 +122,6 @@ const Login = () => {
         </form>
       </Form>
 
-      <div
-        className="mt-7 pt-5 flex items-center justify-center gap-2"
-        style={{ borderTop: "1px solid var(--color-line)" }}
-      >
-        <ShieldCheck
-          className="w-3.5 h-3.5 shrink-0"
-          style={{ color: "var(--color-text-muted)" }}
-        />
-        <span style={{ fontSize: 12.5, color: "var(--color-text-muted)" }}>
-          Maximum security access
-        </span>
-      </div>
     </AuthLayout>
   );
 };

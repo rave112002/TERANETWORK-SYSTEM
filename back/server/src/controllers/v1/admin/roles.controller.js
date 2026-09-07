@@ -2,6 +2,7 @@ import express from "express";
 import { catchAsync, validateBody, validateQuery } from "../../../utils/catchAsync.js";
 import { getCurrentTimestampLocal } from "../../../utils/dateUtils.js";
 import { checkPermission } from "../../../middlewares/checkPermission.middleware.js";
+import { branchScope, getScopedBranchIds } from "../../../utils/branchScope.js";
 import {
   createRoleSchema,
   updateRoleSchema,
@@ -12,8 +13,27 @@ import {
 const router = express.Router();
 
 /**
+ * Resolve a role the caller is actually allowed to touch. Returns undefined
+ * when the role does not exist, belongs to another company, or sits in a branch
+ * outside the caller's assignment — all three are reported to the client as a
+ * plain 404 so role IDs cannot be probed.
+ *
+ * @returns {Promise<{roleId: string, branchId: string}|undefined>}
+ */
+const findScopedRole = async (req, roleId) => {
+  const scope = branchScope("branchId", getScopedBranchIds(req.user));
+  const [role] = await req.db.query(
+    `SELECT roleId, branchId FROM roles
+     WHERE roleId = ? AND companyId = ?${scope.clause} AND status != 'Deleted'
+     LIMIT 1`,
+    [roleId, req.user.companyId, ...scope.params]
+  );
+  return role;
+};
+
+/**
  * GET /
- * List all roles (scoped by companyId/branchId from authenticated user)
+ * List all roles (scoped to the authenticated user's company + assigned branches)
  */
 router.get(
   "/",
@@ -28,11 +48,11 @@ router.get(
       sortBy = "dateCreated",
       sortOrder = "DESC",
     } = req.query;
-    const { companyId, branchId } = req.user;
+    const { companyId } = req.user;
+    const scope = branchScope("r.branchId", getScopedBranchIds(req.user));
     const offset = (page - 1) * pageSize;
-    const params = [companyId, branchId];
-    let whereClause =
-      "WHERE r.companyId = ? AND r.branchId = ? AND r.status != 'Deleted' AND r.roleName != 'Owner'";
+    const params = [companyId, ...scope.params];
+    let whereClause = `WHERE r.companyId = ?${scope.clause} AND r.status != 'Deleted' AND r.roleName != 'Owner'`;
 
     if (search) {
       whereClause += ` AND (r.roleName LIKE ? OR r.description LIKE ?)`;
@@ -93,10 +113,12 @@ router.get(
   checkPermission("users", "roles", "read"),
   catchAsync(async (req, res) => {
     const { roleId } = req.params;
+    const { companyId } = req.user;
+    const scope = branchScope("branchId", getScopedBranchIds(req.user));
     const roles = await req.db.query(
       `SELECT roleId, companyId, branchId, roleName, description, status, dateCreated, dateUpdated
-       FROM roles WHERE roleId = ? AND status != 'Deleted' LIMIT 1`,
-      [roleId]
+       FROM roles WHERE roleId = ? AND companyId = ?${scope.clause} AND status != 'Deleted' LIMIT 1`,
+      [roleId, companyId, ...scope.params]
     );
 
     if (roles.length === 0) {
@@ -170,8 +192,12 @@ router.put(
     const { roleName, description, status } = req.body;
     const now = getCurrentTimestampLocal();
 
+    if (!(await findScopedRole(req, roleId))) {
+      return res.sendError("Role not found", 404);
+    }
+
     const result = await req.db.query(
-      `UPDATE roles 
+      `UPDATE roles
        SET roleName = ?, description = ?, status = ?, dateUpdated = ?
        WHERE roleId = ? AND status != 'Deleted'`,
       [roleName, description || null, status || "Active", now, roleId]
@@ -196,6 +222,10 @@ router.delete(
     const { roleId } = req.params;
     const now = getCurrentTimestampLocal();
 
+    if (!(await findScopedRole(req, roleId))) {
+      return res.sendError("Role not found", 404);
+    }
+
     const result = await req.db.query(
       `UPDATE roles SET status = 'Inactive', dateUpdated = ? WHERE roleId = ? AND status = 'Active'`,
       [now, roleId]
@@ -219,8 +249,12 @@ router.get(
   catchAsync(async (req, res) => {
     const { roleId } = req.params;
 
+    if (!(await findScopedRole(req, roleId))) {
+      return res.sendError("Role not found", 404);
+    }
+
     const permissions = await req.db.query(
-      `SELECT 
+      `SELECT
         rp.id,
         rp.roleId,
         rp.permissionId,
@@ -252,6 +286,10 @@ router.post(
     const { roleId } = req.params;
     const { permissions } = req.body;
     const now = getCurrentTimestampLocal();
+
+    if (!(await findScopedRole(req, roleId))) {
+      return res.sendError("Role not found", 404);
+    }
 
     let conn;
     try {

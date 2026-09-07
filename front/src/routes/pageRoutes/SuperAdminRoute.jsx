@@ -18,6 +18,9 @@ const Companies = lazy(
 const Branches = lazy(
   () => import("../../pages/SuperAdmin/CompanyManagement/Branches"),
 );
+const CompanyProfile = lazy(
+  () => import("../../pages/SuperAdmin/CompanyProfile"),
+);
 const SuperAdminUsers = lazy(() => import("../../pages/SuperAdmin/Users"));
 const SystemSettings = lazy(() => import("../../pages/SuperAdmin/Settings"));
 const AccountSettings = lazy(() => import("../../pages/Admin/AccountSettings"));
@@ -65,6 +68,18 @@ const SuperAdminRoute = () => {
           component: (
             <Suspense fallback={<ComponentLoader />}>
               <Branches />
+            </Suspense>
+          ),
+          isFilter: true,
+          isShow: true,
+        },
+        {
+          route: "/company-profile",
+          name: "Company Profile",
+          label: "Company Profile",
+          component: (
+            <Suspense fallback={<ComponentLoader />}>
+              <CompanyProfile />
             </Suspense>
           ),
           isFilter: true,

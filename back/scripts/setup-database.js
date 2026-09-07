@@ -55,31 +55,70 @@ async function main() {
     console.log("\n📋 Applying migrations...\n");
     await runMigrations(connection);
 
-    // Seed permissions (skipped when already seeded — setup is re-runnable)
+    // Seed permissions — one row at a time, and only when missing.
+    //
+    // This used to be all-or-nothing on `COUNT(*) > 0`, which broke as soon as
+    // migrations started inserting permissions of their own: runMigrations()
+    // runs FIRST, so a fresh install found the table non-empty and skipped
+    // every base permission — leaving an install with no dashboard, users,
+    // settings or audit-trail access, and no error to say so. Checking per row
+    // makes the seed agree with what the migrations already do.
     console.log("\n🔐 Seeding permissions...");
     const timestamp = now();
 
-    const [permCount] = await connection.query(`SELECT COUNT(*) as count FROM permissions`);
-    if (permCount[0].count > 0) {
-      console.log("   ⏭️  Permissions already seeded — skipping");
-    } else {
+    {
       const permissions = [
         { module: "dashboard", submodule: null, description: "Dashboard access" },
         { module: "users", submodule: "list", description: "Users list management" },
         { module: "users", submodule: "roles", description: "Roles management" },
         { module: "settings", submodule: null, description: "Settings management" },
         { module: "audit_trail", submodule: null, description: "Audit Trail access" },
+        // ── ISP domain ──
+        { module: "plans", submodule: null, description: "Service plans management" },
+        { module: "customers", submodule: null, description: "Subscribers management" },
+        { module: "network", submodule: "olts", description: "OLT devices" },
+        { module: "network", submodule: "pon_ports", description: "PON ports" },
+        { module: "network", submodule: "splitters", description: "Optical splitters" },
+        { module: "network", submodule: "naps", description: "Network access points" },
+        { module: "network", submodule: "onus", description: "Subscriber modems (ONUs)" },
+        { module: "network", submodule: "provisioning", description: "Activate and deactivate modems at the OLT" },
+        { module: "network", submodule: "action_logs", description: "Device command history" },
+        { module: "network", submodule: "topology", description: "Network topology and map" },
+        { module: "subscriptions", submodule: null, description: "Subscriptions management" },
+        { module: "system", submodule: null, description: "System settings and job queue" },
+
+        { module: "billing", submodule: "invoices", description: "Invoices — view, issue, void" },
+        { module: "billing", submodule: "payments", description: "Payments — record and reverse" },
+        { module: "billing", submodule: "adjustments", description: "Credits, discounts and one-off charges" },
+        { module: "billing", submodule: "cycle", description: "Run the monthly billing cycle" },
       ];
 
+      let inserted = 0;
       for (const perm of permissions) {
+        // submodule is NULLable, and `= NULL` never matches — the two shapes
+        // need different SQL.
+        const [existing] = await connection.query(
+          perm.submodule === null
+            ? `SELECT permissionId FROM permissions WHERE module = ? AND submodule IS NULL LIMIT 1`
+            : `SELECT permissionId FROM permissions WHERE module = ? AND submodule = ? LIMIT 1`,
+          perm.submodule === null ? [perm.module] : [perm.module, perm.submodule]
+        );
+        if (existing.length > 0) continue;
+
         const [uuidRow] = await connection.query(`SELECT UUID() as id`);
         await connection.query(
           `INSERT INTO permissions (permissionId, module, submodule, description, portal, status, dateCreated, dateUpdated)
            VALUES (?, ?, ?, ?, 'ADMIN', 'Active', ?, ?)`,
           [uuidRow[0].id, perm.module, perm.submodule, perm.description, timestamp, timestamp]
         );
+        inserted += 1;
       }
-      console.log(`   ✅ ${permissions.length} permissions seeded`);
+
+      console.log(
+        inserted > 0
+          ? `   ✅ ${inserted} permission(s) seeded (${permissions.length - inserted} already present)`
+          : "   ⏭️  All permissions already present"
+      );
     }
 
     // Seed superadmin (skipped when the account already exists)

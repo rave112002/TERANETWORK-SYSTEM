@@ -88,3 +88,51 @@ export const queryInt = (defaultValue, { min = 1, max } = {}) => {
   if (max !== undefined) schema = schema.max(max);
   return emptyToUndefined(schema.default(defaultValue));
 };
+
+/* ── Money & coordinates ────────────────────────────────────────────────────
+ * The ISP domain adds two field shapes the template did not have. Both are
+ * here rather than in each validator so the rules (and the error messages a
+ * customer-facing form shows) stay identical everywhere.
+ */
+
+/**
+ * A peso amount for a DECIMAL(12,2) column.
+ *
+ * Coerced, because an HTML number input posts a string. Capped at the column's
+ * real limit — DECIMAL(12,2) holds up to 9,999,999,999.99 — so an over-large
+ * value is a 400 with a readable message instead of a driver error. Rejects
+ * more than 2 decimal places rather than silently rounding someone's bill.
+ *
+ * @param {{ min?: number, required?: boolean }} [options]
+ */
+export const money = ({ min = 0, required = true } = {}) => {
+  const schema = z.coerce
+    .number({ error: "Must be a number" })
+    .min(min, `Must be at least ${min}`)
+    .max(9999999999.99, "Amount is too large")
+    .refine(
+      (v) => Number.isInteger(Math.round(v * 100)) && Math.abs(v * 100 - Math.round(v * 100)) < 1e-9,
+      "Use at most 2 decimal places",
+    );
+  return required ? schema : emptyToUndefined(schema.optional());
+};
+
+/** Optional latitude for a DECIMAL(10,7) column. */
+export const optionalLatitude = () =>
+  emptyToUndefined(
+    z.coerce
+      .number({ error: "Latitude must be a number" })
+      .min(-90, "Latitude must be between -90 and 90")
+      .max(90, "Latitude must be between -90 and 90")
+      .optional(),
+  );
+
+/** Optional longitude for a DECIMAL(10,7) column. */
+export const optionalLongitude = () =>
+  emptyToUndefined(
+    z.coerce
+      .number({ error: "Longitude must be a number" })
+      .min(-180, "Longitude must be between -180 and 180")
+      .max(180, "Longitude must be between -180 and 180")
+      .optional(),
+  );

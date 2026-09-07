@@ -1,0 +1,18 @@
+### show onu-info all — column layout VERIFIED (July 2026) ###
+#
+# Confirmed column ORDER (HSGQ-XE04I-CLI-Validation.md §7):
+#   PON/ONU  Mac-Address  Status  Auth  Cfg  Reg-time  ONU-Name  ONU-Desc
+#
+# The bench report listed the columns but not a raw multi-row dump, so the exact
+# spacing of Reg-time (date + time) and free-text ONU-Desc below is our best
+# reconstruction, used to develop + unit-test the parser. If a real capture
+# shows different spacing, drop it in as `show-onu-info-all.txt` and tune the
+# parser regexes. Lines starting with '#' are notes; the parser ignores the
+# command echo and header row.
+
+Tera-Network(config-epon-1)#show onu-info all
+PON/ONU  Mac-Address        Status   Auth  Cfg   Reg-time             ONU-Name   ONU-Desc
+1/27     30:c5:0f:d8:7f:2c  online   TRUE  TRUE  2000/03/17 13:46:51  ONU01/27   Jacqueline-Rebancos PON 2 NAP 1 PORT 5
+1/5      48:57:02:11:22:33  offline  TRUE  TRUE  2000/03/17 10:20:11  ONU01/05   Test-Customer PON 1 NAP 2 PORT 3
+1/12     a4:2b:b0:9c:11:e0  online   TRUE  FALSE 2000/03/17 09:01:02  ONU01/12
+Tera-Network(config-epon-1)#
