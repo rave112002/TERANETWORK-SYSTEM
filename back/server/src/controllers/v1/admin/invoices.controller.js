@@ -289,7 +289,7 @@ router.get(
         [invoice.invoiceId]
       ),
       req.db.query(
-        `SELECT paymentId, amount, channel, xenditPaymentId, recordedBy, paidAt, notes
+        `SELECT paymentId, amount, channel, provider, providerPaymentId, recordedBy, paidAt, notes
            FROM payments WHERE invoiceId = ? ORDER BY paidAt DESC`,
         [invoice.invoiceId]
       ),

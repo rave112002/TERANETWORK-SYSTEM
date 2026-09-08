@@ -31,6 +31,7 @@ const System = lazy(() => import("../../pages/Admin/System"));
 const Invoices = lazy(() => import("../../pages/Admin/Billing/Invoices"));
 const Payments = lazy(() => import("../../pages/Admin/Billing/Payments"));
 const Adjustments = lazy(() => import("../../pages/Admin/Billing/Adjustments"));
+const Dunning = lazy(() => import("../../pages/Admin/Billing/Dunning"));
 
 const AdminRoute = () => {
   const navigations = [
@@ -196,6 +197,7 @@ const AdminRoute = () => {
           { module: "billing", submodule: "invoices", accessLevel: "read" },
           { module: "billing", submodule: "payments", accessLevel: "read" },
           { module: "billing", submodule: "adjustments", accessLevel: "read" },
+          { module: "billing", submodule: "dunning", accessLevel: "read" },
         ],
       },
       isFilter: true,
@@ -253,6 +255,25 @@ const AdminRoute = () => {
           permission: {
             module: "billing",
             submodule: "adjustments",
+            accessLevel: "read",
+          },
+          isFilter: true,
+          isShow: true,
+        },
+        {
+          route: "/dunning",
+          name: "Dunning",
+          label: "Dunning",
+          component: (
+            <Suspense fallback={<ComponentLoader />}>
+              <ProtectedRoute module="billing" submodule="dunning" accessLevel="read">
+                <Dunning />
+              </ProtectedRoute>
+            </Suspense>
+          ),
+          permission: {
+            module: "billing",
+            submodule: "dunning",
             accessLevel: "read",
           },
           isFilter: true,

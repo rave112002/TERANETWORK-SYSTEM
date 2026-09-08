@@ -7,7 +7,7 @@ import QRCode from "qrcode";
  *
  * Always this system's own `/pay/<token>` URL, never a payment gateway's link.
  *
- * A gateway payment link expires — Xendit's default is 24 hours, and an invoice
+ * A gateway payment link expires — a day is typical — and an invoice
  * is issued on the 15th and due on the 2nd. A QR printed on a statement will be
  * scanned by somebody on the 30th, and it has to work. Pointing at our page
  * means the token stays valid for the life of the invoice and the page decides

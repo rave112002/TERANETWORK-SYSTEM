@@ -105,3 +105,34 @@ export const deleteAdjustmentApi = async (pendingChargeId) => {
   const response = await api.delete(`/api/v1/admin/adjustments/${pendingChargeId}`);
   return response.data;
 };
+
+/* ── Dunning ────────────────────────────────────────────────────────────── */
+
+export const getAtRiskApi = async () => {
+  const response = await api.get("/api/v1/admin/dunning/at-risk");
+  return response.data;
+};
+
+/** @param {{runDate?: string}} body */
+export const runDunningSweepApi = async (body = {}) => {
+  const response = await api.post("/api/v1/admin/dunning/sweep", body);
+  return response.data;
+};
+
+export const getExemptionsApi = async (filters = {}) => {
+  const response = await api.get("/api/v1/admin/dunning/exemptions", { params: filters });
+  return response.data;
+};
+
+/** @param {{subscriptionId: string, reason: string, expiresAt: string}} data */
+export const createExemptionApi = async (data) => {
+  const response = await api.post("/api/v1/admin/dunning/exemptions", data);
+  return response.data;
+};
+
+export const revokeExemptionApi = async (exemptionId, reason) => {
+  const response = await api.post(`/api/v1/admin/dunning/exemptions/${exemptionId}/revoke`, {
+    reason,
+  });
+  return response.data;
+};

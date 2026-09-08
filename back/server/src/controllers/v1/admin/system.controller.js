@@ -2,6 +2,7 @@ import express from "express";
 
 import { catchAsync, validateBody, validateQuery } from "../../../utils/catchAsync.js";
 import { checkPermission } from "../../../middlewares/checkPermission.middleware.js";
+import { gatewayStatus } from "../../../lib/payment-gateways/index.js";
 import { branchScope, getScopedBranchIds } from "../../../utils/branchScope.js";
 import { getAuditContext, writeAudit } from "../../../utils/audit.js";
 import { getAllSettings, setSetting } from "../../../lib/settings/settings.service.js";
@@ -113,6 +114,27 @@ router.put(
       throw err;
     }
   })
+);
+
+/**
+ * GET /payment-gateway
+ *
+ * Which gateway is collecting, and whether it is pointed at test credentials.
+ *
+ * A read, and only a read. The provider and its keys come from the environment
+ * — see lib/payment-gateways/index.js for why they cannot live in
+ * `system_settings` — so this screen reports the deployment rather than
+ * configuring it. Reporting it still matters: "are we live?" should be
+ * answerable without SSH access, and `testMode: null` (an unrecognised key
+ * prefix) must be shown as unknown rather than rounded to the comfortable
+ * answer.
+ */
+router.get(
+  "/payment-gateway",
+  checkPermission("system", null, "read"),
+  catchAsync(async (req, res) =>
+    res.sendSuccess("Payment gateway status", { gateway: gatewayStatus() })
+  )
 );
 
 /**

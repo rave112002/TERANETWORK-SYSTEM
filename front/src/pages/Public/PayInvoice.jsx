@@ -1,10 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import { useParams } from "react-router";
+import { useParams, useSearchParams } from "react-router";
 import { CircleCheck, Download, FileText, TriangleAlert } from "lucide-react";
 import dayjs from "dayjs";
 
 import { Button } from "@/components/ui/button";
 
+import PaymentSection from "./components/PaymentSection";
 import Spinner from "../../components/Spinner";
 import { formatPeso } from "../../utils/currency";
 
@@ -63,11 +64,17 @@ const STATUS_COPY = {
 
 const PayInvoice = () => {
   const { token } = useParams();
+  // Set when a mock checkout sends the customer back here. A real gateway
+  // returns them to the same page with no parameter, so this is simply absent
+  // in any deployment taking real money.
+  const [searchParams] = useSearchParams();
+  const simulateRef = searchParams.get("simulate");
 
   const {
     data: invoice,
     error,
     isLoading: loading,
+    refetch,
   } = useQuery({
     queryKey: ["public-invoice", token],
     queryFn: () => fetchPublicInvoice(token),
@@ -215,41 +222,16 @@ const PayInvoice = () => {
           )}
 
           {isPayable && (
-            <div className="px-7 py-6" style={{ borderTop: status ? "none" : "1px solid var(--color-line)" }}>
-              {/* Online payment arrives with the gateway integration. Until
-                  then this says what to do instead — a dead "Pay now" button
-                  would be worse than none. */}
-              <div
-                className="px-4 py-4 text-center"
-                style={{
-                  borderRadius: 10,
-                  border: "1px dashed var(--color-line)",
-                }}
-              >
-                <p
-                  className="m-0"
-                  style={{ fontSize: 13.5, color: "var(--color-text-secondary)" }}
-                >
-                  Online payment is not enabled yet.
-                </p>
-                <p
-                  className="m-0 mt-1.5"
-                  style={{ fontSize: 13, color: "var(--color-text-muted)" }}
-                >
-                  Please settle this at the office, or contact{" "}
-                  {invoice.companyEmail ? (
-                    <a
-                      href={`mailto:${invoice.companyEmail}`}
-                      style={{ color: "var(--color-link)" }}
-                    >
-                      {invoice.companyEmail}
-                    </a>
-                  ) : (
-                    "your provider"
-                  )}
-                  {invoice.companyPhone ? ` or ${invoice.companyPhone}` : ""}.
-                </p>
-              </div>
+            <div
+              className="px-7 py-6"
+              style={{ borderTop: status ? "none" : "1px solid var(--color-line)" }}
+            >
+              <PaymentSection
+                token={token}
+                invoice={invoice}
+                simulateRef={simulateRef}
+                onSettled={refetch}
+              />
             </div>
           )}
 

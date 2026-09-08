@@ -761,9 +761,6 @@ CREATE TABLE IF NOT EXISTS invoices (
   -- payment link expires, and a customer paying weeks late still lands
   -- somewhere useful.
   publicToken CHAR(32) NOT NULL UNIQUE,
-  xenditRef VARCHAR(64) NULL UNIQUE,
-  xenditPaymentUrl VARCHAR(512) NULL,
-  xenditExpiresAt DATETIME NULL,
   pdfPath VARCHAR(255) NULL,
   issuedAt DATETIME NULL,
   paidAt DATETIME NULL,
@@ -802,7 +799,7 @@ CREATE TABLE IF NOT EXISTS invoice_lines (
 
 -- ── Payments ────────────────────────────────────────────────────────────────
 --
--- `uq_payments_xendit (xenditPaymentId)` is the webhook idempotency guard: the
+-- `providerPaymentId`'s unique index is the webhook idempotency guard: the
 -- gateway retries on any non-2xx, so the same payment WILL arrive more than
 -- once. NULL for cash and over-the-counter entries, which is why it is a unique
 -- index on a nullable column rather than a unique NOT NULL one.
@@ -819,7 +816,10 @@ CREATE TABLE IF NOT EXISTS payments (
   amount DECIMAL(12,2) NOT NULL,
   -- GCASH, MAYA, QRPH, CARD, CASH, BANK_TRANSFER…
   channel VARCHAR(40) NOT NULL,
-  xenditPaymentId VARCHAR(64) NULL UNIQUE,
+  -- Which gateway a payment came through, so revenue stays attributable after
+  -- a switch and two gateways can run side by side during one. NULL for cash.
+  provider VARCHAR(32) NULL,
+  providerPaymentId VARCHAR(64) NULL UNIQUE,
   -- Set for manual entries, so "who took this cash?" is answerable.
   recordedBy VARCHAR(50) NULL,
   paidAt DATETIME NOT NULL,
@@ -897,4 +897,158 @@ CREATE TABLE IF NOT EXISTS email_events (
   INDEX idx_email_events_customer (customerId, type),
   CONSTRAINT fk_email_events_company  FOREIGN KEY (companyId)  REFERENCES companies(companyId),
   CONSTRAINT fk_email_events_customer FOREIGN KEY (customerId) REFERENCES customers(customerId)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- PAYMENT GATEWAY
+--
+-- Nothing here names a vendor. The gateway is chosen at runtime by
+-- PAYMENT_PROVIDER and implemented behind the port in
+-- server/src/lib/payment-gateways/ — adding one is a new adapter file, not a
+-- schema change on a table holding payment history.
+-- ============================================================================
+
+-- ── Payment attempts ────────────────────────────────────────────────────────
+--
+-- One row per time we asked a gateway to collect an invoice.
+--
+-- Several attempts per invoice is normal, not exceptional: a link expires
+-- before the customer pays, they abandon GCash and come back to try a card, or
+-- the ISP changes provider mid-month. Keeping only the newest would throw away
+-- the answer to "what did we actually send them, and when".
+--
+-- `UNIQUE(provider, providerRef)` is the create-idempotency guard. A retried
+-- job or a double-clicked Pay button must not open two payment sessions for one
+-- bill — a customer who pays both is owed a refund, which is a conversation
+-- nobody wants to have.
+CREATE TABLE IF NOT EXISTS payment_attempts (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  paymentAttemptId VARCHAR(50) NOT NULL UNIQUE,
+  companyId VARCHAR(50) NOT NULL,
+  branchId VARCHAR(50) NOT NULL,
+  invoiceId VARCHAR(50) NOT NULL,
+  -- 'mock', 'xendit', 'paymongo', 'dragonpay', … Deliberately a VARCHAR and
+  -- not an ENUM: adding a gateway should be a new adapter file, not a schema
+  -- migration on a table holding payment history.
+  provider VARCHAR(32) NOT NULL,
+  -- What we sent the gateway as our own reference — the invoice number. It is
+  -- what comes back on the webhook and how the payment finds its invoice again.
+  reference VARCHAR(64) NOT NULL,
+  -- The gateway's id for this attempt. NULL only in the moment between
+  -- inserting the row and the API answering.
+  providerRef VARCHAR(128) NULL,
+  amount DECIMAL(12,2) NOT NULL,
+  paymentUrl VARCHAR(512) NULL,
+  status ENUM('pending','paid','failed','expired','cancelled') NOT NULL DEFAULT 'pending',
+  expiresAt DATETIME NULL,
+  failureReason VARCHAR(255) NULL,
+  -- The gateway's create response, verbatim. When a link misbehaves months
+  -- later this is the only record of what it actually returned.
+  rawResponse JSON NULL,
+  dateCreated DATETIME NOT NULL,
+  dateUpdated DATETIME NOT NULL,
+  UNIQUE KEY uq_payment_attempts_ref (provider, providerRef),
+  INDEX idx_payment_attempts_invoice (invoiceId, status),
+  INDEX idx_payment_attempts_tenant (companyId, branchId, dateCreated),
+  CONSTRAINT fk_payment_attempts_company FOREIGN KEY (companyId) REFERENCES companies(companyId),
+  CONSTRAINT fk_payment_attempts_branch  FOREIGN KEY (branchId)  REFERENCES branches(branchId),
+  CONSTRAINT fk_payment_attempts_invoice FOREIGN KEY (invoiceId) REFERENCES invoices(invoiceId)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ── Webhook events ──────────────────────────────────────────────────────────
+--
+-- Every callback a gateway sends us, recorded before it is acted on.
+--
+-- `UNIQUE(provider, eventId)` is the replay guard, and it is an index rather
+-- than a check-then-insert because gateways retry on any non-2xx and two
+-- retries can arrive in the same millisecond. Only one can win a unique key.
+--
+-- The subtlety that makes this table work: a duplicate is NOT the same as
+-- "already handled". If a previous attempt recorded the event and then crashed,
+-- `processedAt` is still NULL and the gateway's retry must be allowed through —
+-- otherwise the row written for safety permanently blocks the retry that would
+-- have fixed it.
+--
+-- No tenant columns and no foreign keys: a callback can arrive for an invoice
+-- that does not exist, from a provider we no longer use, or fail verification
+-- entirely. All three still need recording. This is an operations log, and it
+-- must be able to hold the evidence of things going wrong.
+CREATE TABLE IF NOT EXISTS webhook_events (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  webhookEventId VARCHAR(50) NOT NULL UNIQUE,
+  provider VARCHAR(32) NOT NULL,
+  -- The gateway's own event or payment id, whatever it gives us to deduplicate
+  -- on. 190 chars so the composite unique key fits in utf8mb4.
+  eventId VARCHAR(190) NOT NULL,
+  eventType VARCHAR(80) NULL,
+  -- Our invoice number as it came back, before it is resolved to an invoice.
+  reference VARCHAR(64) NULL,
+  invoiceId VARCHAR(50) NULL,
+  -- Recorded, not enforced: a rejected callback is exactly the event worth
+  -- keeping, because a run of them is either a misconfiguration or somebody
+  -- probing the endpoint.
+  signatureVerified TINYINT(1) NOT NULL DEFAULT 0,
+  payload JSON NULL,
+  processedAt DATETIME NULL,
+  processError TEXT NULL,
+  dateCreated DATETIME NOT NULL,
+  UNIQUE KEY uq_webhook_events_event (provider, eventId),
+  INDEX idx_webhook_events_unprocessed (processedAt, dateCreated),
+  INDEX idx_webhook_events_reference (reference)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- DUNNING
+--
+-- The sweep itself holds no state — it reads invoices and subscriptions and
+-- writes job tickets. This is the one table it needs: the human override.
+-- ============================================================================
+
+-- ── Dunning exemptions ──────────────────────────────────────────────────────
+--
+-- "Do not auto-disconnect this subscription until <date>, because <reason>."
+--
+-- This table exists for the situations no rule anticipates: a disputed bill, a
+-- promise to pay on Friday, a barangay office on a 30-day purchase-order cycle,
+-- a customer whose payment is provably in transit. Without it, staff work around
+-- the system — by editing due dates, or by leaving the sweep switched off for
+-- everyone because of one account.
+--
+-- ── Both NOT NULL, deliberately ─────────────────────────────────────────────
+--
+-- `reason` is required and must be more than a couple of characters, because
+-- "why is this customer four months overdue and still connected?" has to have
+-- an answer with a name attached. An exemption with a blank reason is
+-- indistinguishable from a mistake.
+--
+-- `expiresAt` is required because an exemption with no end date is not an
+-- exemption, it is a silent permanent discount that nobody revisits. Staff who
+-- genuinely need longer can renew it — which puts the decision back in front of
+-- a person on a schedule.
+--
+-- Rows are never deleted, only revoked. "This customer was shielded from
+-- disconnection for six weeks last year, by whom, and why" is exactly the
+-- question an audit asks.
+CREATE TABLE IF NOT EXISTS dunning_exemptions (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  exemptionId VARCHAR(50) NOT NULL UNIQUE,
+  companyId VARCHAR(50) NOT NULL,
+  branchId VARCHAR(50) NOT NULL,
+  subscriptionId VARCHAR(50) NOT NULL,
+  reason VARCHAR(255) NOT NULL,
+  expiresAt DATETIME NOT NULL,
+  createdBy VARCHAR(50) NULL,
+  revokedBy VARCHAR(50) NULL,
+  revokedAt DATETIME NULL,
+  revokeReason VARCHAR(255) NULL,
+  status ENUM('Active','Revoked') NOT NULL DEFAULT 'Active',
+  dateCreated DATETIME NOT NULL,
+  dateUpdated DATETIME NOT NULL,
+  -- The index the sweep's NOT EXISTS subquery rides on. It runs once per
+  -- candidate row every night, so it must not be a table scan.
+  INDEX idx_dunning_exemptions_live (subscriptionId, status, expiresAt),
+  INDEX idx_dunning_exemptions_tenant (companyId, branchId, status),
+  CONSTRAINT fk_dunning_exemptions_company      FOREIGN KEY (companyId)      REFERENCES companies(companyId),
+  CONSTRAINT fk_dunning_exemptions_branch       FOREIGN KEY (branchId)       REFERENCES branches(branchId),
+  CONSTRAINT fk_dunning_exemptions_subscription FOREIGN KEY (subscriptionId) REFERENCES subscriptions(subscriptionId)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

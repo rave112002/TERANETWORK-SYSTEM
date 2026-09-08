@@ -3,6 +3,7 @@ import cron from "node-cron";
 import { logger } from "../../../config/logger.js";
 import { runDailyBilling } from "../billing/reminders.service.js";
 import { runMonthlyCycle } from "../billing/cycle.service.js";
+import { runDunningSweep } from "../dunning/dunning.service.js";
 import { systemAuditContext } from "../../utils/audit.js";
 
 /**
@@ -26,10 +27,9 @@ import { systemAuditContext } from "../../utils/audit.js";
  * anything that emails customers should land in an inbox during office hours,
  * and a failure at 09:00 is noticed the same day rather than the next.
  *
- * Disconnection is not scheduled here. Cutting off a customer is the dunning
- * sweep's job, it happens after a grace period, and it goes through the device
- * queue — keeping it out of this file is what stops a scheduling change
- * accidentally disconnecting people.
+ * The dunning sweep runs at 20:00, late enough that a payment made during the
+ * working day has landed, and early enough that somebody is still around when
+ * it goes wrong. It queues disconnections; it does not perform them.
  */
 
 /**
@@ -41,6 +41,15 @@ export const CYCLE_CRON = process.env.BILLING_CYCLE_CRON || "0 9 15 * *";
 
 /** The overdue sweep, then due reminders. */
 export const DAILY_CRON = process.env.DAILY_BILLING_CRON || "0 8 * * *";
+
+/**
+ * The disconnection sweep, nightly.
+ *
+ * 20:00 by default: after the day's payments have had time to land, and while
+ * somebody is still awake to notice if it queues a hundred disconnections when
+ * it should have queued three.
+ */
+export const DUNNING_CRON = process.env.DUNNING_CRON || "0 20 * * *";
 
 const TZ = process.env.TIMEZONE || "Asia/Manila";
 
@@ -104,6 +113,53 @@ export const runScheduledCycle = async (db, { runDate = new Date() } = {}) => {
  * @param {Object} [opts]
  * @returns {Promise<Object>}
  */
+/**
+ * Run the disconnection sweep for every active company.
+ *
+ * Queues job tickets and nothing more. The provisioning worker performs the
+ * device work, re-checks the debt immediately beforehand, and honours DRY_RUN.
+ *
+ * @param {Object} db
+ * @param {Object} [opts]
+ * @returns {Promise<Array>} one summary per company.
+ */
+export const runScheduledDunning = async (db, { runDate = new Date() } = {}) => {
+  const companies = await activeCompanies(db);
+  const summaries = [];
+
+  for (const company of companies) {
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const result = await runDunningSweep(db, {
+        runDate,
+        companyId: company.companyId,
+        triggeredBy: "system:dunning",
+      });
+
+      summaries.push({ companyId: company.companyId, ...result });
+
+      // Warning, not info: this is the system preparing to cut people off, and
+      // a run that queues an unexpected number is the thing worth noticing in a
+      // log at eight in the evening.
+      if (result.queued > 0) {
+        logger.warn(
+          `[scheduler] dunning for ${company.name}: ${result.queued} disconnect(s) queued, ` +
+            `${result.deduped} already pending${result.dryRun ? " [DRY RUN]" : ""}`
+        );
+      } else {
+        logger.info(`[scheduler] dunning for ${company.name}: nobody eligible`);
+      }
+    } catch (error) {
+      // Loud. A sweep that silently fails is a month of unpaid customers
+      // staying connected, discovered when somebody looks at the revenue.
+      logger.error(`🚨 [scheduler] dunning sweep failed for ${company.name}: ${error.message}`);
+      summaries.push({ companyId: company.companyId, error: error.message });
+    }
+  }
+
+  return summaries;
+};
+
 export const runScheduledDaily = async (db, { runDate = new Date() } = {}) => {
   const result = await runDailyBilling(db, {
     runDate,
@@ -150,14 +206,35 @@ export const startScheduler = (db) => {
     options
   );
 
-  logger.info(`[scheduler] billing cycle '${CYCLE_CRON}' and daily '${DAILY_CRON}' (${TZ})`);
+  const dunningTask = cron.schedule(
+    DUNNING_CRON,
+    () => {
+      runScheduledDunning(db).catch((error) =>
+        logger.error(`🚨 [scheduler] dunning sweep crashed: ${error.message}`)
+      );
+    },
+    options
+  );
+
+  logger.info(
+    `[scheduler] cycle '${CYCLE_CRON}', daily '${DAILY_CRON}', dunning '${DUNNING_CRON}' (${TZ})`
+  );
 
   return {
     stop: () => {
       cycleTask.stop();
       dailyTask.stop();
+      dunningTask.stop();
     },
   };
 };
 
-export default { CYCLE_CRON, DAILY_CRON, startScheduler, runScheduledCycle, runScheduledDaily };
+export default {
+  CYCLE_CRON,
+  DAILY_CRON,
+  DUNNING_CRON,
+  startScheduler,
+  runScheduledCycle,
+  runScheduledDaily,
+  runScheduledDunning,
+};

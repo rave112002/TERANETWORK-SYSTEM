@@ -91,6 +91,7 @@ async function main() {
         { module: "billing", submodule: "payments", description: "Payments — record and reverse" },
         { module: "billing", submodule: "adjustments", description: "Credits, discounts and one-off charges" },
         { module: "billing", submodule: "cycle", description: "Run the monthly billing cycle" },
+        { module: "billing", submodule: "dunning", description: "Disconnection sweep and exemptions" },
       ];
 
       let inserted = 0;

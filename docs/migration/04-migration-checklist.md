@@ -19,8 +19,8 @@
 | **S5** | Settings + jobs queue + worker | ✅ complete |
 | **S6** | OLT drivers + provisioning | ✅ complete |
 | **S7** | Billing | ✅ complete |
-| S8 | Xendit | ⬜ |
-| S9 | Dunning | ⬜ |
+| **S8** | Payment gateway | 🟡 port complete — adapter pending the client's choice |
+| **S9** | Dunning | ✅ complete |
 | S10 | Discovery | ⬜ |
 | S11 | Phase-6 surface | ⬜ |
 
@@ -765,6 +765,252 @@ button.
 
 ---
 
+## S8 — Payment gateway (port complete, adapter pending) 🟡
+
+The client asked to evaluate Philippine gateways other than Xendit before
+committing, so this stage built everything that does **not** depend on which one
+they pick. The provider-specific half is one file whenever the answer arrives.
+
+### What changed about the plan
+
+The plan named this stage "Xendit". That was an assumption, and migration 007
+had already baked it into four column names. Since the tables were empty, the
+first thing S8 did was un-name the vendor — free now, a data migration against
+live payment history later.
+
+### Built
+
+| # | Item | File |
+| --- | --- | --- |
+| 1 | The port contract, drawn against three providers | `back/server/src/lib/payment-gateways/gateway.interface.js` |
+| 2 | Currency-unit conversion | `back/server/src/lib/payment-gateways/amounts.js` (+ 15 tests) |
+| 3 | Mock gateway — a working gateway, not a stub | `back/server/src/lib/payment-gateways/mock.gateway.js` (+ 28 tests) |
+| 4 | Resolver, registry and status | `back/server/src/lib/payment-gateways/index.js` |
+| 5 | Adapter-writing guide | `back/server/src/lib/payment-gateways/README.md` |
+| 6 | Checkout creation and attempt reuse | `back/server/src/lib/payments/payment.service.js` |
+| 7 | Callback processing, replay guard, reconnection | `back/server/src/lib/payments/webhook.service.js` |
+| 8 | Webhook endpoint, one per provider slug | `back/server/src/controllers/v1/public/webhooks.controller.js` |
+| 9 | `POST /pay` and the mock simulator | `back/server/src/controllers/v1/public/pay.controller.js` |
+| 10 | Raw-body capture for signature verification | `back/server/config/express.js` |
+| 11 | Un-named columns, `payment_attempts`, `webhook_events` | `back/database/schema.sql`, migration `008` |
+| 12 | Gateway status for the settings screen | `back/server/src/controllers/v1/admin/system.controller.js` |
+| 13 | The Pay button, and the mock checkout | `front/src/pages/Public/components/PaymentSection.jsx` |
+
+### The five things that differ between gateways
+
+The contract was drawn against Xendit, PayMongo and Dragonpay together, because
+a port shaped around one vendor inherits that vendor's model and stops fitting
+the second. They disagree in every place a naive interface would assume
+agreement:
+
+| | Xendit | PayMongo | Dragonpay |
+| --- | --- | --- | --- |
+| Amount unit | whole pesos (`1200`) | centavos (`120000`) | decimal string (`"1200.00"`) |
+| Callback body | JSON, snake_case | JSON, JSON:API nesting | **form-encoded** |
+| Authentication | static header token | HMAC-SHA256 over `` `${t}.${rawBody}` `` | SHA1 digest of concatenated fields |
+| Paid status | `PAID` / `SETTLED` | `link.payment.paid` | `S` |
+| Our reference | `externalId` | `remarks` / metadata | `txnid` |
+
+Three consequences the contract had to carry:
+
+1. **Verification receives the raw bytes.** A signature is computed over exactly
+   what was sent, and this app's `sanitizeMiddleware` rewrites `req.body` before
+   any controller sees it. `express.js` now stashes the untouched buffer.
+2. **Adapters normalise statuses** into `paid` / `failed` / `expired` /
+   `pending` / `unknown`. Nothing outside an adapter ever compares a provider's
+   string.
+3. **Amount conversion happens at the boundary**, through `amounts.js`, never in
+   billing code.
+
+### Decisions worth knowing before touching this code
+
+| Rule | Why |
+| --- | --- |
+| **Never write `* 100`.** | Xendit takes whole pesos, PayMongo takes centavos — a hundredfold error in opposite directions, and nothing downstream catches it. `settleInvoice()` requires an exact match, so an underpaid invoice stays unpaid and the customer stays disconnected *after paying*. `toWholePesos()` throws on a fraction rather than rounding, because rounding hides exactly that mistake. |
+| **Idempotency lives in `payment_attempts`, not in the adapter.** | Xendit can be asked "did I already create this?"; PayMongo cannot; Dragonpay keys on a txnid we choose. Relying on the provider would put the guarantee at the mercy of whoever is collecting this month. An open attempt is reused, which works identically for all three. |
+| **`verifyWebhook` fails closed.** | With no key configured it rejects everything. "We haven't set it up yet" is precisely when an endpoint that accepts unsigned callbacks becomes a reconnect-yourself-for-free button. |
+| **Signatures compare in constant time.** | `===` returns as soon as two bytes differ — measurably faster for a wrong first byte, which is enough to recover a signature one byte at a time. Both sides are hashed first, which also guarantees the equal lengths `timingSafeEqual` demands, so a malformed header cannot crash the endpoint. |
+| **Rejected callbacks are recorded before being rejected.** | A run of failures is either a misconfiguration or somebody probing, and neither is visible if rejected callbacks leave no trace. |
+| **A duplicate event is not the same as a handled one.** | If an earlier attempt recorded an event then crashed, `processedAt` is still NULL and the retry must be allowed through — otherwise the row written for safety permanently blocks the retry that fixes it. |
+| **The status code is a control signal, not a formality.** | 200 = stop sending, 401 = signature failed, stop sending, 500 = we failed, please resend. Answering 200 on an internal error loses the payment silently and nothing ever asks again. |
+| **The gateway is called before the attempt row is written.** | A row claiming a checkout that was never opened would be reused forever, handing the customer a dead link every time. A gateway session with no row is merely wasted. Of the two ways to be inconsistent, only one is recoverable. |
+| **Credentials come from the environment, not `system_settings`.** | A callback arrives before we know whose it is. Verifying it needs the secret, finding the company needs the invoice, finding the invoice needs the verified payload — circular. The usual escape, trying every tenant's key, is an oracle that tells an attacker when they have guessed a valid one. |
+| **The invoice's cached payment-link columns were dropped.** | They were a copy of the newest attempt, and a copy is a second thing that can be wrong once a link expires or the gateway changes. One indexed read cannot disagree with itself. |
+| **Two gateways can run at once.** | `payments.provider` records which one took each payment. Changing provider does not have to mean migrating — point new subscribers at the new gateway and let the old one drain. |
+
+### The mock is a working gateway, not a stub
+
+It keeps its money in memory, and otherwise behaves like an awkward real
+provider: it speaks **centavos** (so a conversion bug fails on a laptop rather
+than against a live card), signs its callbacks with HMAC-SHA256 over the raw
+body (so the raw-body plumbing is exercised rather than assumed), fails closed
+without a secret, and refuses to open a second session for a reference that
+already has a live one.
+
+Its simulator does not settle anything itself. It builds the callback a gateway
+would send, signature and all, and the page POSTs that at the *real* webhook
+endpoint — so a simulated payment travels through verification, the replay
+guard, settlement and reconnection rather than around them. A shortcut that set
+`status = 'paid'` directly would prove nothing.
+
+The simulate endpoint returns 404 unless the mock is the active provider, so it
+cannot exist in a deployment taking real money.
+
+### Verified
+
+**239 unit tests** across 12 files (43 new: 15 amount-conversion, 28 port).
+
+**44 e2e assertions, all passing**, against the running API with the mock active:
+
+| Area | What it proved |
+| --- | --- |
+| Payability | the server decides whether a Pay button exists, names the provider, and flags test mode |
+| Checkout | opens; a second click reuses the same session rather than opening a second one; an unknown token cannot open one |
+| Rejection | unsigned, wrongly signed and tampered callbacks all rejected 401; unknown provider 404; **none of them settled anything** |
+| Payment | a properly signed callback settles the invoice, records the payment attributed to the provider with its payment id and the channel used, and the public page flips to paid and stops offering to pay |
+| Replay | a repeated callback returns 200 and records **no second payment** |
+| Ledger | the payment appears named by provider, with no staff member attached |
+
+The audit tables were inspected afterwards: three `signature_failed` rows with
+`signatureVerified = 0` and `processedAt` NULL, one verified event processed,
+and exactly one `payment_attempts` row despite two Pay clicks.
+
+### What is left for the real adapter
+
+One file implementing five methods, one line in `index.js`, and its env keys.
+`README.md` in that folder is the checklist — the comparison table above, the
+rules, and the test cases to copy. Roughly a day once sandbox credentials exist.
+
+The remaining Xendit-specific knowledge worth keeping from V2, now recorded in
+`amounts.js`: `amount: 4999` with `currency: 'PHP'` renders as PHP 4,999.00 on a
+live Xendit checkout — confirmed against a real sandbox invoice, and not
+inferable from their docs, whose examples are all IDR.
+
+---
+
+## S9 — Dunning ✅
+
+The join of billing, payments and provisioning, and the stage where a bug costs
+the most: the failure mode is cutting off a customer who has paid.
+
+### Built
+
+| # | Item | File |
+| --- | --- | --- |
+| 1 | The sweep, the candidate query, the eligibility re-check, the at-risk view | `back/server/src/lib/dunning/dunning.service.js` (+ 25 tests) |
+| 2 | The payment re-check wired into the worker's Gate 3 | `back/server/src/lib/jobs/processors/provisioning.processor.js` |
+| 3 | `dunning_exemptions` + the `billing/dunning` permission | `back/database/schema.sql`, migration `009` |
+| 4 | At-risk, sweep, exemption grant and revoke | `back/server/src/controllers/v1/admin/dunning.controller.js` |
+| 5 | Validators, including the 365-day cap | `back/server/src/validators/dunning.validator.js` |
+| 6 | The nightly 20:00 sweep | `back/server/src/lib/scheduler/scheduler.js` |
+| 7 | The Dunning screen | `front/src/pages/Admin/Billing/Dunning/` |
+
+### The safety design, which is the whole point of this stage
+
+**The sweep does not disconnect anybody.** It reads invoices and writes job
+tickets. The provisioning worker does the device work, re-checks the debt
+immediately beforehand, honours DRY_RUN, and is the only thing that ever flips a
+subscription to `suspended` — in the same transaction as the device's confirmed
+reply.
+
+That split is what makes the system safe to be wrong in. A sweep that
+disconnected directly would have to be correct at the instant it runs. This one
+only has to be right about who is *worth asking about*, and the worker asks
+again.
+
+**The candidate query is a list of reasons not to disconnect somebody.** Every
+condition exists because of a specific failure:
+
+| Condition | Prevents |
+| --- | --- |
+| `i.status IN ('issued','overdue')` | disconnecting somebody who has paid |
+| `i.dueDate <= today - grace` | disconnecting on the due date itself |
+| `s.status = 'active'` | re-disconnecting the already-suspended |
+| `NOT EXISTS (live exemption)` | overriding a staff decision to wait |
+| `s.onuId IS NOT NULL` | queuing device work with no device |
+
+### The race, and the guard that was missing
+
+Before this stage the worker's precondition check only asked whether the
+subscription was still `active`. It never re-checked whether the customer had
+**paid**. That left a real window open:
+
+```
+20:00:00  the sweep queues a disconnect
+20:00:05  the worker claims it — status is now 'processing'
+20:00:30  the customer pays; the webhook's cancel finds nothing to cancel,
+          because cancellation can only touch jobs still 'queued'
+20:01:00  the worker reaches the device
+```
+
+The payment path's cancel and this re-check cover **different moments**, and only
+together do they cover the whole window. `isStillEligibleForDisconnect()` now
+runs immediately before the device call, and deliberately re-uses the sweep's own
+query rather than a copy of it — so there is exactly one definition of "deserves
+disconnection" in the system, and the two can never drift.
+
+It reads the grace period **fresh** rather than carrying it on the job, so staff
+changing the setting between the sweep and the worker takes effect at once.
+
+**`dunning` and `manual` disconnects are checked differently.** A dunning
+disconnect is only justified while the debt stands. A staff member suspending a
+line by hand has a reason the system does not know about — abuse, a move-out, a
+customer request — so requiring an overdue invoice there would make the button
+silently refuse to work.
+
+### Decisions worth knowing
+
+| Rule | Why |
+| --- | --- |
+| **Exemptions require both a reason and an end date, and neither is a formality.** | "Why is this account four months overdue and still connected?" is asked months later by somebody who was not in the room; a blank reason is indistinguishable from a mistake. And an exemption with no end is not an exemption — it is a silent permanent discount nobody revisits. |
+| **365-day cap on an exemption.** | Not a business rule — a guard against a mistyped year becoming indefinite free service. A clerk aiming for 2026 and hitting 2062 should be stopped by the form, not found by an auditor. |
+| **Exemptions are revoked, never deleted.** | "This customer was shielded for six weeks, by whom, and why" is exactly what an audit asks, and a deleted row cannot answer it. |
+| **Revoking does not disconnect anybody.** | It removes the shield; the next sweep decides. The UI says so in those words, because a confirm dialog that reads like a kill switch gets clicked differently. |
+| **One live exemption per subscription, enforced under `FOR UPDATE`.** | Two clerks granting one at the same moment would otherwise both pass a check before either inserted. |
+| **The at-risk view is deliberately wider than the sweep.** | It includes people still inside their grace period, with the days remaining, because the point of the screen is to let staff act *before* a disconnection rather than explain one afterwards. A customer phoned on day two is worth more than one cut off on day three. |
+| **An empty branch scope selects nothing, not everything.** | Reading `branchIds: []` as "no filter" would let a user with no branch assignments disconnect the entire estate. |
+| **`cutoffDate` inverts the comparison.** | `today - grace` is computed once in Asia/Manila rather than `dueDate + grace` per row in SQL, keeping date arithmetic in the tested JavaScript helpers and off a database server whose session timezone may be eight hours out. |
+| **Queuing a disconnect logs at warning level.** | It is not routine bookkeeping. A run that queues an unexpected number is the thing worth noticing in a log at eight in the evening. |
+| **The sweep runs at 20:00.** | Late enough that the day's payments have landed, early enough that somebody is still awake when it goes wrong. |
+
+### A parameter-binding bug caught before it shipped
+
+The first draft of `findDisconnectCandidates` bound `now` and `cutoff` in the
+opposite order to the placeholders. MySQL compares a DATE against a DATETIME
+string without complaining, so this would not have thrown — it would have
+returned a **plausible wrong answer about who to cut off**. Both queries now
+build their parameters as a single list in placeholder order, and a test pins
+the order explicitly.
+
+### Verified
+
+**264 unit tests** across 13 files (25 new), and **55 e2e assertions, all
+passing**, driving the real API plus the worker in-process against the mock OLT.
+
+Four customers, chosen so the interesting assertions are about people who must
+**not** lose service:
+
+| | Situation | Expected | Result |
+| --- | --- | --- | --- |
+| Deadbeat | 10 days overdue | disconnected | ✅ suspended, device confirmed |
+| Recent | 1 day overdue | untouched, still in grace | ✅ never queued |
+| Payer | 10 days overdue, pays after the job is queued | **not** disconnected | ✅ still active |
+| Shielded | 10 days overdue, holds an exemption | **not** queued at all | ✅ excluded |
+
+The payer's case is the one that matters, and it passes for the right reason:
+the skip is recorded in that modem's device history as *"the account is no
+longer overdue — it has been paid, or exempted"*, marked as a **successful**
+outcome rather than a failure. Deciding not to disconnect somebody is a correct
+result, and it needs to be something a person can point at.
+
+Also proven: the sweep disconnects nobody by itself; re-running it queues
+nothing new; one job per customer rather than one per unpaid invoice; a revoked
+exemption makes the account eligible again on the next sweep; paying while
+suspended queues a reconnection automatically and the modem comes back; and
+another branch can neither see, exempt, nor revoke any of it.
+
+---
+
 ## ⚠️ Needs attention
 
 | # | Item | Detail |
@@ -784,3 +1030,4 @@ button.
 | P2 | Which ISP tables store `branchId` vs inherit it through a parent | Partly resolved: `customers` stores it, `plans` has none. Network inventory decided in S3. |
 | P3 | 60-day blacklist/revocation — six open client questions | Phase 7 (parked) |
 | P4 | MikroTik router IP, RouterOS version, API port, read-only credentials | Phase 7 (parked) |
+| **P5** | **Which payment gateway.** Xendit was the first choice; the client wants to evaluate others available in PH. The S8 port makes this a one-file change, and two gateways can run at once — so the practical constraint is not the code but **saved payment methods**: autodebit mandates and card tokens do not transfer between providers, so switching gets expensive only once subscribers start enrolling. Recommendation: pick a primary and start collecting, but hold off pushing autodebit enrolment until they are confident. | before go-live |

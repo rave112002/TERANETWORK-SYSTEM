@@ -21,6 +21,7 @@ import systemController from "../../../controllers/v1/admin/system.controller.js
 import invoicesController from "../../../controllers/v1/admin/invoices.controller.js";
 import paymentsController from "../../../controllers/v1/admin/payments.controller.js";
 import adjustmentsController from "../../../controllers/v1/admin/adjustments.controller.js";
+import dunningController from "../../../controllers/v1/admin/dunning.controller.js";
 import provisioningController from "../../../controllers/v1/admin/provisioning.controller.js";
 import { auditTrail } from "../../../middlewares/auditTrail.middleware.js";
 
@@ -64,5 +65,6 @@ router.use("/system", requireAuth, auditTrail("system"), systemController);
 router.use("/invoices", requireAuth, auditTrail("billing"), invoicesController);
 router.use("/payments", requireAuth, auditTrail("billing"), paymentsController);
 router.use("/adjustments", requireAuth, auditTrail("billing"), adjustmentsController);
+router.use("/dunning", requireAuth, auditTrail("billing"), dunningController);
 
 export default router;

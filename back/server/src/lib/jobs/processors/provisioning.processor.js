@@ -2,6 +2,7 @@ import { getCurrentTimestampLocal } from "../../../utils/dateUtils.js";
 import { decryptCredentials } from "../../crypto/credentialCrypto.js";
 import { resolveDriver } from "../../olt-drivers/index.js";
 import { isDryRun } from "../../settings/settings.service.js";
+import { isStillEligibleForDisconnect } from "../../dunning/dunning.service.js";
 
 /**
  * The provisioning processor — where a device response becomes database state.
@@ -60,16 +61,36 @@ const loadContext = async (db, onuId) => {
 };
 
 /**
- * Has a payment (or a staff decision) made this disconnect unnecessary while it
+ * Has a payment, or a staff decision, made this disconnect unnecessary while it
  * waited in the queue?
  *
- * This is the backstop for the race the payment path also guards by cancelling
- * queued jobs: cancellation cannot touch a job already `processing`, so the
- * check has to happen here too, as late as possible.
+ * ── The last line of defence, and the one that matters ──────────────────────
+ *
+ * The payment path already cancels queued disconnects when an invoice settles.
+ * That is not enough on its own, because cancellation cannot touch a job the
+ * worker has already claimed:
+ *
+ *   20:00:00  the sweep queues a disconnect
+ *   20:00:05  the worker claims it — status is now 'processing'
+ *   20:00:30  the customer pays; the cancel finds nothing to cancel
+ *   20:01:00  the worker reaches the device
+ *
+ * Everything between claiming the job and sending the command is unprotected
+ * except by this function. It runs as late as possible, immediately before the
+ * device call, and it is the reason a customer who pays at 20:00:30 does not
+ * lose their connection at 20:01.
+ *
+ * ── Why 'dunning' and 'manual' are checked differently ──────────────────────
+ *
+ * A dunning disconnect is only justified while the debt stands, so it re-asks
+ * the sweep's own question — through the sweep's own code, not a copy of it.
+ * A staff member suspending a line by hand has a reason the system does not
+ * know about (abuse, a move-out, a request from the customer), so requiring an
+ * overdue invoice would make the button silently refuse to work.
  *
  * @returns {Promise<string|null>} a reason to skip, or null to proceed
  */
-const preconditionFailure = async (db, { action, onu }) => {
+const preconditionFailure = async (db, { action, onu, reason }) => {
   if (action !== "deactivate") return null;
 
   const [subscription] = await db.query(
@@ -90,6 +111,21 @@ const preconditionFailure = async (db, { action, onu }) => {
   // Anything else means the situation changed underneath this job.
   if (subscription.status !== "active") {
     return `the subscription is now '${subscription.status}'`;
+  }
+
+  // Only for disconnects the sweep raised. See the note above on why a manual
+  // suspension is not held to the same test.
+  if (reason === "dunning") {
+    const stillOwing = await isStillEligibleForDisconnect(db, subscription.subscriptionId, {
+      companyId: onu.companyId,
+    });
+
+    if (!stillOwing) {
+      // Said as a fact about the customer rather than about the job, because
+      // this line ends up in the device history somebody reads when asking
+      // "why was I / was I not disconnected on the 5th?".
+      return "the account is no longer overdue — it has been paid, or exempted";
+    }
   }
 
   return null;
@@ -176,7 +212,7 @@ export const provisioningProcessor = async (job, { db, logger }) => {
   }
 
   // ── Gate 3: does the work still need doing? ───────────────────────
-  const stale = await preconditionFailure(db, { action, onu });
+  const stale = await preconditionFailure(db, { action, onu, reason });
   if (stale) {
     logger.info(`[provisioning] skipping ${action} for ONU ${onuId} — ${stale}`, {
       jobId: job.jobId,

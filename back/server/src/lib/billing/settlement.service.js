@@ -8,7 +8,7 @@ import { getCurrentTimestampLocal, toTimestampLocal } from "../../utils/dateUtil
  * Payment settlement.
  *
  * `settleInvoice()` is the ONE transaction that both the manual-payment
- * endpoint and the Xendit webhook call. Keeping it in a single place is what
+ * endpoint and the payment gateway webhook call. Keeping it in one place is what
  * stops the two paths drifting: a cash payment and a GCash payment mark an
  * invoice paid by exactly the same code, with the same guarantees.
  *
@@ -104,7 +104,8 @@ const queueReconnectionIfSettled = async (conn, invoice) => {
  * @param {string} args.invoiceId
  * @param {number|string} args.amount must equal the invoice total exactly.
  * @param {string} args.channel e.g. 'CASH', 'GCASH', 'QRPH'.
- * @param {string|null} [args.xenditPaymentId=null] set for gateway payments; the dedupe key.
+ * @param {string|null} [args.providerPaymentId=null] set for gateway payments; the dedupe key.
+ * @param {string|null} [args.provider=null] which gateway, e.g. 'xendit'. NULL for cash.
  * @param {string|null} [args.recordedBy=null] staff accountId, for manual entries.
  * @param {Date|string} [args.paidAt] defaults to now, Manila local.
  * @param {Object|null} [args.rawPayload=null] the gateway's original payload.
@@ -118,7 +119,8 @@ export const settleInvoice = async (
     invoiceId,
     amount,
     channel,
-    xenditPaymentId = null,
+    providerPaymentId = null,
+    provider = null,
     recordedBy = null,
     paidAt = null,
     rawPayload = null,
@@ -149,10 +151,10 @@ export const settleInvoice = async (
     // Checked BEFORE the paid/void checks, because a replayed webhook for an
     // invoice that is already paid must report 'duplicate' — that is the answer
     // that tells the caller to stop retrying.
-    if (xenditPaymentId) {
+    if (providerPaymentId) {
       const [dup] = await conn.execute(
-        `SELECT paymentId FROM payments WHERE xenditPaymentId = ? LIMIT 1`,
-        [xenditPaymentId]
+        `SELECT paymentId FROM payments WHERE providerPaymentId = ? LIMIT 1`,
+        [providerPaymentId]
       );
       if (dup.length > 0) {
         await db.commit(conn);
@@ -190,8 +192,8 @@ export const settleInvoice = async (
     await conn.execute(
       `INSERT INTO payments
          (paymentId, companyId, branchId, invoiceId, customerId, amount, channel,
-          xenditPaymentId, recordedBy, paidAt, rawPayload, dateCreated)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          provider, providerPaymentId, recordedBy, paidAt, rawPayload, dateCreated)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         paymentId,
         invoice.companyId,
@@ -200,7 +202,8 @@ export const settleInvoice = async (
         invoice.customerId,
         toAmount(amount),
         channel,
-        xenditPaymentId,
+        provider,
+        providerPaymentId,
         recordedBy,
         paidAtValue,
         rawPayload ? JSON.stringify(rawPayload) : null,
@@ -228,7 +231,7 @@ export const settleInvoice = async (
       action: "payment_recorded",
       description: `${channel} payment for invoice ${invoice.invoiceNo}`,
       before: { status: invoice.status },
-      after: { status: "paid", amount: toAmount(amount), channel, paymentId },
+      after: { status: "paid", amount: toAmount(amount), channel, provider, paymentId },
     });
 
     const reconnectQueued = await queueReconnectionIfSettled(conn, invoice);

@@ -7,6 +7,7 @@ const router = Router();
 import adminRoute from "./v1/admin/index.js";
 import superAdminRoute from "./v1/superadmin/index.js";
 import payController from "../controllers/v1/public/pay.controller.js";
+import webhooksController from "../controllers/v1/public/webhooks.controller.js";
 import uploadRoute from "../controllers/v1/upload/upload.controller.js";
 import { idempotencyMiddleware } from "../middlewares/idempotency.middleware.js";
 
@@ -22,6 +23,11 @@ router.use("/v1/superadmin", superAdminRoute);
 // /pay/<token> link is the credential. See controllers/v1/public/pay.controller.js
 // for what that costs and how it is bounded.
 router.use("/v1/public", payController);
+
+// Payment gateway callbacks. No auth and no CSRF by necessity — a gateway is a
+// server, holds no cookie, and cannot fetch a token. The signature is the
+// authentication; see controllers/v1/public/webhooks.controller.js.
+router.use("/v1/public/webhooks", webhooksController);
 
 // Shared routes (accessible by all authenticated users)
 import passport from "passport";

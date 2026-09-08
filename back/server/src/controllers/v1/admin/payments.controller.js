@@ -22,7 +22,8 @@ const router = express.Router();
  * ── This endpoint does not settle anything itself ───────────────────────────
  *
  * It validates, scopes, and calls `settleInvoice()`, the same function the
- * Xendit webhook calls. That is the whole point: a cash payment and an online
+ * payment gateway's webhook calls. That is the whole point: a cash payment and
+ * an online
  * payment must mark an invoice paid identically — same idempotency, same exact
  * amount rule, same reconnection — or the two paths drift and one of them
  * eventually leaves a paying customer disconnected.
@@ -35,7 +36,8 @@ const router = express.Router();
  */
 
 const PAYMENT_COLUMNS = `p.paymentId, p.companyId, p.branchId, p.invoiceId, p.customerId,
-  p.amount, p.channel, p.xenditPaymentId, p.recordedBy, p.paidAt, p.notes, p.dateCreated`;
+  p.amount, p.channel, p.provider, p.providerPaymentId, p.recordedBy, p.paidAt,
+  p.notes, p.dateCreated`;
 
 const JOINED_COLUMNS = `i.invoiceNo, i.total AS invoiceTotal, i.status AS invoiceStatus,
   c.name AS customerName, c.accountNo, b.name AS branchName,

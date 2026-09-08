@@ -104,10 +104,11 @@ export const usePaymentsData = () => {
               {record.channel}
             </div>
             <div className="truncate" style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
-              {/* A gateway payment has no staff member behind it, and saying
-                  "online" is more honest than leaving the column blank. */}
-              {record.xenditPaymentId
-                ? "online"
+              {/* A gateway payment has no staff member behind it. Naming the
+                  provider rather than saying "online" is what makes a ledger
+                  readable after a gateway switch, when both appear in it. */}
+              {record.provider
+                ? `online · ${record.provider}`
                 : decodeHTML(record.recordedByName) || "recorded by hand"}
             </div>
           </div>

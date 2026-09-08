@@ -175,7 +175,7 @@ export const writeAudit = async (
  * pseudo-account instead: reading "who disconnected this customer?" should
  * answer "system:dunning", never an empty cell.
  *
- * @param {string} source - e.g. "dunning", "billing-cycle", "xendit-webhook".
+ * @param {string} source - e.g. "dunning", "billing-cycle", "payment:xendit".
  * @param {{companyId?: string, branchId?: string}} [scope]
  */
 export const systemAuditContext = (source, scope = {}) => ({

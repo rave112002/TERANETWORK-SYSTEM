@@ -148,9 +148,26 @@ app.set("json replacer", (key, value) => {
   return value;
 });
 
-// Parse incoming JSON and URL-encoded data (with increased size limit)
-app.use(json({ limit: "2mb" }));
-app.use(urlencoded({ limit: "2mb", extended: true }));
+// Parse incoming JSON and URL-encoded data (with increased size limit).
+//
+// ── Why the raw bytes are kept ──────────────────────────────────────────────
+//
+// Payment gateways sign their callbacks over the EXACT body they sent. A
+// re-serialised object will not match: key order, whitespace and number
+// formatting all differ. Worse, `sanitizeMiddleware` below rewrites `req.body`
+// before any controller sees it, so by then the parsed body is not even the
+// same data.
+//
+// So the untouched buffer is stashed here, and webhook handlers verify and
+// parse from `req.rawBody` and never from `req.body`. Capped at 1MB: a callback
+// is a few hundred bytes, and holding a 2MB buffer per request for the sake of
+// one endpoint is not a trade worth making.
+const captureRawBody = (req, res, buf) => {
+  if (buf?.length && buf.length <= 1_048_576) req.rawBody = buf;
+};
+
+app.use(json({ limit: "2mb", verify: captureRawBody }));
+app.use(urlencoded({ limit: "2mb", extended: true, verify: captureRawBody }));
 
 // Parse cookies (required for CSRF protection)
 app.use(cookieParser());

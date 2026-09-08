@@ -3,7 +3,12 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 
 import {
   createAdjustmentApi,
+  createExemptionApi,
   deleteAdjustmentApi,
+  getAtRiskApi,
+  getExemptionsApi,
+  revokeExemptionApi,
+  runDunningSweepApi,
   generateInvoiceApi,
   getAdjustmentsApi,
   getInvoiceByIdApi,
@@ -269,6 +274,109 @@ export const useDeleteAdjustment = () => {
     },
     onError: (error) => {
       toast.error(error.response?.data?.message || "Could not remove the adjustment");
+    },
+  });
+};
+
+/* ── Dunning ────────────────────────────────────────────────────────────── */
+
+/**
+ * Who is heading for disconnection.
+ *
+ * A short staleTime, and refetched on focus: this is the screen somebody has
+ * open while phoning customers, and a stale "eligible" badge next to a name
+ * they have just taken payment from is exactly the wrong thing to show.
+ */
+export const useGetAtRisk = (options = {}) =>
+  useQuery({
+    queryKey: ["dunning", "at-risk"],
+    queryFn: getAtRiskApi,
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: true,
+    ...options,
+  });
+
+export const useGetExemptions = (filters = {}, options = {}) =>
+  useQuery({
+    queryKey: ["dunning", "exemptions", filters],
+    queryFn: () => getExemptionsApi(filters),
+    staleTime: 60 * 1000,
+    placeholderData: keepPreviousData,
+    ...options,
+  });
+
+const invalidateDunning = (queryClient) => {
+  queryClient.invalidateQueries({ queryKey: ["dunning"] });
+  // A sweep queues device work, so the job list is now wrong too.
+  queryClient.invalidateQueries({ queryKey: ["jobs"] });
+};
+
+export const useRunDunningSweep = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: runDunningSweepApi,
+    onSuccess: (res) => {
+      const result = res?.data?.result;
+      const queued = result?.queued ?? 0;
+      const deduped = result?.deduped ?? 0;
+
+      if (result?.dryRun) {
+        // Never let a dry run look like a real one. Somebody testing needs to
+        // know nothing reached a device.
+        toast.warning(
+          `Dry run — ${queued} disconnect(s) queued but no commands will be sent`
+        );
+      } else if (queued === 0) {
+        toast.success(
+          deduped > 0
+            ? `Nobody new — ${deduped} disconnect(s) already pending`
+            : "Nobody is eligible for disconnection"
+        );
+      } else {
+        // Deliberately not a success toast. Queuing disconnections is not a
+        // thing to feel good about having done.
+        toast.warning(
+          `${queued} disconnect${queued === 1 ? "" : "s"} queued${deduped ? `, ${deduped} already pending` : ""}`
+        );
+      }
+
+      invalidateDunning(queryClient);
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.message || "The sweep could not be run");
+    },
+  });
+};
+
+export const useCreateExemption = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: createExemptionApi,
+    onSuccess: () => {
+      toast.success("Exemption granted — this account will not be disconnected automatically");
+      invalidateDunning(queryClient);
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.message || "Could not grant the exemption");
+    },
+  });
+};
+
+export const useRevokeExemption = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ exemptionId, reason }) => revokeExemptionApi(exemptionId, reason),
+    onSuccess: () => {
+      // Says what does and does not happen next: revoking removes the shield,
+      // it does not cut anybody off on the spot.
+      toast.success("Exemption revoked — eligible again from the next sweep");
+      invalidateDunning(queryClient);
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.message || "Could not revoke the exemption");
     },
   });
 };
