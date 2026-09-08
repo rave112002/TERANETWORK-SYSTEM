@@ -84,6 +84,7 @@ async function main() {
         { module: "network", submodule: "provisioning", description: "Activate and deactivate modems at the OLT" },
         { module: "network", submodule: "action_logs", description: "Device command history" },
         { module: "network", submodule: "topology", description: "Network topology and map" },
+        { module: "network", submodule: "discovery", description: "Device discovery and import" },
         { module: "subscriptions", submodule: null, description: "Subscriptions management" },
         { module: "system", submodule: null, description: "System settings and job queue" },
 

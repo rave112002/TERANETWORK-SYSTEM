@@ -23,6 +23,7 @@ import paymentsController from "../../../controllers/v1/admin/payments.controlle
 import adjustmentsController from "../../../controllers/v1/admin/adjustments.controller.js";
 import dunningController from "../../../controllers/v1/admin/dunning.controller.js";
 import provisioningController from "../../../controllers/v1/admin/provisioning.controller.js";
+import discoveryController from "../../../controllers/v1/admin/discovery.controller.js";
 import { auditTrail } from "../../../middlewares/auditTrail.middleware.js";
 
 const router = Router();
@@ -58,6 +59,7 @@ router.use("/network/onus", requireAuth, auditTrail("network"), onusController);
 // Mounted after /network/onus so the CRUD routes match first; these add the
 // action sub-routes beneath the same path.
 router.use("/network/provisioning", requireAuth, auditTrail("network"), provisioningController);
+router.use("/network/discovery", requireAuth, auditTrail("network"), discoveryController);
 router.use("/subscriptions", requireAuth, auditTrail("subscriptions"), subscriptionsController);
 router.use("/system", requireAuth, auditTrail("system"), systemController);
 

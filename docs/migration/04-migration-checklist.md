@@ -21,7 +21,7 @@
 | **S7** | Billing | ✅ complete |
 | **S8** | Payment gateway | 🟡 port complete — adapter pending the client's choice |
 | **S9** | Dunning | ✅ complete |
-| S10 | Discovery | ⬜ |
+| **S10** | Discovery | ✅ complete — OLT half; the router half is blocked on M22/P4 |
 | S11 | Phase-6 surface | ⬜ |
 
 ---
@@ -1008,6 +1008,80 @@ nothing new; one job per customer rather than one per unpaid invoice; a revoked
 exemption makes the account eligible again on the next sweep; paying while
 suspended queues a reconnection automatically and the modem comes back; and
 another branch can neither see, exempt, nor revoke any of it.
+
+---
+
+## S10 — Discovery ✅
+
+Asking an OLT what it can see, and putting that next to what we think we have.
+Deliberately last of the ported work, so it could not block the money path.
+
+### Built
+
+| # | Item | File |
+| --- | --- | --- |
+| 1 | MAC normalisation and description parsing | `back/server/src/lib/discovery/reconcile.helpers.js` |
+| 2 | The reconciliation engine — pure, no DB, no devices | `back/server/src/lib/discovery/reconcile.js` (+ 29 tests) |
+| 3 | Sweep, stage, and the audited import path | `back/server/src/lib/discovery/discovery.service.js` |
+| 4 | `discovery_runs`, `discovered_items`, the `network/discovery` permission | `back/database/schema.sql`, migration `010` |
+| 5 | Sweep, runs, items and import endpoints | `back/server/src/controllers/v1/admin/discovery.controller.js` |
+| 6 | Validators | `back/server/src/validators/discovery.validator.js` |
+| 7 | The Discovery screen, sweep drawer and import form | `front/src/pages/Admin/Network/Discovery/` |
+
+### Scope: the OLT half only
+
+The reconciler accepts MikroTik accounts and sessions and nothing produces
+them. There is no RouterOS client (blocker M22) and the router's address and
+credentials are still open (P4). Sweeping only the OLT is the honest half; the
+bucketing rules for the router side are written and tested so adding it later
+does not mean rewriting the OLT path around it.
+
+### Three buckets, and what each one asks of a person
+
+| Bucket | Meaning | What happens |
+| --- | --- | --- |
+| `matched` | on the device and in our records | nothing — this is the healthy state |
+| `new` | on the device, not in our records | a candidate to import, one at a time |
+| `orphaned` | in our records, the device did not report it | **flagged, never deleted** |
+
+**An orphan is only ever a flag.** The obvious next step from "this modem is
+gone" is to delete the row, and it is wrong. An ONU drops off a sweep because
+the fibre is cut, because it is unplugged while the family is away, because a
+PON card is being swapped, or because the sweep read one port and not another.
+Deleting on that evidence destroys a billable subscription's link to its
+hardware over a temporary fault.
+
+### Decisions worth knowing
+
+| Rule | Why |
+| --- | --- |
+| **A sweep creates nothing.** | It reads the device, stages a comparison, and stops. A sweep of a four-hundred-modem OLT would otherwise create four hundred inventory records out of free text typed by whoever installed them, and unpicking that is worse than typing it. Importing is a separate, audited call with staff-confirmed values. |
+| **Nothing is flagged orphaned when the OLT was not swept.** | A run that read no ONUs must not conclude that every modem in the database has vanished. `oltOnus.length > 0` guards the whole orphan pass, and a test pins it. |
+| **Every MAC is normalised before comparison.** | An OLT reports lowercase, a MikroTik uppercase, Cisco-style kit uses dots. Reading two spellings of one address as two modems is how a customer ends up with duplicate hardware on file. |
+| **`provisioningState` is derived, not submitted.** | A modem the OLT reported online is `active`; anything else is `unprovisioned`. The import form cannot assert it — letting it would let somebody record a device as carrying service when nothing confirmed that, and the dunning sweep reads this column to decide who is already disconnected. |
+| **The parsed description is a suggestion, shown next to the original.** | "Jacqueline-Rebancos PON 2 NAP 1 PORT 5" is often the only record of who a modem belongs to, and it is also years old and inconsistent. The parse pre-fills the form; the raw text sits above it so a bad reading is visible rather than silently saved. |
+| **`failed` is a distinct run status.** | A sweep that could not reach the device and one that reached it and found nothing produce the same empty list and mean opposite things. A failed run says so on the screen, and says that it is not evidence any modem is missing. |
+| **The run keeps the command and the device's verbatim reply.** | Same reason as the provisioning action log: a sweep that returned nothing is a mystery without it. |
+| **Runs are kept, not overwritten.** | "The modem was there in August and gone in September" is a question about two runs — and it is the question asked when a customer says their connection vanished. |
+| **A staged item is stamped `matched` on import, not deleted.** | It is the record of where that ONU came from, and re-running the sweep should now legitimately find it as matched. |
+| **The existing-ONU query is branch-scoped.** | A sweep of the Bicutan OLT must not report Bagumbayan's modems as orphaned merely because this device cannot see them. |
+
+### Verified
+
+**293 unit tests** across 14 files (29 new, all on the pure reconciler — the
+part that decides whether two records are the same modem).
+
+**52 e2e assertions, all passing**, against the running API and a mock OLT:
+
+| Area | What it proved |
+| --- | --- |
+| First sweep | finds the device's modems, all `new`, none matched, none orphaned; keeps the command, the raw reply, the duration and who ran it |
+| Staging | descriptions parsed into name/NAP/port hints with the original text kept beside them; **and the sweep created zero inventory rows** |
+| Import | uses the discovered values, derives `provisioningState` from the device, keeps the original description, refuses a second import of the same item, stamps the staged row `matched` pointing at the new ONU |
+| Second sweep | the imported modem is now `matched` and the rest still `new` — the import is what moved it |
+| Orphans | a modem on file the OLT cannot see is flagged, named, **not deleted**, and cannot be imported |
+| Refusals | unknown OLT 404, missing `oltId` 400, unknown run 404 |
+| Branch isolation | another branch cannot sweep the OLT, read the run, see its items, import from it, or find it in a list |
 
 ---
 

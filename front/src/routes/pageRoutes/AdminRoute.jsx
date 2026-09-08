@@ -27,6 +27,7 @@ const PonPorts = lazy(() => import("../../pages/Admin/Network/PonPorts"));
 const Splitters = lazy(() => import("../../pages/Admin/Network/Splitters"));
 const Naps = lazy(() => import("../../pages/Admin/Network/Naps"));
 const Onus = lazy(() => import("../../pages/Admin/Network/Onus"));
+const Discovery = lazy(() => import("../../pages/Admin/Network/Discovery"));
 const System = lazy(() => import("../../pages/Admin/System"));
 const Invoices = lazy(() => import("../../pages/Admin/Billing/Invoices"));
 const Payments = lazy(() => import("../../pages/Admin/Billing/Payments"));
@@ -292,6 +293,7 @@ const AdminRoute = () => {
           { module: "network", submodule: "olts", accessLevel: "read" },
           { module: "network", submodule: "naps", accessLevel: "read" },
           { module: "network", submodule: "onus", accessLevel: "read" },
+          { module: "network", submodule: "discovery", accessLevel: "read" },
         ],
       },
       isFilter: true,
@@ -406,6 +408,25 @@ const AdminRoute = () => {
           permission: {
             module: "network",
             submodule: "onus",
+            accessLevel: "read",
+          },
+          isFilter: true,
+          isShow: true,
+        },
+        {
+          route: "/discovery",
+          name: "Discovery",
+          label: "Discovery",
+          component: (
+            <Suspense fallback={<ComponentLoader />}>
+              <ProtectedRoute module="network" submodule="discovery" accessLevel="read">
+                <Discovery />
+              </ProtectedRoute>
+            </Suspense>
+          ),
+          permission: {
+            module: "network",
+            submodule: "discovery",
             accessLevel: "read",
           },
           isFilter: true,
