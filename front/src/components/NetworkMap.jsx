@@ -100,9 +100,23 @@ const NetworkMap = ({ naps = [], height = 460, onSelect }) => {
         scrollWheelZoom
         style={{ height, width: "100%", background: "var(--color-surface-sunken)" }}
       >
+        {/*
+          OpenStreetMap's own tiles, which need no API key.
+
+          This was CARTO's Voyager basemap, which looks better and now stamps
+          "API KEY REQUIRED" diagonally across every tile for unkeyed callers —
+          so the map shipped legible but plastered with a watermark. Caught by
+          looking at it; no test would have.
+
+          OSM's tile usage policy covers a handful of staff checking a NAP map,
+          which is what this is. If it ever becomes a customer-facing or
+          heavily-hit map, move to a keyed provider (CARTO, Stadia, MapTiler)
+          and put the key in an env var — the only line that changes is this one.
+        */}
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+          maxZoom={19}
         />
 
         <FitToMarkers points={points} />

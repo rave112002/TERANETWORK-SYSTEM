@@ -143,6 +143,12 @@ const ViewBranchModal = ({ open, onClose, branch, onEdit }) => {
           value={formatPhoneDisplay(decodeHTML(branch.phone))}
         />
         <DetailRow label="Address" value={decodeHTML(branch.address)} />
+        {/* Says "Company default" rather than showing an empty row: unset is a
+            deliberate state here, not a missing value. */}
+        <DetailRow
+          label="Collects through"
+          value={branch.paymentProvider || "Company default"}
+        />
       </div>
 
       {/* Record */}

@@ -28,3 +28,6 @@ dist-ssr
 .env
 .env.local
 .env.production
+
+# Screenshots from `npm run shoot` — local verification output, not source.
+shots/

@@ -21,6 +21,7 @@ const AccountSettings = lazy(() => import("../../pages/Admin/AccountSettings"));
 const Customers = lazy(() => import("../../pages/Admin/Customers"));
 const Plans = lazy(() => import("../../pages/Admin/Plans"));
 const Subscriptions = lazy(() => import("../../pages/Admin/Subscriptions"));
+const Recovery = lazy(() => import("../../pages/Admin/Recovery"));
 const Topology = lazy(() => import("../../pages/Admin/Network/Topology"));
 const Olts = lazy(() => import("../../pages/Admin/Network/Olts"));
 const PonPorts = lazy(() => import("../../pages/Admin/Network/PonPorts"));
@@ -33,6 +34,7 @@ const Invoices = lazy(() => import("../../pages/Admin/Billing/Invoices"));
 const Payments = lazy(() => import("../../pages/Admin/Billing/Payments"));
 const Adjustments = lazy(() => import("../../pages/Admin/Billing/Adjustments"));
 const Dunning = lazy(() => import("../../pages/Admin/Billing/Dunning"));
+const Reports = lazy(() => import("../../pages/Admin/Reports"));
 
 const AdminRoute = () => {
   const navigations = [
@@ -156,6 +158,25 @@ const AdminRoute = () => {
             <Suspense fallback={<ComponentLoader />}>
               <ProtectedRoute module="subscriptions" accessLevel="read">
                 <Subscriptions />
+              </ProtectedRoute>
+            </Suspense>
+          ),
+          permission: {
+            module: "subscriptions",
+            submodule: null,
+            accessLevel: "read",
+          },
+          isFilter: true,
+          isShow: true,
+        },
+        {
+          route: "/recovery",
+          name: "Modem Recovery",
+          label: "Modem Recovery",
+          component: (
+            <Suspense fallback={<ComponentLoader />}>
+              <ProtectedRoute module="subscriptions" accessLevel="read">
+                <Recovery />
               </ProtectedRoute>
             </Suspense>
           ),
@@ -467,6 +488,27 @@ const AdminRoute = () => {
       isFilter: true,
       isShow: true,
       section: "system", // renders below the sidebar divider
+    },
+    {
+      route: "/reports",
+      name: "Reports",
+      label: "Reports",
+      icon: <FileText className="h-5 w-5" />,
+      component: (
+        <Suspense fallback={<ComponentLoader />}>
+          <ProtectedRoute module="billing" submodule="invoices" accessLevel="read">
+            <Reports />
+          </ProtectedRoute>
+        </Suspense>
+      ),
+      permission: {
+        module: "billing",
+        submodule: "invoices",
+        accessLevel: "read",
+      },
+      isFilter: true,
+      isShow: true,
+      section: "system",
     },
     {
       route: "/audit-trail",

@@ -5,7 +5,15 @@ import { checkPermission } from "../../../middlewares/checkPermission.middleware
 import { gatewayStatus } from "../../../lib/payment-gateways/index.js";
 import { branchScope, getScopedBranchIds } from "../../../utils/branchScope.js";
 import { getAuditContext, writeAudit } from "../../../utils/audit.js";
-import { getAllSettings, setSetting } from "../../../lib/settings/settings.service.js";
+import {
+  SETTING_KEYS,
+  getAllSettings,
+  getBillingSchedule,
+  getRecoveryAfterDays,
+  parseIntSetting,
+  setSetting,
+  validateBillingSchedule,
+} from "../../../lib/settings/settings.service.js";
 import { getQueueStats } from "../../../lib/jobs/jobs.queue.js";
 import {
   updateSettingsSchema,
@@ -42,12 +50,26 @@ router.get(
     );
     const meta = Object.fromEntries(rows.map((r) => [r.settingKey, r]));
 
+    // The schedule comes back through the same parser the billing jobs use, so
+    // the screen can never show a number the worker would reject as junk.
+    const schedule = await getBillingSchedule(req.db, companyId);
+    const recoveryAfterDays = await getRecoveryAfterDays(req.db, companyId);
+
     return res.sendSuccess("Settings retrieved successfully", {
       settings: {
         DRY_RUN: raw.DRY_RUN === "true",
-        GRACE_DAYS: Number.parseInt(raw.GRACE_DAYS, 10),
+        GRACE_DAYS: schedule.graceDays,
         VAT_RATE: Number.parseFloat(raw.VAT_RATE),
         RECONNECTION_FEE_ENABLED: raw.RECONNECTION_FEE_ENABLED === "true",
+
+        STATEMENT_DAY: schedule.statementDay,
+        DUE_DAY: schedule.dueDay,
+        REMINDER_DAYS_BEFORE: schedule.reminderDaysBefore,
+        CYCLE_HOUR: schedule.cycleHour,
+        DAILY_HOUR: schedule.dailyHour,
+        DUNNING_HOUR: schedule.dunningHour,
+
+        RECOVERY_AFTER_DAYS: recoveryAfterDays,
       },
       meta,
     });
@@ -68,6 +90,35 @@ router.put(
   catchAsync(async (req, res) => {
     const { companyId, accountId } = req.user;
     const updates = req.body;
+
+    // ── Check the schedule as a whole before writing any of it ──────────────
+    //
+    // The validator has already checked each value on its own. What it cannot
+    // check is the combination, because an update is partial: "due day 20" is
+    // fine or catastrophic depending on the statement day already stored. So
+    // the stored schedule is merged with the incoming changes and the result is
+    // judged as one thing.
+    //
+    // Refused before the transaction opens, so a rejected schedule leaves no
+    // half-applied settings behind and the message says which two values
+    // disagree rather than "invalid".
+    const SCHEDULE_FIELDS = {
+      [SETTING_KEYS.STATEMENT_DAY]: "statementDay",
+      [SETTING_KEYS.DUE_DAY]: "dueDay",
+      [SETTING_KEYS.GRACE_DAYS]: "graceDays",
+      [SETTING_KEYS.DAILY_HOUR]: "dailyHour",
+      [SETTING_KEYS.DUNNING_HOUR]: "dunningHour",
+    };
+
+    if (Object.keys(SCHEDULE_FIELDS).some((key) => key in updates)) {
+      const merged = await getBillingSchedule(req.db, companyId);
+      for (const [key, field] of Object.entries(SCHEDULE_FIELDS)) {
+        if (key in updates) merged[field] = parseIntSetting(updates[key], key);
+      }
+
+      const problem = validateBillingSchedule(merged);
+      if (problem) return res.sendError(problem, 400);
+    }
 
     let conn;
     try {

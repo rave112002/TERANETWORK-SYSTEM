@@ -66,6 +66,7 @@ router.get(
         br.email,
         br.phone,
         br.address,
+        br.paymentProvider,
         br.isMainBranch,
         br.status,
         br.dateCreated,
@@ -106,7 +107,8 @@ router.get(
       `SELECT 
         br.branchId, br.companyId, br.name, br.email, br.phone, br.address,
         br.regCode, br.provCode, br.citymunCode, br.brgyCode, br.zipCode,
-        br.logoUrl, br.website, br.isMainBranch, br.status, br.dateCreated, br.dateUpdated,
+        br.logoUrl, br.website, br.paymentProvider,
+        br.isMainBranch, br.status, br.dateCreated, br.dateUpdated,
         b.name as companyName
       FROM branches br
       LEFT JOIN companies b ON b.companyId = br.companyId
@@ -132,7 +134,7 @@ router.post(
   "/",
   validateBody(createBranchSchema),
   catchAsync(async (req, res) => {
-    const { companyId, name, email, phone, address } = req.body;
+    const { companyId, name, email, phone, address, paymentProvider } = req.body;
     const now = getCurrentTimestampLocal();
 
     let conn;
@@ -157,9 +159,23 @@ router.post(
 
       // Create branch
       await conn.execute(
-        `INSERT INTO branches (branchId, companyId, name, email, phone, address, isMainBranch, status, dateCreated, dateUpdated)
-         VALUES (?, ?, ?, ?, ?, ?, 0, 'Active', ?, ?)`,
-        [branchId, companyId, name, email || null, phone || null, address || null, now, now]
+        `INSERT INTO branches (branchId, companyId, name, email, phone, address,
+                               paymentProvider, isMainBranch, status, dateCreated, dateUpdated)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'Active', ?, ?)`,
+        [
+          branchId,
+          companyId,
+          name,
+          email || null,
+          phone || null,
+          address || null,
+          // NULL, not a default slug: a branch nobody has thought about should
+          // follow the company default rather than be silently pinned to
+          // whichever gateway happened to be first.
+          paymentProvider || null,
+          now,
+          now,
+        ]
       );
 
       // Create Owner role for this company+branch
@@ -209,14 +225,26 @@ router.put(
   validateBody(updateBranchSchema),
   catchAsync(async (req, res) => {
     const { branchId } = req.params;
-    const { name, email, phone, address, status } = req.body;
+    const { name, email, phone, address, paymentProvider, status } = req.body;
     const now = getCurrentTimestampLocal();
 
     const result = await req.db.query(
-      `UPDATE branches 
-       SET name = ?, email = ?, phone = ?, address = ?, status = ?, dateUpdated = ?
+      `UPDATE branches
+       SET name = ?, email = ?, phone = ?, address = ?, paymentProvider = ?,
+           status = ?, dateUpdated = ?
        WHERE branchId = ? AND status != 'Deleted'`,
-      [name, email || null, phone || null, address || null, status || "Active", now, branchId]
+      [
+        name,
+        email || null,
+        phone || null,
+        address || null,
+        // An empty string is how a cleared dropdown arrives, and it means
+        // "follow the company default" — stored as NULL, not as "".
+        paymentProvider || null,
+        status || "Active",
+        now,
+        branchId,
+      ]
     );
 
     if (result.affectedRows === 0) {

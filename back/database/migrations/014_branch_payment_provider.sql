@@ -1,0 +1,39 @@
+-- ============================================================================
+-- 014 — A branch can collect through a different gateway
+--
+-- The client's decision, 2026-09-10: HitPay for the two Taguig branches (New
+-- Lower Bicutan and Bagumbayan), GCash Business for Batangas. One company, two
+-- merchant relationships, split by geography.
+--
+-- ── NULL means "whatever the company is using" ──────────────────────────────
+--
+-- Not a default of 'hitpay'. A branch that has never been thought about should
+-- follow `PAYMENT_PROVIDER` rather than be silently pinned to whichever gateway
+-- happened to be first, because the failure mode of being pinned is invisible:
+-- the branch keeps working, on the wrong merchant account, until somebody
+-- reconciles the statements.
+--
+-- ── What this column does NOT do ────────────────────────────────────────────
+--
+-- It does not carry credentials. Those stay in the environment, for the reason
+-- set out in lib/payment-gateways/index.js: a callback arrives before we know
+-- whose it is, so putting the verifying secret behind a tenant lookup is
+-- circular, and the usual escape — try every tenant's key until one verifies —
+-- is an oracle that tells an attacker when they have guessed a valid secret.
+--
+-- The consequence, stated plainly: two branches on the SAME provider share one
+-- merchant account. That is exactly what the client wants today, since both
+-- Taguig branches bill under one HitPay account. If they ever want separate
+-- HitPay merchants per branch, this column is not enough and the credential
+-- story has to be reopened.
+--
+-- ── Why the webhook still works ─────────────────────────────────────────────
+--
+-- The callback URL carries the provider slug (/webhooks/hitpay), so
+-- verification picks the secret from the URL and never needs to know the branch
+-- first. The branch is discovered afterwards, from the invoice the reference
+-- points at. No circularity.
+-- ============================================================================
+
+ALTER TABLE branches
+  ADD COLUMN paymentProvider VARCHAR(30) NULL AFTER website;

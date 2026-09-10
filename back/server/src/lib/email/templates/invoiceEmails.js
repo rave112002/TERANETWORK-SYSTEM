@@ -146,18 +146,23 @@ export const buildInvoiceIssuedEmail = ({
 };
 
 /**
- * The reminder, two days before the due date, and the overdue notice after it.
+ * The three notices a customer gets about an unpaid invoice: the reminder ahead
+ * of the due date, the last warning on the morning of the cut-off day, and the
+ * overdue notice after the due date has passed.
  *
- * One function for both because they differ only in tone and urgency — and
- * keeping them together is what stops the reminder quietly drifting into
- * saying something the overdue notice contradicts.
+ * One function for all three because they differ only in tone and urgency — and
+ * keeping them together is what stops one of them quietly drifting into saying
+ * something another contradicts.
  *
  * @param {Object} args
- * @param {'reminder'|'overdue'} args.kind
+ * @param {'reminder'|'final'|'overdue'} args.kind
  * @param {Object} args.invoice
  * @param {{name: string}} args.customer
  * @param {string} args.payUrl
- * @param {number} [args.graceDays] mentioned only on the overdue notice.
+ * @param {number} [args.graceDays] shapes the overdue notice's consequence line;
+ *   0 means the disconnection has already happened by the time it is read.
+ * @param {number} [args.cutOffHour] the hour the sweep runs, named on the final
+ *   notice so "today" has a deadline attached to it.
  * @param {string} [args.companyName="TERANETWORK"]
  * @returns {{subject: string, html: string, text: string}}
  */
@@ -167,35 +172,66 @@ export const buildInvoiceNoticeEmail = ({
   customer,
   payUrl,
   graceDays = null,
+  cutOffHour = null,
   companyName = "TERANETWORK",
 }) => {
-  const isOverdue = kind === "overdue";
+  const due = dateOnly(invoice.dueDate);
+  const total = amount(invoice.total);
 
-  const subject = isOverdue
-    ? `Overdue: invoice ${invoice.invoiceNo} — ${amount(invoice.total)}`
-    : `Reminder: invoice ${invoice.invoiceNo} is due ${dateOnly(invoice.dueDate)}`;
+  // ── What each notice is for ───────────────────────────────────────────────
+  //
+  //   reminder  days ahead of the due date — a nudge, no consequence stated
+  //   final     the morning of the cut-off day — the last chance, with the hour
+  //   overdue   after the due date has passed — the status, and what it means
+  //
+  // The consequence is said plainly, and only where it is actually true. A
+  // vague "service may be affected" is worse than either saying nothing or
+  // saying exactly what will happen and when.
+  const COPY = {
+    reminder: {
+      subject: `Reminder: invoice ${invoice.invoiceNo} is due ${due}`,
+      heading: "Your invoice is due soon",
+      lead: `invoice ${invoice.invoiceNo} for ${total} is due on ${due}.`,
+      consequence: null,
+    },
+    final: {
+      subject: `Last notice: invoice ${invoice.invoiceNo} — ${total}`,
+      heading: "Last notice before your service is suspended",
+      lead: `invoice ${invoice.invoiceNo} for ${total} was due on ${due} and is still unpaid.`,
+      consequence: Number.isFinite(cutOffHour)
+        ? `If payment is not received by ${String(cutOffHour).padStart(2, "0")}:00 today, your connection will be suspended until it is.`
+        : `If payment is not received today, your connection will be suspended until it is.`,
+    },
+    overdue: {
+      subject: `Overdue: invoice ${invoice.invoiceNo} — ${total}`,
+      heading: "Your invoice is past due",
+      lead: `invoice ${invoice.invoiceNo} for ${total} was due on ${due}.`,
+      // With no grace period the disconnection sweep has already run by the
+      // time this goes out, so the old "within 0 days" wording was both
+      // nonsense and late. It does not claim this customer IS suspended —
+      // an exemption or a missing modem can mean they are not, and a notice
+      // that tells someone their service is off when it is on costs a call.
+      consequence:
+        graceDays === 0
+          ? `Service is suspended while an invoice is past due. Once this is paid your connection is restored automatically — there is no need to call.`
+          : Number.isFinite(graceDays)
+            ? `If this is not settled within ${graceDays} day${graceDays === 1 ? "" : "s"} of the due date, your connection will be suspended until payment is received.`
+            : null,
+    },
+  };
 
-  const heading = isOverdue ? "Your invoice is past due" : "Your invoice is due soon";
+  const copy = COPY[kind] ?? COPY.reminder;
 
-  // Said plainly, and only when it is actually true. A vague "service may be
-  // affected" is worse than either saying nothing or saying exactly what will
-  // happen and when.
-  const consequence =
-    isOverdue && Number.isFinite(graceDays)
-      ? `<p style="color:#b45309;margin:0 0 16px;">
-           If this is not settled within ${graceDays} day${graceDays === 1 ? "" : "s"} of the due date,
-           your connection will be suspended until payment is received.
-         </p>`
-      : "";
+  const consequenceHtml = copy.consequence
+    ? `<p style="color:#b45309;margin:0 0 16px;">${escapeHtml(copy.consequence)}</p>`
+    : "";
 
   const bodyHtml = `
-    <h1 style="font-size:18px;color:${BRAND};margin:0 0 4px;">${heading}</h1>
+    <h1 style="font-size:18px;color:${BRAND};margin:0 0 4px;">${copy.heading}</h1>
     <p style="color:#353a3e;margin:0 0 16px;">
-      Hi ${escapeHtml(customer.name)}, invoice ${escapeHtml(invoice.invoiceNo)} for
-      ${escapeHtml(amount(invoice.total))} was due on
-      <strong>${escapeHtml(dateOnly(invoice.dueDate))}</strong>.
+      Hi ${escapeHtml(customer.name)}, ${escapeHtml(copy.lead)}
     </p>
-    ${consequence}
+    ${consequenceHtml}
     ${payButton(payUrl)}
     <p style="color:${MUTED};font-size:12px;margin:18px 0 0;">
       If you have already paid, please ignore this message — payments can take a short
@@ -203,20 +239,17 @@ export const buildInvoiceNoticeEmail = ({
     </p>`;
 
   const text = [
-    heading,
+    copy.heading,
     ``,
-    `Hi ${customer.name}, invoice ${invoice.invoiceNo} for ${amount(invoice.total)} was due on ${dateOnly(invoice.dueDate)}.`,
-    ...(isOverdue && Number.isFinite(graceDays)
-      ? [
-          ``,
-          `If this is not settled within ${graceDays} day${graceDays === 1 ? "" : "s"} of the due date, your connection will be suspended until payment is received.`,
-        ]
-      : []),
+    `Hi ${customer.name}, ${copy.lead}`,
+    ...(copy.consequence ? [``, copy.consequence] : []),
     ``,
     `Pay online: ${payUrl}`,
     ``,
     `If you have already paid, please ignore this message.`,
   ].join("\n");
+
+  const subject = copy.subject;
 
   return {
     subject,

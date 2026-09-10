@@ -37,6 +37,28 @@ const TARGET_STATE = {
 };
 
 /**
+ * Where this particular job is trying to get the ONU to.
+ *
+ * ── The one case where an activate does not mean "back in service" ──────────
+ *
+ * On this OLT, activating is literally `blacklist delete mac` — it lifts the
+ * block and lets the unit register again. A modem recovered from a closed
+ * account needs exactly that command, because a unit left blacklisted is a
+ * brick when a technician seats it for the next customer months later.
+ *
+ * But it is not going back into service, it is going into a box. Recording it
+ * as 'active' would put a modem nobody is using into the "modems up" figure on
+ * the dashboard and hide a real outage behind it.
+ *
+ * Exported so that distinction is pinned by a test rather than left to whoever
+ * next simplifies this back into a lookup table.
+ */
+export const targetStateFor = (action, reason) =>
+  action === "activate" && reason === "recovery"
+    ? "unprovisioned"
+    : (TARGET_STATE[action] ?? null);
+
+/**
  * Load everything the driver needs: the ONU, its OLT, and the decrypted login.
  *
  * @returns {Promise<Object|null>} null when the ONU is gone — a deleted modem
@@ -91,13 +113,32 @@ const loadContext = async (db, onuId) => {
  * @returns {Promise<string|null>} a reason to skip, or null to proceed
  */
 const preconditionFailure = async (db, { action, onu, reason }) => {
-  if (action !== "deactivate") return null;
+  // A recovery activate is deliberate housekeeping on an unbound modem — there
+  // is no subscription left to ask about, and asking would refuse it.
+  if (action === "activate" && reason === "recovery") return null;
+
+  if (action === "status") return null;
 
   const [subscription] = await db.query(
     `SELECT subscriptionId, status FROM subscriptions
      WHERE onuId = ? AND recordStatus != 'Deleted' LIMIT 1`,
     [onu.onuId]
   );
+
+  if (action === "activate") {
+    // Restoring service to a revoked account would hand the internet back to
+    // somebody the business has written off and is trying to collect a modem
+    // from. Refused here rather than trusted to the caller, because "Restore
+    // service" is a button on the ONU screen and the person pressing it is
+    // looking at a modem, not at a subscription.
+    if (subscription?.status === "for_recovery") {
+      return "the account is awaiting modem pull-out — restoring it needs a new subscription";
+    }
+    if (subscription?.status === "terminated") {
+      return "the subscription has been terminated";
+    }
+    return null;
+  }
 
   if (!subscription) {
     return "the ONU is no longer bound to a subscription";
@@ -203,7 +244,7 @@ export const provisioningProcessor = async (job, { db, logger }) => {
   }
 
   // ── Gate 2: idempotency ───────────────────────────────────────────
-  const target = TARGET_STATE[action];
+  const target = targetStateFor(action, reason);
   if (target && onu.provisioningState === target) {
     logger.info(`[provisioning] ONU ${onuId} is already '${target}' — skipping`, {
       jobId: job.jobId,
@@ -342,12 +383,32 @@ export const provisioningProcessor = async (job, { db, logger }) => {
       // The subscription follows the device. Written here rather than through
       // the subscriptions controller precisely because this is the only place
       // that has seen the OLT confirm it (decision D6).
-      const subscriptionStatus = action === "deactivate" ? "suspended" : "active";
-      await conn.execute(
-        `UPDATE subscriptions SET status = ?, dateUpdated = ?
-         WHERE onuId = ? AND status != 'terminated' AND recordStatus != 'Deleted'`,
-        [subscriptionStatus, now, onu.onuId]
-      );
+      //
+      // Two exclusions, and both matter:
+      //
+      //   reason 'recovery'  the modem has been collected and the subscription
+      //                      was closed before this job ran. There is nothing
+      //                      to follow, and the UPDATE would be a no-op anyway
+      //                      because the ONU was unbound — said out loud rather
+      //                      than relied on.
+      //   'for_recovery'     the account is revoked and awaiting pull-out. An
+      //                      activate reaching it would quietly put a written-
+      //                      off customer back into service, still owing.
+      if (reason !== "recovery") {
+        const subscriptionStatus = action === "deactivate" ? "suspended" : "active";
+        const stamp =
+          action === "deactivate"
+            ? `, suspendedAt = COALESCE(suspendedAt, ?)`
+            : `, suspendedAt = NULL`;
+        const stampParams = action === "deactivate" ? [now] : [];
+
+        await conn.execute(
+          `UPDATE subscriptions SET status = ?, dateUpdated = ?${stamp}
+           WHERE onuId = ? AND status NOT IN ('terminated', 'for_recovery')
+             AND recordStatus != 'Deleted'`,
+          [subscriptionStatus, now, ...stampParams, onu.onuId]
+        );
+      }
     }
 
     if (result.success && action === "status" && result.parsed) {

@@ -5,25 +5,35 @@ import moment from "moment-timezone";
  *
  * The billing model:
  *   - The billing period is the CALENDAR MONTH (e.g. July 1–31).
- *   - The statement date is the 15th of that month (when the invoice is issued).
- *   - Payment is due on the 2nd of the NEXT month (July invoice → due Aug 2).
+ *   - The statement day is when the invoice is issued — the 25th for this
+ *     client.
+ *   - Payment falls due on the 2nd of the NEXT month (July invoice → due Aug 2).
  *
- * ── Why the 15th and not the 1st ────────────────────────────────────────────
+ * ── The statement day is configuration, not a constant ──────────────────────
  *
- * The 15th is load-bearing, not cosmetic. It is what makes "a suspended
- * customer accrues nothing" fall out of the existing skip rule instead of
- * needing special handling:
+ * It lives in `system_settings` and an admin can change it. The values below
+ * are only the fallback for a caller that has no company to read settings for,
+ * and every real billing path passes a schedule in. See
+ * `lib/settings/settings.service.js`.
  *
- *   May 15  MAY invoice issued, due Jun 2
- *   Jun  2  unpaid → disconnected
- *   Jun 15  cycle runs → subscription is 'suspended' → SKIPPED
- *           ✅ no June invoice
- *   Jul  5  customer pays → reconnected
- *   Jul 15  cycle runs → 'active' → JULY invoice in full, due Aug 2
+ * ── Why it must stay late in the month ──────────────────────────────────────
  *
- * On a 1st-of-month statement the June invoice would be generated on Jun 1 —
- * the day BEFORE the Jun 2 disconnection — so the customer would wrongly owe
- * both May and June. Do not "simplify" this back to the 1st.
+ * The statement day is load-bearing, not cosmetic. It is what makes "a
+ * suspended customer accrues nothing" fall out of the existing skip rule
+ * instead of needing special handling:
+ *
+ *   Jul 25  JULY invoice issued, due Aug 2
+ *   Aug  2  unpaid → disconnected
+ *   Aug 25  cycle runs → subscription is 'suspended' → SKIPPED
+ *           ✅ no August invoice
+ *   Sep  5  customer pays → reconnected
+ *   Sep 25  cycle runs → 'active' → SEPTEMBER invoice in full, due Oct 2
+ *
+ * On a 1st-of-month statement the August invoice would be generated on Aug 1 —
+ * the day BEFORE the Aug 2 disconnection — so the customer would wrongly owe
+ * both July and August. `validateBillingSchedule` refuses that combination, and
+ * it is refused rather than clamped because the correct fix depends on which
+ * of the two dates the client actually meant to move.
  *
  * These functions return 'YYYY-MM-DD' strings, which is also how the DATE
  * columns come back from the driver (`dateStrings: true`), so a period read
@@ -32,16 +42,21 @@ import moment from "moment-timezone";
 
 const TZ = process.env.TIMEZONE || "Asia/Manila";
 
-/** Which day of the month invoices are issued. Read the note above first. */
-export const STATEMENT_DAY = 15;
-
-/** Which day of the following month payment is due. */
-export const DUE_DAY_OF_NEXT_MONTH = 2;
+/**
+ * The schedule used when no company context is available — a preview, a test,
+ * a script. Matches what migration 011 seeds, so a fallback can never quietly
+ * bill on a different day from the configured system.
+ */
+export const DEFAULT_STATEMENT_DAY = 25;
+export const DEFAULT_DUE_DAY = 2;
 
 /**
  * The billing period and its statement/due dates for the month `runDate` falls in.
  *
  * @param {Date|string} [runDate=new Date()]
+ * @param {Object} [schedule]
+ * @param {number} [schedule.statementDay=25] day of the month invoices are issued.
+ * @param {number} [schedule.dueDay=2] day of the FOLLOWING month payment is due.
  * @returns {{
  *   periodStart: string, periodEnd: string,
  *   statementDate: string, dueDate: string,
@@ -51,22 +66,30 @@ export const DUE_DAY_OF_NEXT_MONTH = 2;
  * @example
  *   computeBilledPeriod("2026-07-20")
  *   // → { periodStart: '2026-07-01', periodEnd: '2026-07-31',
- *   //     statementDate: '2026-07-15', dueDate: '2026-08-02',
+ *   //     statementDate: '2026-07-25', dueDate: '2026-08-02',
  *   //     daysInMonth: 31, year: 2026 }
  */
-export const computeBilledPeriod = (runDate = new Date()) => {
+export const computeBilledPeriod = (
+  runDate = new Date(),
+  { statementDay = DEFAULT_STATEMENT_DAY, dueDay = DEFAULT_DUE_DAY } = {}
+) => {
   const m = moment.tz(runDate, TZ);
   const start = m.clone().startOf("month");
   const end = m.clone().endOf("month");
-  // Issued on the 15th, but still covering the whole calendar month.
-  const statementDate = start.clone().date(STATEMENT_DAY);
-  const dueDate = start.clone().add(1, "month").date(DUE_DAY_OF_NEXT_MONTH);
+  const nextMonth = start.clone().add(1, "month");
+
+  // The settings bounds stop at 28 precisely so this clamp never fires. It is
+  // here for a schedule that arrives from somewhere else — a script, a seed —
+  // because `moment().date(31)` in February rolls into March silently, which
+  // would move a due date into the wrong month rather than to its last day.
+  const onDay = (base, day) => base.clone().date(Math.min(day, base.daysInMonth()));
 
   return {
     periodStart: start.format("YYYY-MM-DD"),
     periodEnd: end.format("YYYY-MM-DD"),
-    statementDate: statementDate.format("YYYY-MM-DD"),
-    dueDate: dueDate.format("YYYY-MM-DD"),
+    // Issued on the statement day, but still covering the whole calendar month.
+    statementDate: onDay(start, statementDay).format("YYYY-MM-DD"),
+    dueDate: onDay(nextMonth, dueDay).format("YYYY-MM-DD"),
     daysInMonth: m.daysInMonth(),
     year: m.year(),
   };
@@ -111,4 +134,9 @@ export const serviceDaysInPeriod = (activatedAt, periodStart, periodEnd, daysInM
   return end.date() - act.date() + 1;
 };
 
-export default { STATEMENT_DAY, DUE_DAY_OF_NEXT_MONTH, computeBilledPeriod, serviceDaysInPeriod };
+export default {
+  DEFAULT_STATEMENT_DAY,
+  DEFAULT_DUE_DAY,
+  computeBilledPeriod,
+  serviceDaysInPeriod,
+};

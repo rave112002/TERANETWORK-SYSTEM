@@ -1,4 +1,4 @@
-import { resolveGateway } from "../payment-gateways/index.js";
+import { resolveGatewayForBranch } from "../payment-gateways/index.js";
 import { buildPayUrl } from "../qr/payQr.js";
 import { getCurrentTimestampLocal } from "../../utils/dateUtils.js";
 import { logger } from "../../../config/logger.js";
@@ -66,9 +66,12 @@ export const createPaymentForInvoice = async (db, invoice) => {
     return { status: "not_payable", reason: invoice.status };
   }
 
+  // Per branch, not per company: the client collects through HitPay in Taguig
+  // and GCash Business in Batangas. The invoice already knows which branch it
+  // belongs to, so choosing here costs one indexed read and no ambiguity.
   let gateway;
   try {
-    gateway = resolveGateway();
+    gateway = await resolveGatewayForBranch(db, invoice.branchId);
   } catch (err) {
     logger.error(`[payments] ${err.message}`);
     return { status: "unavailable", reason: "no_adapter" };

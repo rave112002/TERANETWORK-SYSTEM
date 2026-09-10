@@ -121,7 +121,7 @@ const InvoicesPage = () => {
           <SearchInput
             value={filters.search}
             onChange={handleSearch}
-            placeholder="Search invoice number, customer, account no…"
+            placeholder="Search invoice no, customer…"
           />
           <div className="flex items-center gap-2">
             <RefreshButton onRefresh={refetch} isFetching={isFetching} />

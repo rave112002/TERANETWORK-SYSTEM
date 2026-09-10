@@ -263,8 +263,12 @@ router.post(
   checkPermission("billing", "cycle", "write"),
   validateBody(runDailySchema),
   catchAsync(async (req, res) => {
+    // Scoped to the caller's company: the schedule that decides which invoices
+    // are chased today is per company, and an unscoped run would sweep every
+    // tenant's invoices against one tenant's grace period.
     const result = await runDailyBilling(req.db, {
       runDate: req.body.runDate || new Date(),
+      companyId: req.user.companyId,
       context: getAuditContext(req),
     });
 

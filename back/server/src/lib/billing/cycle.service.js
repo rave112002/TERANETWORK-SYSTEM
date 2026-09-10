@@ -4,7 +4,7 @@ import { computeBilledPeriod, serviceDaysInPeriod } from "./billing.dates.js";
 import { buildInvoiceComputation } from "./invoice.calc.js";
 import { formatReference, nextSequence } from "../counters/counters.js";
 import { enqueue } from "../jobs/jobs.queue.js";
-import { getVatRate } from "../settings/settings.service.js";
+import { getBillingSchedule, getVatRate } from "../settings/settings.service.js";
 import { writeAudit, systemAuditContext } from "../../utils/audit.js";
 import { getCurrentTimestampLocal } from "../../utils/dateUtils.js";
 
@@ -59,15 +59,17 @@ export const allocateInvoiceNo = async (conn, companyId, year) => {
  * @param {Object} [opts]
  * @param {Date|string} [opts.runDate=new Date()] which month to bill.
  * @param {Object} [opts.context] audit context; defaults to the cycle system actor.
+ * @param {Object|null} [opts.schedule=null] the company's billing schedule, if the
+ *   caller has already read it. Omit and it is read from settings — pass it when
+ *   billing a whole company so the cycle does not re-read the same rows per
+ *   subscription.
  * @returns {Promise<{status: 'created'|'skipped', reason?: string, invoiceId?: string, invoiceNo?: string, total?: string}>}
  */
 export const generateInvoiceForSubscription = async (
   db,
   subscriptionId,
-  { runDate = new Date(), context = null } = {}
+  { runDate = new Date(), context = null, schedule = null } = {}
 ) => {
-  const period = computeBilledPeriod(runDate);
-
   const rows = await db.query(
     `SELECT s.subscriptionId, s.companyId, s.branchId, s.customerId, s.planId,
             s.status, s.activatedAt,
@@ -83,8 +85,12 @@ export const generateInvoiceForSubscription = async (
   if (!sub) return { status: "skipped", reason: "subscription_not_found" };
 
   // A suspended subscription is skipped and never billed. That is the whole
-  // point of issuing on the 15th — see billing.dates.js.
+  // point of issuing late in the month — see billing.dates.js.
   if (sub.status !== "active") return { status: "skipped", reason: "not_active" };
+
+  // Read after the subscription, because the schedule belongs to its company.
+  const effectiveSchedule = schedule ?? (await getBillingSchedule(db, sub.companyId));
+  const period = computeBilledPeriod(runDate, effectiveSchedule);
 
   const existing = await db.query(
     `SELECT invoiceId FROM invoices
@@ -271,7 +277,12 @@ export const runMonthlyCycle = async (
   db,
   { runDate = new Date(), companyId = null, branchIds = null, context = null } = {}
 ) => {
-  const period = computeBilledPeriod(runDate);
+  // One read for the whole run when the caller named a company — which the
+  // scheduler always does, because it loops companies. Without a company there
+  // is no schedule to read, so the summary reports the default period and each
+  // subscription still resolves its own company's dates.
+  const schedule = companyId ? await getBillingSchedule(db, companyId) : null;
+  const period = computeBilledPeriod(runDate, schedule ?? {});
 
   const where = [`status = 'active'`, `recordStatus != 'Deleted'`];
   const params = [];
@@ -302,7 +313,11 @@ export const runMonthlyCycle = async (
     // not abort the other nine hundred invoices.
     try {
       // eslint-disable-next-line no-await-in-loop
-      const res = await generateInvoiceForSubscription(db, s.subscriptionId, { runDate, context });
+      const res = await generateInvoiceForSubscription(db, s.subscriptionId, {
+        runDate,
+        context,
+        schedule,
+      });
       results.push({ subscriptionId: s.subscriptionId, ...res });
       if (res.status === "created") created += 1;
       else skipped += 1;

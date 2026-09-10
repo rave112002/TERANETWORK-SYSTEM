@@ -52,6 +52,10 @@ const SubscriptionsPage = () => {
   const suspended = data?.filter((s) => s.status === "suspended").length || 0;
   // Recurring revenue counts suspended subscriptions too — they are still
   // customers, just ones currently cut off for non-payment.
+  //
+  // It does NOT count 'for_recovery'. Those accounts have been given up on: no
+  // payment will restore them, so counting their plan price would be counting
+  // revenue the business has already decided it is not going to get.
   const mrr =
     data
       ?.filter((s) => ["active", "suspended"].includes(s.status))
@@ -174,7 +178,8 @@ const SubscriptionsPage = () => {
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="active">Active</SelectItem>
                   <SelectItem value="suspended">Suspended</SelectItem>
-                  <SelectItem value="terminated">Terminated</SelectItem>
+                  <SelectItem value="for_recovery">For pull-out</SelectItem>
+                  <SelectItem value="terminated">Closed</SelectItem>
                 </SelectContent>
               </Select>
             </div>

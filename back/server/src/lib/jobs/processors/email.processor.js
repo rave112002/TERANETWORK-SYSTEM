@@ -7,14 +7,14 @@ import {
 } from "../../email/templates/invoiceEmails.js";
 import { ensureInvoicePdf, loadInvoiceForRender } from "../../billing/invoice.render.js";
 import { buildPayUrl } from "../../qr/payQr.js";
-import { getGraceDays } from "../../settings/settings.service.js";
+import { getBillingSchedule } from "../../settings/settings.service.js";
 import { recordEmailEvent, sendEmail } from "../../email/email.service.js";
 
 /**
  * The email job processor.
  *
  * Registered for the `email` job type. `job.payload.kind` selects the message:
- * `invoice_issued`, `reminder`, `overdue`, `payment_received`.
+ * `invoice_issued`, `reminder`, `final`, `overdue`, `payment_received`.
  *
  * ── What throwing means here ────────────────────────────────────────────────
  *
@@ -32,6 +32,15 @@ const RENDERERS = {
     buildInvoiceIssuedEmail({ invoice, customer, payUrl, companyName }),
   reminder: ({ invoice, customer, payUrl, companyName }) =>
     buildInvoiceNoticeEmail({ kind: "reminder", invoice, customer, payUrl, companyName }),
+  final: ({ invoice, customer, payUrl, companyName, cutOffHour }) =>
+    buildInvoiceNoticeEmail({
+      kind: "final",
+      invoice,
+      customer,
+      payUrl,
+      cutOffHour,
+      companyName,
+    }),
   overdue: ({ invoice, customer, payUrl, companyName, graceDays }) =>
     buildInvoiceNoticeEmail({
       kind: "overdue",
@@ -44,6 +53,23 @@ const RENDERERS = {
   payment_received: ({ invoice, customer, payment, reconnecting, companyName }) =>
     buildPaymentReceivedEmail({ invoice, customer, payment, reconnecting, companyName }),
 };
+
+/**
+ * Every kind this processor can send.
+ *
+ * Exported so a test can hold it against the `email_events.type` ENUM. Adding a
+ * renderer without widening that column sends the email and then fails on the
+ * INSERT that records it — after the message has left, so the job retries and
+ * the customer receives it again. Migration 012 exists because of exactly that.
+ */
+export const EMAIL_KINDS = Object.keys(RENDERERS);
+
+/**
+ * The kinds that chase an unpaid invoice. They share two behaviours: none of
+ * them may be sent for an invoice that has since been paid, and each needs the
+ * billing schedule to say what happens next.
+ */
+const CHASING_KINDS = new Set(["reminder", "final", "overdue"]);
 
 /**
  * Process one `email` job.
@@ -84,7 +110,7 @@ export const emailProcessor = async (job, { db, logger }) => {
 
   // Nor should a paid invoice get a reminder or an overdue notice — the same
   // race, from the other direction.
-  if (invoice.status === "paid" && (kind === "reminder" || kind === "overdue")) {
+  if (invoice.status === "paid" && CHASING_KINDS.has(kind)) {
     logger.info(`[email] invoice ${invoice.invoiceNo} is already paid — not sending ${kind}`, {
       jobId: job.jobId,
     });
@@ -108,14 +134,19 @@ export const emailProcessor = async (job, { db, logger }) => {
   }
 
   const payUrl = buildPayUrl(invoice.publicToken);
-  const graceDays = kind === "overdue" ? await getGraceDays(db, invoice.companyId) : null;
+
+  // The two notices that state a consequence need the schedule to state it
+  // correctly: the overdue notice reads differently with no grace period, and
+  // the final notice names the hour the sweep runs.
+  const schedule = CHASING_KINDS.has(kind) ? await getBillingSchedule(db, invoice.companyId) : null;
 
   const message = render({
     invoice,
     customer,
     payUrl,
     companyName: company.name || "TERANETWORK",
-    graceDays,
+    graceDays: schedule?.graceDays ?? null,
+    cutOffHour: schedule?.dunningHour ?? null,
     payment: payload.payment ?? null,
     reconnecting: Boolean(payload.reconnecting),
   });

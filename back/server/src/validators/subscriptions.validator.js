@@ -16,7 +16,16 @@ import {
  * from the device") is not a field a form should be able to overwrite.
  */
 
-export const SUBSCRIPTION_STATUSES = ["pending", "active", "suspended", "terminated"];
+export const SUBSCRIPTION_STATUSES = [
+  "pending",
+  "active",
+  "suspended",
+  "for_recovery",
+  "terminated",
+];
+
+/** What the technician found when they went to collect the modem. */
+export const RECOVERY_OUTCOMES = ["recovered", "not_recovered"];
 
 const subscriptionShape = {
   customerId: z.string().min(1, "Customer is required").max(50),
@@ -42,14 +51,26 @@ export const updateSubscriptionSchema = z.object(subscriptionShape);
  * ONU's own state. Exposing them as buttons would let the database claim a
  * customer is cut off — or reconnected — when the hardware disagrees.
  */
-export const transitionSchema = z.object({
-  action: z.enum(["activate", "terminate"], {
-    error: "Action must be 'activate' or 'terminate'",
-  }),
-  // Required on terminate: "why did this customer leave" is unanswerable a year
-  // later without it, and terminate is the one irreversible transition.
-  reason: optionalString(255),
-});
+export const transitionSchema = z
+  .object({
+    action: z.enum(["activate", "terminate", "revoke", "unrevoke", "close"], {
+      error: "Action must be 'activate', 'terminate', 'revoke', 'unrevoke' or 'close'",
+    }),
+    // Required on terminate: "why did this customer leave" is unanswerable a
+    // year later without it, and terminate is the one irreversible transition.
+    reason: optionalString(255),
+    // Only meaningful on 'close'. A modem that came back goes into stock; one
+    // that did not stays blacklisted at the OLT so nobody else can use it, and
+    // its record is written off rather than deleted.
+    outcome: z.enum(RECOVERY_OUTCOMES).optional(),
+  })
+  .refine((data) => data.action !== "close" || Boolean(data.outcome), {
+    path: ["outcome"],
+    // The whole point of closing a recovery is recording what happened to the
+    // hardware. Allowing it to be omitted would leave the modem in a state
+    // nobody can act on: neither in stock nor written off.
+    message: "Say whether the modem was recovered — it decides where it goes next",
+  });
 
 // GET / — list query params (a cleared filter arrives as "", see _helpers.js)
 export const listSubscriptionsQuerySchema = z.object({
@@ -66,4 +87,9 @@ export const listSubscriptionsQuerySchema = z.object({
     "dateCreated",
   ),
   sortOrder: queryEnumDefault(["ASC", "DESC"], "DESC"),
+});
+
+// GET /recovery/candidates and /recovery/pending — both take only a search box.
+export const recoveryQuerySchema = z.object({
+  search: z.string().max(100).optional().default(""),
 });

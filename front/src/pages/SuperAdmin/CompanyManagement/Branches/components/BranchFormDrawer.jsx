@@ -2,7 +2,7 @@ import { useEffect, useMemo } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { Building2, Loader2, Mail, MapPin, Phone, Plus, X } from "lucide-react";
+import { Building2, CreditCard, Loader2, Mail, MapPin, Phone, Plus, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -36,6 +36,7 @@ import {
   useUpdateBranch,
 } from "../../../../../services/requests/superadmin/branches";
 import { useGetCompanies } from "../../../../../services/requests/superadmin/companies";
+import { useGetSystemInfo } from "../../../../../services/requests/superadmin/system";
 import {
   PHONE_MAX_LENGTH,
   PHONE_PLACEHOLDER,
@@ -48,6 +49,22 @@ const STATUS_OPTIONS = [
   { value: "Inactive", label: "Inactive" },
   { value: "Suspended", label: "Suspended" },
 ];
+
+/**
+ * "Follow the company default" needs a value a <Select> can hold, because Radix
+ * treats an empty string as "nothing selected" and shows the placeholder
+ * instead of the choice. It is translated back to "" on the way out, which the
+ * API stores as NULL.
+ */
+const DEFAULT_PROVIDER = "__default__";
+
+/** Names for the slugs. Anything unrecognised shows its slug rather than
+ *  disappearing — a branch pointed at a gateway this build does not have is
+ *  exactly what somebody needs to see. */
+const PROVIDER_LABELS = {
+  hitpay: "HitPay",
+  mock: "Mock gateway (development)",
+};
 
 const optionalEmail = z
   .string()
@@ -62,6 +79,7 @@ const EMPTY = {
   email: "",
   phone: "",
   address: "",
+  paymentProvider: DEFAULT_PROVIDER,
   status: "Active",
 };
 
@@ -71,6 +89,19 @@ const BranchFormDrawer = ({ open, onClose, onSuccess, entity }) => {
   const isEditMode = !!entity;
   const createMutation = useCreateBranch();
   const updateMutation = useUpdateBranch();
+
+  // Which adapters this build actually has, read from the server rather than
+  // listed here. A hard-coded dropdown lags the code by a release, and the
+  // symptom is a gateway you cannot select on the day it ships.
+  const { data: systemData } = useGetSystemInfo();
+  const gateway = systemData?.data?.paymentGateway;
+  const providerOptions = useMemo(() => {
+    const available = gateway?.available ?? [];
+    return available.map((slug) => ({
+      value: slug,
+      label: PROVIDER_LABELS[slug] ?? slug,
+    }));
+  }, [gateway]);
 
   const { data: orgsData } = useGetCompanies({ pageSize: 100 });
   const orgOptions = useMemo(() => {
@@ -93,6 +124,7 @@ const BranchFormDrawer = ({ open, onClose, onSuccess, entity }) => {
         email: optionalEmail,
         phone: zPhone,
         address: z.string().max(255, "Must be 255 characters or fewer"),
+        paymentProvider: z.string(),
         ...(isEditMode
           ? { status: z.enum(["Active", "Inactive", "Suspended"]) }
           : {}),
@@ -115,6 +147,7 @@ const BranchFormDrawer = ({ open, onClose, onSuccess, entity }) => {
             email: entity.email ?? "",
             phone: entity.phone ?? "",
             address: entity.address ?? "",
+            paymentProvider: entity.paymentProvider || DEFAULT_PROVIDER,
             status: entity.status ?? "Active",
           }
         : EMPTY,
@@ -140,6 +173,11 @@ const BranchFormDrawer = ({ open, onClose, onSuccess, entity }) => {
   });
 
   const onSubmit = async (values) => {
+    // The sentinel exists only so a <Select> can hold "follow the company
+    // default"; the API says that with an empty string, and stores it as NULL.
+    const provider =
+      values.paymentProvider === DEFAULT_PROVIDER ? "" : values.paymentProvider;
+
     try {
       if (isEditMode) {
         // The PUT endpoint does not accept companyId — a branch can't be moved.
@@ -150,6 +188,7 @@ const BranchFormDrawer = ({ open, onClose, onSuccess, entity }) => {
             email: values.email || null,
             phone: values.phone || null,
             address: values.address || null,
+            paymentProvider: provider,
             status: values.status,
           },
         });
@@ -160,6 +199,7 @@ const BranchFormDrawer = ({ open, onClose, onSuccess, entity }) => {
           email: values.email || null,
           phone: values.phone || null,
           address: values.address || null,
+          paymentProvider: provider,
         });
       }
       markSaved(); // the parent closes us next — don't ask about saved changes
@@ -377,6 +417,58 @@ const BranchFormDrawer = ({ open, onClose, onSuccess, entity }) => {
                           {field.value?.length || 0}/255
                         </span>
                       </div>
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="mt-7">
+                <SectionLabel>Payments</SectionLabel>
+                <FormField
+                  control={form.control}
+                  name="paymentProvider"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Collect through</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger className="h-10 w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value={DEFAULT_PROVIDER}>
+                            {/* A colon rather than parentheses: the mock's own
+                                label already carries a bracketed word, and
+                                "Company default (Mock gateway (development))"
+                                reads as a typo. */}
+                            Company default
+                            {gateway?.provider
+                              ? `: ${PROVIDER_LABELS[gateway.provider] ?? gateway.provider}`
+                              : ""}
+                          </SelectItem>
+                          {providerOptions.map((o) => (
+                            <SelectItem key={o.value} value={o.value}>
+                              {o.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {/* Says the one thing that is not obvious from the field:
+                          picking a gateway here does not give this branch its
+                          own merchant account. */}
+                      <p
+                        className="m-0 mt-1.5"
+                        style={{ fontSize: 12, color: "var(--color-text-muted)" }}
+                      >
+                        <CreditCard
+                          className="inline w-3.5 h-3.5 mr-1 -mt-0.5"
+                          strokeWidth={1.9}
+                        />
+                        Branches on the same gateway share one merchant account. Its
+                        credentials live in the server environment, not here.
+                      </p>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />

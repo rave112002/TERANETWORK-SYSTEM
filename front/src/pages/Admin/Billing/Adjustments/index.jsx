@@ -90,7 +90,7 @@ const AdjustmentsPage = () => {
           <SearchInput
             value={filters.search}
             onChange={handleSearch}
-            placeholder="Search description, customer, account no…"
+            placeholder="Search description, customer…"
           />
           <div className="flex items-center gap-2">
             <RefreshButton onRefresh={refetch} isFetching={isFetching} />

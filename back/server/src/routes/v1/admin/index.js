@@ -22,6 +22,7 @@ import invoicesController from "../../../controllers/v1/admin/invoices.controlle
 import paymentsController from "../../../controllers/v1/admin/payments.controller.js";
 import adjustmentsController from "../../../controllers/v1/admin/adjustments.controller.js";
 import dunningController from "../../../controllers/v1/admin/dunning.controller.js";
+import reportsController from "../../../controllers/v1/admin/reports.controller.js";
 import provisioningController from "../../../controllers/v1/admin/provisioning.controller.js";
 import discoveryController from "../../../controllers/v1/admin/discovery.controller.js";
 import { auditTrail } from "../../../middlewares/auditTrail.middleware.js";
@@ -68,5 +69,10 @@ router.use("/invoices", requireAuth, auditTrail("billing"), invoicesController);
 router.use("/payments", requireAuth, auditTrail("billing"), paymentsController);
 router.use("/adjustments", requireAuth, auditTrail("billing"), adjustmentsController);
 router.use("/dunning", requireAuth, auditTrail("billing"), dunningController);
+
+// Reports are read-only, so no auditTrail wrapper — the audit log records
+// changes, and filling it with "somebody looked at the aging report" would
+// bury the entries that matter.
+router.use("/reports", requireAuth, reportsController);
 
 export default router;

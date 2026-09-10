@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  DUE_DAY_OF_NEXT_MONTH,
-  STATEMENT_DAY,
+  DEFAULT_DUE_DAY,
+  DEFAULT_STATEMENT_DAY,
   computeBilledPeriod,
   serviceDaysInPeriod,
 } from "./billing.dates.js";
@@ -18,17 +18,39 @@ describe("computeBilledPeriod", () => {
     expect(fromThe1st.periodEnd).toBe(fromThe20th.periodEnd);
   });
 
-  it("issues on the 15th and falls due on the 2nd of the next month", () => {
-    const july = computeBilledPeriod("2026-07-15");
+  it("issues on the statement day and falls due on the due day of the next month", () => {
+    const july = computeBilledPeriod("2026-07-25");
 
-    expect(july.statementDate).toBe("2026-07-15");
+    expect(july.statementDate).toBe("2026-07-25");
     expect(july.dueDate).toBe("2026-08-02");
   });
 
-  it("rolls the due date into the next year in December", () => {
-    const december = computeBilledPeriod("2026-12-15");
+  it("honours a schedule the admin has changed", () => {
+    // The whole point of the settings work: the client moving their invoice
+    // day is a form field, not a deploy.
+    const july = computeBilledPeriod("2026-07-20", { statementDay: 18, dueDay: 5 });
 
-    expect(december.statementDate).toBe("2026-12-15");
+    expect(july.statementDate).toBe("2026-07-18");
+    expect(july.dueDate).toBe("2026-08-05");
+    // The period itself does not move with the statement day.
+    expect(july.periodStart).toBe("2026-07-01");
+    expect(july.periodEnd).toBe("2026-07-31");
+  });
+
+  it("keeps a due date inside its month rather than rolling into the next one", () => {
+    // The settings bounds stop at 28 so this cannot come from the UI, but a
+    // script passing 31 must get February 28th — not March 3rd, which is what
+    // `moment().date(31)` does on its own.
+    const january = computeBilledPeriod("2026-01-10", { statementDay: 31, dueDay: 31 });
+
+    expect(january.statementDate).toBe("2026-01-31");
+    expect(january.dueDate).toBe("2026-02-28");
+  });
+
+  it("rolls the due date into the next year in December", () => {
+    const december = computeBilledPeriod("2026-12-25");
+
+    expect(december.statementDate).toBe("2026-12-25");
     expect(december.dueDate).toBe("2027-01-02");
     expect(december.year).toBe(2026);
   });
@@ -60,17 +82,22 @@ describe("computeBilledPeriod", () => {
     expect(period.periodEnd).toBe("2026-07-31");
   });
 
-  it("keeps the statement and due days where the billing model puts them", () => {
-    // Not a tautology: these constants are what make a suspended customer
-    // accrue nothing, and moving the statement to the 1st would silently
-    // double-bill every reconnected customer. See billing.dates.js.
-    expect(STATEMENT_DAY).toBe(15);
-    expect(DUE_DAY_OF_NEXT_MONTH).toBe(2);
+  it("defaults to the schedule the migration seeds", () => {
+    // Not a tautology. These are the fallback for a caller with no company to
+    // read settings for, and they have to match what migration 011 writes —
+    // otherwise a preview or a script silently bills on a different day from
+    // the running system. The client issues on the 25th, due on the 2nd.
+    expect(DEFAULT_STATEMENT_DAY).toBe(25);
+    expect(DEFAULT_DUE_DAY).toBe(2);
+
+    const july = computeBilledPeriod("2026-07-20");
+    expect(july.statementDate).toBe("2026-07-25");
+    expect(july.dueDate).toBe("2026-08-02");
   });
 });
 
 describe("serviceDaysInPeriod", () => {
-  const july = computeBilledPeriod("2026-07-15");
+  const july = computeBilledPeriod("2026-07-25");
 
   it("bills the full month when the subscription predates the period", () => {
     expect(serviceDaysInPeriod("2026-05-04", july.periodStart, july.periodEnd, 31)).toBe(31);

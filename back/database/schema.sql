@@ -67,6 +67,11 @@ CREATE TABLE IF NOT EXISTS branches (
   zipCode VARCHAR(20) NULL,
   logoUrl VARCHAR(255) NULL,
   website VARCHAR(255) NULL,
+  -- Which payment gateway this branch collects through. NULL follows the
+  -- company default in PAYMENT_PROVIDER. It carries no credentials — those stay
+  -- in the environment, so two branches on the same provider share one merchant
+  -- account. See migration 014 and lib/payment-gateways/index.js.
+  paymentProvider VARCHAR(30) NULL,
   isMainBranch TINYINT(1) NOT NULL DEFAULT 0,
   status ENUM('Active','Inactive','Suspended','Deleted') NOT NULL DEFAULT 'Active',
   dateCreated DATETIME NOT NULL,
@@ -578,10 +583,21 @@ CREATE TABLE IF NOT EXISTS subscriptions (
   -- One live subscription per modem. NULL while a connection is pending
   -- installation, so the UNIQUE key tolerates many un-bound rows.
   onuId VARCHAR(50) NULL,
-  status ENUM('pending','active','suspended','terminated') NOT NULL DEFAULT 'pending',
+  -- 'for_recovery' is a status rather than a reason on 'terminated' because the
+  -- two differ in what the system may do: on for_recovery the modem is still on
+  -- the customer's wall and the NAP port is still occupied. See migration 013.
+  status ENUM('pending','active','suspended','for_recovery','terminated') NOT NULL DEFAULT 'pending',
   -- When service actually began. Proration reads this, so it is set at
   -- activation rather than at creation.
   activatedAt DATETIME NULL,
+  -- Starts the clock on modem recovery: the client counts 60 days from the
+  -- disconnection, not from the last payment or the due date.
+  suspendedAt DATETIME NULL,
+  -- When staff confirmed the pull-out, so the technician queue can be aged.
+  forRecoveryAt DATETIME NULL,
+  -- A modem that came back goes to stock; one that did not stays blacklisted at
+  -- the OLT so nobody else can use it. Opposite handling, so it is recorded.
+  recoveryOutcome ENUM('recovered','not_recovered') NULL,
   terminatedAt DATETIME NULL,
   notes TEXT NULL,
   -- Separate from `status`: one is the service lifecycle, the other is whether
@@ -593,6 +609,7 @@ CREATE TABLE IF NOT EXISTS subscriptions (
   INDEX idx_subscriptions_customerId (customerId),
   INDEX idx_subscriptions_planId (planId),
   INDEX idx_subscriptions_status (status),
+  INDEX idx_subscriptions_recovery (status, suspendedAt),
   INDEX idx_subscriptions_tenant (companyId, branchId, recordStatus),
   CONSTRAINT fk_subscriptions_company  FOREIGN KEY (companyId)  REFERENCES companies(companyId),
   CONSTRAINT fk_subscriptions_branch   FOREIGN KEY (branchId)   REFERENCES branches(branchId),
@@ -607,8 +624,13 @@ CREATE TABLE IF NOT EXISTS subscriptions (
 --
 -- These live in the database rather than the environment because they must be
 -- changeable without a restart: DRY_RUN is a kill switch someone reaches for
--- while a disconnect is going wrong, and GRACE_DAYS is a business rule the
--- client may revise. Anything that only changes at deploy time stays in .env.
+-- while a disconnect is going wrong, and the billing schedule — STATEMENT_DAY,
+-- DUE_DAY, GRACE_DAYS, REMINDER_DAYS_BEFORE and the three run hours — is a set
+-- of business rules the client revises. The scheduler re-reads them every hour,
+-- so an edit on the System screen takes effect on the next tick. Anything that
+-- only changes at deploy time stays in .env.
+--
+-- Seeded by migrations 005 and 011, not here: seeding needs companies to exist.
 CREATE TABLE IF NOT EXISTS system_settings (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   companyId VARCHAR(50) NOT NULL,
@@ -883,7 +905,9 @@ CREATE TABLE IF NOT EXISTS email_events (
   companyId VARCHAR(50) NOT NULL,
   invoiceId VARCHAR(50) NULL,
   customerId VARCHAR(50) NOT NULL,
-  type ENUM('invoice_issued','reminder','overdue','suspension','reconnection','payment_received')
+  -- 'final' is the last warning, sent on the morning of the cut-off day. See
+  -- lib/billing/reminders.service.js for why the other two were not enough.
+  type ENUM('invoice_issued','reminder','final','overdue','suspension','reconnection','payment_received')
     NOT NULL,
   recipient VARCHAR(190) NOT NULL,
   subject VARCHAR(255) NULL,

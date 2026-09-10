@@ -62,7 +62,8 @@ export const cutoffDate = (runDate, graceDays) =>
  * @param {Object} db
  * @param {Object} [opts]
  * @param {Date|string} [opts.runDate=new Date()]
- * @param {number} [opts.graceDays=3]
+ * @param {number} [opts.graceDays=0] the client's configured value. Every caller
+ *   passes it from settings; the default only matters to a direct call.
  * @param {string|null} [opts.subscriptionId=null] narrow to one subscription.
  *   Used by the worker's re-check, so "should this customer be disconnected?"
  *   is asked in exactly one place. If the sweep and the re-check ever drifted,
@@ -75,7 +76,7 @@ export const findDisconnectCandidates = async (
   db,
   {
     runDate = new Date(),
-    graceDays = 3,
+    graceDays = 0,
     subscriptionId = null,
     companyId = null,
     branchIds = null,

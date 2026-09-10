@@ -5,12 +5,19 @@ import { getCurrentTimestampLocal } from "../../../utils/dateUtils.js";
 import { checkPermission } from "../../../middlewares/checkPermission.middleware.js";
 import { branchScope, getScopedBranchIds } from "../../../utils/branchScope.js";
 import { getAuditContext, writeAudit } from "../../../utils/audit.js";
+import { enqueue } from "../../../lib/jobs/jobs.queue.js";
 import { findScopedRow } from "../../../lib/network/network.helpers.js";
+import { getRecoveryAfterDays } from "../../../lib/settings/settings.service.js";
+import {
+  findAwaitingPullOut,
+  findRecoveryCandidates,
+} from "../../../lib/recovery/recovery.service.js";
 import {
   createSubscriptionSchema,
   updateSubscriptionSchema,
   transitionSchema,
   listSubscriptionsQuerySchema,
+  recoveryQuerySchema,
 } from "../../../validators/subscriptions.validator.js";
 
 const router = express.Router();
@@ -20,20 +27,41 @@ const router = express.Router();
  *
  * ── The lifecycle, and who owns each edge ───────────────────────────────────
  *
- *   pending   → active       staff, via POST /:id/status { action: 'activate' }
- *   active    → suspended    the DUNNING WORKER, after the OLT confirms the cut
- *   suspended → active       the PAYMENT PATH, after the OLT confirms restore
- *   any       → terminated   staff, via POST /:id/status { action: 'terminate' }
+ *   pending      → active         staff, POST /:id/status { action: 'activate' }
+ *   active       → suspended      the DUNNING WORKER, after the OLT confirms the cut
+ *   suspended    → active         the PAYMENT PATH, after the OLT confirms restore
+ *   suspended    → for_recovery   staff, { action: 'revoke' }
+ *   for_recovery → suspended      staff, { action: 'unrevoke' } — a correction
+ *   for_recovery → terminated     staff, { action: 'close', outcome }
+ *   any          → terminated     staff, { action: 'terminate' }
  *
  * Only the staff edges live here. Suspension and restoration mirror what the
  * device is actually doing and are written by the worker in the same
  * transaction as the ONU's state — if this controller could set them, the
  * system would bill on a belief the hardware does not share, and the dunning
  * sweep reads exactly this column to decide who to cut off.
+ *
+ * ── What 'for_recovery' means, and what it costs to get wrong ───────────────
+ *
+ * The customer has been cut off for the configured number of days (60 by the
+ * client's rule) and the business has given up on them. The modem is still on
+ * their wall and the NAP port is still theirs; a technician has to go and get
+ * it back. Screen label: **For pull-out**.
+ *
+ * Revoking is not suspending harder. It is the end of the relationship:
+ *
+ *   - paying no longer restores service, at any amount
+ *   - coming back is a NEW subscription, with a new installation fee
+ *   - the debt survives, so the account still appears in aging
+ *
+ * That last consequence is why this is a staff decision and not a timer, and
+ * why `unrevoke` exists — a revocation made by mistake has to be undoable
+ * without charging somebody a second installation for a clerical error.
  */
 
 const SUBSCRIPTION_COLUMNS = `s.subscriptionId, s.companyId, s.branchId, s.customerId,
-  s.planId, s.onuId, s.status, s.activatedAt, s.terminatedAt, s.notes,
+  s.planId, s.onuId, s.status, s.activatedAt, s.suspendedAt, s.forRecoveryAt,
+  s.recoveryOutcome, s.terminatedAt, s.notes,
   s.recordStatus, s.dateCreated, s.dateUpdated`;
 
 const JOINED_COLUMNS = `c.accountNo, c.name AS customerName, c.email AS customerEmail,
@@ -151,6 +179,58 @@ router.get(
         totalPages: Math.ceil(total / pageSize),
       },
     });
+  })
+);
+
+/**
+ * GET /recovery/candidates — accounts cut off long enough to consider giving up on.
+ *
+ * Registered before `/:subscriptionId` on purpose: Express matches in order, and
+ * a route parameter declared first would swallow "recovery" as a subscription
+ * id and answer 404 for a page that exists.
+ *
+ * Read-only. Nothing here revokes anything; the list is for a person.
+ */
+router.get(
+  "/recovery/candidates",
+  checkPermission("subscriptions", null, "read"),
+  validateQuery(recoveryQuerySchema),
+  catchAsync(async (req, res) => {
+    const { search = "" } = req.query;
+    const { companyId } = req.user;
+
+    const recoveryAfterDays = await getRecoveryAfterDays(req.db, companyId);
+    const result = await findRecoveryCandidates(req.db, {
+      companyId,
+      branchIds: getScopedBranchIds(req.user),
+      recoveryAfterDays,
+      search,
+    });
+
+    return res.sendSuccess("Recovery candidates retrieved", result);
+  })
+);
+
+/**
+ * GET /recovery/pending — modems already marked for pull-out, still uncollected.
+ *
+ * The technician's outstanding work, oldest first.
+ */
+router.get(
+  "/recovery/pending",
+  checkPermission("subscriptions", null, "read"),
+  validateQuery(recoveryQuerySchema),
+  catchAsync(async (req, res) => {
+    const { search = "" } = req.query;
+    const { companyId } = req.user;
+
+    const pending = await findAwaitingPullOut(req.db, {
+      companyId,
+      branchIds: getScopedBranchIds(req.user),
+      search,
+    });
+
+    return res.sendSuccess("Pending pull-outs retrieved", { pending });
   })
 );
 
@@ -436,7 +516,7 @@ router.post(
   validateBody(transitionSchema),
   catchAsync(async (req, res) => {
     const { subscriptionId } = req.params;
-    const { action, reason } = req.body;
+    const { action, reason, outcome } = req.body;
     const { companyId } = req.user;
     const now = getCurrentTimestampLocal();
 
@@ -446,7 +526,8 @@ router.post(
 
       const before = await findScopedSubscription(conn, req, subscriptionId, {
         columns:
-          "subscriptionId, customerId, planId, onuId, status, activatedAt, terminatedAt",
+          "subscriptionId, companyId, branchId, customerId, planId, onuId, status, " +
+          "activatedAt, suspendedAt, forRecoveryAt, recoveryOutcome, terminatedAt",
         forUpdate: true,
       });
 
@@ -491,7 +572,204 @@ router.post(
         return res.sendSuccess("Subscription activated", { status: "active" });
       }
 
+      if (action === "revoke") {
+        // Only from 'suspended'. Not from 'active' — an account with working
+        // service is not somebody the business has given up on, whatever the
+        // arrears look like, and reaching this from 'active' would mean nobody
+        // ever cut them off, which is a different problem.
+        if (before.status !== "suspended") {
+          await req.db.rollback(conn);
+          return res.sendError(
+            `Only a suspended account can be marked for pull-out (this one is '${before.status}')`,
+            409
+          );
+        }
+
+        await conn.execute(
+          `UPDATE subscriptions
+           SET status = 'for_recovery', forRecoveryAt = ?, dateUpdated = ?
+           WHERE subscriptionId = ? AND companyId = ?`,
+          [now, now, subscriptionId, companyId]
+        );
+
+        await writeAudit(conn, {
+          context: getAuditContext(req),
+          module: "subscriptions",
+          action: "revoke",
+          // Spelled out because this is the entry somebody reads when a former
+          // customer rings up asking why paying did not switch them back on.
+          description:
+            "Marked for pull-out — the account is revoked, payment no longer restores " +
+            "service, and coming back means a new subscription and a new installation fee",
+          before,
+          after: { ...before, status: "for_recovery", forRecoveryAt: now },
+          meta: reason ? { reason } : null,
+        });
+
+        await req.db.commit(conn);
+        return res.sendSuccess("Marked for pull-out", { status: "for_recovery" });
+      }
+
+      if (action === "unrevoke") {
+        // For a revocation made in error. Deliberately NOT a way back for a
+        // customer who has decided to pay: it returns them to 'suspended', and
+        // service still only comes back the usual way, through the device.
+        if (before.status !== "for_recovery") {
+          await req.db.rollback(conn);
+          return res.sendError(
+            `Only an account marked for pull-out can be un-marked (this one is '${before.status}')`,
+            409
+          );
+        }
+
+        await conn.execute(
+          `UPDATE subscriptions
+           SET status = 'suspended', forRecoveryAt = NULL, dateUpdated = ?
+           WHERE subscriptionId = ? AND companyId = ?`,
+          [now, subscriptionId, companyId]
+        );
+
+        await writeAudit(conn, {
+          context: getAuditContext(req),
+          module: "subscriptions",
+          action: "unrevoke",
+          description:
+            "Cancelled the pull-out — the account is suspended again. Service still " +
+            "returns only when the balance is settled.",
+          before,
+          after: { ...before, status: "suspended", forRecoveryAt: null },
+          meta: reason ? { reason } : null,
+        });
+
+        await req.db.commit(conn);
+        return res.sendSuccess("Pull-out cancelled", { status: "suspended" });
+      }
+
+      if (action === "close") {
+        if (before.status !== "for_recovery") {
+          await req.db.rollback(conn);
+          return res.sendError(
+            `Only an account marked for pull-out can be closed this way (this one is ` +
+              `'${before.status}'). Use 'terminate' for a customer who is leaving normally.`,
+            409
+          );
+        }
+
+        const recovered = outcome === "recovered";
+        let onu = null;
+
+        if (before.onuId) {
+          const [onuRows] = await conn.execute(
+            `SELECT onuId, mac, serialNo, oltId, napId, napPort, provisioningState
+               FROM onus WHERE onuId = ? FOR UPDATE`,
+            [before.onuId]
+          );
+          onu = onuRows[0] ?? null;
+        }
+
+        await conn.execute(
+          `UPDATE subscriptions
+           SET status = 'terminated', terminatedAt = ?, recoveryOutcome = ?,
+               onuId = NULL, dateUpdated = ?
+           WHERE subscriptionId = ? AND companyId = ?`,
+          [now, outcome, now, subscriptionId, companyId]
+        );
+
+        let unblacklistQueued = false;
+
+        if (onu) {
+          // ── The NAP port is released either way ───────────────────────
+          //
+          // Whether or not the unit came back, nothing of ours is serving that
+          // address any more, and the port has to be available for the next
+          // install. Holding it because a technician could not retrieve a modem
+          // would slowly starve a NAP of ports for no benefit.
+          //
+          // ── What differs is where the modem goes ──────────────────────
+          //
+          //   recovered      back to stock: unprovisioned, and un-blacklisted at
+          //                  the OLT so it actually works when next seated
+          //   not_recovered  written off: the record is kept for its history and
+          //                  the MAC STAYS blacklisted, because the unit is on
+          //                  somebody's shelf and must not be usable
+          if (recovered) {
+            await conn.execute(
+              `UPDATE onus
+                 SET napId = NULL, napPort = NULL, provisioningState = 'unprovisioned',
+                     recordStatus = 'Active', dateUpdated = ?
+               WHERE onuId = ?`,
+              [now, onu.onuId]
+            );
+
+            // A modem left blacklisted is a brick the next time a technician
+            // seats it, months from now, with nothing to explain why. Queued
+            // rather than sent here: nothing in a request handler talks to a
+            // device.
+            if (onu.oltId && onu.mac) {
+              const { deduped } = await enqueue(conn, {
+                companyId,
+                branchId: before.branchId,
+                type: "activate",
+                payload: {
+                  onuId: onu.onuId,
+                  reason: "recovery",
+                  triggeredBy: `user:${req.user.accountId}`,
+                },
+                dedupeKey: `activate:recovery:${onu.onuId}`,
+              });
+              unblacklistQueued = !deduped;
+            }
+          } else {
+            await conn.execute(
+              `UPDATE onus
+                 SET napId = NULL, napPort = NULL, recordStatus = 'Inactive',
+                     dateUpdated = ?
+               WHERE onuId = ?`,
+              [now, onu.onuId]
+            );
+          }
+        }
+
+        const modem = onu?.mac || onu?.serialNo || "(none on record)";
+
+        await writeAudit(conn, {
+          context: getAuditContext(req),
+          module: "subscriptions",
+          action: "recovery.close",
+          description: recovered
+            ? `Closed the account — modem ${modem} recovered and returned to stock, ` +
+              `NAP port released`
+            : `Closed the account — modem ${modem} was NOT recovered. It stays ` +
+              `blacklisted at the OLT and is written off; the NAP port is released.`,
+          before,
+          after: {
+            ...before,
+            status: "terminated",
+            terminatedAt: now,
+            recoveryOutcome: outcome,
+            onuId: null,
+          },
+          meta: reason ? { reason, outcome } : { outcome },
+        });
+
+        await req.db.commit(conn);
+        return res.sendSuccess("Account closed", {
+          status: "terminated",
+          outcome,
+          unblacklistQueued,
+        });
+      }
+
       // action === "terminate"
+      if (before.status === "for_recovery") {
+        await req.db.rollback(conn);
+        return res.sendError(
+          "This account is awaiting modem pull-out. Close it with the recovery outcome " +
+            "instead, so the modem is either returned to stock or written off.",
+          409
+        );
+      }
+
       if (before.status === "terminated") {
         await req.db.rollback(conn);
         return res.sendError("This subscription is already terminated", 409);

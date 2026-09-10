@@ -57,11 +57,21 @@ export const recomputeInvoiceTotals = async (conn, invoiceId, vatRate = 0) => {
  * one of three overdue invoices would restore service they have not paid for,
  * and the next dunning sweep would cut them off again the same day.
  *
+ * ── Only a 'suspended' subscription is reconnected ─────────────────────────
+ *
+ * Not 'for_recovery'. Once an account is revoked and waiting for a technician
+ * to collect the modem, the relationship is over: paying settles the debt, and
+ * the debt is still owed, but it does not buy the service back. Coming back is
+ * a new subscription with a new installation fee, which is the client's rule.
+ *
+ * That is one `!==` and it is the whole of the enforcement, which is why it is
+ * exported and tested directly rather than left to be inferred from a comment.
+ *
  * @param {import('mysql2/promise').PoolConnection} conn
  * @param {Object} invoice the locked invoice row.
  * @returns {Promise<boolean>} whether a job was queued.
  */
-const queueReconnectionIfSettled = async (conn, invoice) => {
+export const queueReconnectionIfSettled = async (conn, invoice) => {
   const [subs] = await conn.execute(
     `SELECT subscriptionId, status, onuId FROM subscriptions
       WHERE subscriptionId = ? LIMIT 1`,

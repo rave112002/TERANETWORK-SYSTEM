@@ -19,10 +19,13 @@
 | **S5** | Settings + jobs queue + worker | ✅ complete |
 | **S6** | OLT drivers + provisioning | ✅ complete |
 | **S7** | Billing | ✅ complete |
-| **S8** | Payment gateway | 🟡 port complete — adapter pending the client's choice |
+| **S8** | Payment gateway | ✅ complete — the port, the mock, and the HitPay adapter (S14) |
 | **S9** | Dunning | ✅ complete |
 | **S10** | Discovery | ✅ complete — OLT half; the router half is blocked on M22/P4 |
-| S11 | Phase-6 surface | ⬜ |
+| **S11** | Phase-6 surface | 🟡 dashboard, reports and runbooks done — M14/M15/M17 remain |
+| **S12** | Client billing schedule | ✅ complete — the schedule is admin-editable and seeded with the client's real dates |
+| **S13** | Revocation and modem recovery | ✅ complete — the lifecycle now has an end, and the modem comes back |
+| **S14** | HitPay + per-branch gateways | ✅ built and tested — waiting only on the client's merchant credentials |
 
 ---
 
@@ -765,7 +768,9 @@ button.
 
 ---
 
-## S8 — Payment gateway (port complete, adapter pending) 🟡
+## S8 — Payment gateway ✅
+
+> The port and the mock. The HitPay adapter and per-branch routing are S14.
 
 The client asked to evaluate Philippine gateways other than Xendit before
 committing, so this stage built everything that does **not** depend on which one
@@ -1085,6 +1090,482 @@ part that decides whether two records are the same modem).
 
 ---
 
+## Frontend verification ✅
+
+Until this point every page was verified only by lint, `vite build` and the API contracts
+underneath — which is to say, not verified. `front/scripts/screenshot.mjs` closes that:
+`npm run shoot` drives the installed Chrome through `playwright-core` (no browser download),
+walks every admin screen, opens every form drawer, checks a 390px viewport and dark mode, and
+reports console errors, page errors and failed requests alongside the images.
+
+### What it found immediately
+
+| # | Defect | Why nothing else caught it |
+| --- | --- | --- |
+| 1 | **The NAP map was stamped "API KEY REQUIRED" across every tile.** CARTO's basemaps now require a key for their CDN; the map rendered, the markers plotted, and the whole thing was covered in a diagonal watermark. Switched to OpenStreetMap's own keyless tiles. | The component compiled, the network requests returned 200, and the tiles were *images*. Only a picture shows it. |
+| 2 | **Search placeholders were clipped mid-word** on Invoices, Payments and Adjustments — `"Search invoice number, custom…"`. The shared `SearchInput` is a fixed 280px and the copy was written without checking against it. | Nothing measures rendered text. |
+
+### What it confirmed
+
+- Dark mode flips cleanly on every screen — no hardcoded colour leaked anywhere.
+- Tables scroll horizontally inside their card at 390px; stat cards stack; toolbars wrap.
+- The invoice detail drawer's arithmetic renders correctly end to end — a prorated
+  `22/30 days` line at ₱659.27 plus a ₱1,500 install fee totalling ₱2,159.27, with the cash
+  payment against it.
+- The gradient icon chip in form drawers is *sanctioned* by `ui-form-design.md` ("the one place
+  a gradient is allowed"), despite the page-level rule against icon chips. Checked rather than
+  assumed.
+
+### One thing that looked like a bug and was not
+
+Invoice numbers render with a faint warm tint in the PNGs. `--color-text-dark` is `#18181b`, a
+neutral near-black — it is subpixel antialiasing of JetBrains Mono in the screenshot, not a
+colour error. Worth recording so nobody "fixes" it later.
+
+### Running it
+
+```bash
+cd back  && PORT=3100 npm start                          # API
+cd front && VITE_API_URL=http://localhost:3100 npm run dev
+cd front && npm run shoot                                # → front/shots/
+```
+
+`CHROME_PATH` overrides the browser location; `APP` and `OUT` override the target and output
+directory. Seed data first — see A6.
+
+---
+
+## S11 — Phase-6 surface 🟡
+
+The stage covers M11–M17. This pass built the operator-facing half — the
+dashboard, the three reports with CSV export, and the runbooks. The security
+pass, backup automation and data export/anonymise are listed at the end as still
+outstanding.
+
+### Built
+
+| # | Item | File |
+| --- | --- | --- |
+| 1 | Aging, collections, subscriber and operations queries | `back/server/src/lib/reports/reports.service.js` |
+| 2 | Reports API, with `?format=csv` on every one | `back/server/src/controllers/v1/admin/reports.controller.js` |
+| 3 | CSV writer | `back/server/src/utils/csv.js` |
+| 4 | The operations dashboard | `front/src/pages/Admin/Dashboard/` |
+| 5 | Billed-versus-collected chart | `front/src/pages/Admin/Dashboard/components/BilledVsCollected.jsx` |
+| 6 | The Reports screen | `front/src/pages/Admin/Reports/` |
+| 7 | Runbooks | `docs/runbooks.md` |
+
+### The dashboard replaced a dashboard
+
+What was there counted users, roles and audit entries — true facts nobody starts
+their day by needing. What an ISP wants at 8am is what is owed, who is about to
+lose service, and what broke overnight.
+
+**Needs attention** is the reason the page is worth opening. Every item on it is
+something that will not fix itself, each links to the screen where it gets
+fixed, and **a count of zero is not shown at all** — a panel full of zeroes
+trains people to skim past it on the morning one of them is not zero. Empty
+reads as healthy, and says so.
+
+The **billed-versus-collected** chart carries two series because they answer
+different questions and legitimately diverge: billed is dated by the period an
+invoice covers, collected by when the money arrived. The gap between the bars is
+the collection lag, and watching it widen is how an ISP notices trouble a month
+before the aging report does.
+
+### Decisions worth knowing
+
+| Rule | Why |
+| --- | --- |
+| **One query serves the screen and the file.** | A report whose export disagrees with the page it came from is worse than no export — somebody reconciles a bank statement against it and finds out months later. |
+| **Totals are computed in SQL, never summed from the rows on screen.** | These are the figures somebody reconciles against, and floats and money do not mix. Nothing in `reports.service.js` adds two amounts together in JavaScript. |
+| **Aging buckets run from the DUE date, and `Current` is separate from `1–30`.** | Being late is measured from when payment was owed. An invoice issued on the 15th and not yet due on the 2nd is not a debt anybody is late on, and folding it into the first overdue bucket makes a healthy month look alarming. |
+| **Reports are not paginated.** | They are meant to be read whole and exported whole, and a page-at-a-time export is not a report. |
+| **Only the visible report is fetched.** | The subscriber roster is the most expensive query in the system and should not run because somebody opened Aging. |
+| **Monthly recurring counts active subscriptions only.** | A suspended line bills nothing, so counting it would overstate the number the business plans against. |
+
+### Two defects the screenshots caught
+
+Both would have shipped; neither is visible to lint or `vite build`.
+
+1. **`billedThisMonth` counted voided invoices**, so the headline figure
+   (₱32,287.46) disagreed with the chart directly beneath it (₱29,834.86) by
+   exactly the one voided bill. Two numbers on one screen that do not reconcile
+   is worse than either being slightly wrong.
+2. **Six peso-valued stat cards do not fit on one row.** Captions were clipped
+   mid-word — "4 cust…" — and spilling past the card border. Now three across.
+
+And one found by reading the CSV rather than the screen: **the
+spreadsheet-injection guard was tab-prefixing ordinary negative numbers**, so
+a days-past-due of `-23` arrived as text and an accountant's `SUM()` over a
+column of credits would have silently returned zero. Plain numbers are now
+exempt from the guard.
+
+### What is left in S11
+
+| # | Item | Note |
+| --- | --- | --- |
+| M13 | Observability — partial | Dead letters, failing jobs and at-risk accounts surface on the dashboard, and 🚨 markers are in the logs. There is no alerting **out** of the system yet: no NOC email on a dead letter or a failed sweep. |
+| M14 | Security pass | Includes the `sharp` advisory (A4). |
+| M15 | Backup automation | `docs/runbooks.md` says what to back up and why `CREDENTIAL_MASTER_KEY` needs its own copy. Nothing automates it. |
+| M17 | Data export / anonymise | Not started. |
+
+---
+
+## S12 — The client's billing schedule ✅
+
+The system was built to a model taken from V2's pending-corrections document:
+issue on the 15th, due the 2nd, three days of grace. The client's actual
+operation is issue on the **25th**, due the **2nd**, and **no grace at all** —
+unpaid at 20:00 on the 2nd means cut off that evening.
+
+Two of those three numbers were wrong, and one of them was wrong in a way that
+would have shipped quietly: three days of grace where the business intends none
+is three days of free service per late customer per month.
+
+### The dates moved out of the code
+
+`STATEMENT_DAY` was a constant in `billing.dates.js`, and the three run times
+were cron strings in `.env`. Both made a business rule into a deployment: the
+client saying "we invoice on the 25th now" meant an edit and a restart.
+
+They are now rows in `system_settings`, edited on **Settings → System →
+Billing schedule**, seeded by migration `011` with the client's real values:
+
+| Setting | Value | Means |
+| --- | --- | --- |
+| `STATEMENT_DAY` | 25 | invoices for the calendar month go out on the 25th |
+| `DUE_DAY` | 2 | payment falls due on the 2nd of the following month |
+| `GRACE_DAYS` | 0 | no grace — the due date is the cut-off |
+| `REMINDER_DAYS_BEFORE` | 2 | a nudge two days out |
+| `CYCLE_HOUR` | 9 | invoices generated at 09:00 |
+| `DAILY_HOUR` | 8 | notices at 08:00 |
+| `DUNNING_HOUR` | 20 | disconnections at 20:00 |
+
+### The scheduler became one hourly tick
+
+Three fixed crons became a single `0 * * * *` that asks each company's settings
+what is due. An admin's edit is live within the hour with no restart, and the
+cron string can no longer disagree with the setting about which day the
+statement goes out.
+
+It also catches up: a run is due when its hour has **arrived**, not when it
+matches exactly, so a worker that was down at 09:00 on the 25th still bills when
+it comes back at 14:00. An in-memory marker keeps it to once a day; a restart
+forgets the marker and the run repeats, which is safe because every one of these
+operations is idempotent.
+
+### The invariant that is now enforced rather than commented
+
+`STATEMENT_DAY` must fall **after** `DUE_DAY + GRACE_DAYS`. That ordering is the
+only reason "a suspended customer accrues nothing" works: the cycle runs after
+the previous month's disconnection, so a suspended subscription is skipped by
+the ordinary rule rather than by special handling.
+
+Set the statement day to the 1st with a due day of the 2nd and the invoice is
+generated the day *before* the disconnection that should have skipped it — so
+every reconnected customer owes a month they had no service for. Nothing
+errors; the invoices are simply wrong, and the first anyone hears of it is a
+customer complaint.
+
+`validateBillingSchedule` refuses that combination, and the message names the
+two values that disagree. It refuses a second one too: the daily notice hour
+must come before the disconnection hour.
+
+### The overdue notice arrived after the disconnection
+
+With grace at 0 the notice sequence had a hole:
+
+| | Before | Now |
+| --- | --- | --- |
+| the 2nd, 08:00 | nothing — the invoice is due, not yet past due | **last notice**: unpaid, service goes off at 20:00 today |
+| the 2nd, 20:00 | disconnected | disconnected |
+| the 3rd, 08:00 | "your invoice is past due" — the morning *after* the cut-off | overdue notice, now accurate about what has happened |
+
+`sendFinalNotices` targets `today − graceDays`, the same arithmetic the dunning
+sweep uses to choose who to disconnect — imported from `dunning.service.js`
+rather than repeated, because a warning sent to a different set of people than
+the sweep acts on is worse than no warning. It works at any grace period, not
+just zero.
+
+The overdue email's copy was wrong too: it said "if this is not settled within
+{graceDays} days of the due date, your connection will be suspended", which
+with grace 0 rendered as "within 0 days" and was, by then, describing something
+that had already happened.
+
+### A second bug, found on the way
+
+`email_events.type` is an ENUM, and `final` was not one of its values. The row
+is written **after** the message is handed to the mail server, so the sequence
+would have been: customer receives the last notice, the INSERT throws, the job
+retries, customer receives it again — five times, then a dead letter.
+
+Migration `012` widens the column. A test now holds the processor's renderer
+list against the ENUM in `schema.sql`, so the next kind added without a
+migration fails in CI instead of in somebody's inbox.
+
+### The screenshot harness could report a pass while logged out
+
+Unrelated to the schedule, but found because of it: `npm run shoot` printed
+`✓ logged in` and a tick for every page while every image was a picture of the
+login screen. Its login check ran before anything proved the session worked.
+
+It now loads a real page to prove the session, and every page checks whether it
+was bounced to `/login` before saving a shot. A false pass is worse than a
+failure — it is the harness lying about the thing it exists to check.
+
+### Verified
+
+| Check | Result |
+| --- | --- |
+| Migrations `011` and `012` applied | ✅ all seven settings rows present for TERANETWORK; the ENUM now carries `final`; re-running both is a no-op |
+| `getBillingSchedule` against the real database | ✅ returns the client's schedule and passes `validateBillingSchedule` |
+| Schedule rules over HTTP | ✅ five invalid schedules refused with 400 and an explanation naming the two values that disagree; two valid changes accepted; settings restored |
+| Backend suite | ✅ 331 tests, 24 of them new — the schedule, the hourly tick, the notice sequence, and the ENUM guard |
+| Backend lint | ✅ 0 errors |
+| Frontend build + lint | ✅ 0 errors |
+| System screen rendered | ✅ seeded values and the plain-English summary — `front/shots/16-system.png` |
+
+---
+
+## S13 — Revocation and modem recovery ✅
+
+Until now the lifecycle stopped at `suspended`. A customer who never paid again
+sat there forever: the account stayed on the books, the modem stayed on their
+wall, and the NAP port stayed occupied by a connection nobody was paying for.
+
+The client's rule, confirmed 2026-09-10: **60 days suspended, then staff
+confirm, then a technician collects the modem.**
+
+### The lifecycle, and what each step is allowed to do
+
+    active  →  suspended  →  for_recovery  →  terminated
+               (the sweep)   (staff)          (staff, after the technician)
+
+On screen: **Suspended** / **For pull-out** / **Closed**. The labels are not the
+stored values — "For recovery" reads like the customer is recovering, and
+"Terminated" sounds like a punishment rather than a closed account.
+
+### Why `for_recovery` is a status and not a reason on `terminated`
+
+The shortcut of `status = 'terminated'` plus a reason column is wrong, because
+the two states differ in what the system may do:
+
+| | modem | NAP port | field work |
+| --- | --- | --- | --- |
+| `for_recovery` | still on the customer's wall | still occupied | outstanding |
+| `terminated` | ours or written off | free | none |
+
+Every query that asks "is this port free?" or "what has the technician still got
+to collect?" has to tell those apart. A reason column cannot be indexed into
+that answer without every caller remembering to check it, and the one that
+forgets hands a NAP port to two customers at once.
+
+### What revoking actually costs the customer
+
+This is the part that had to be got right, because it is irreversible from the
+customer's side:
+
+- paying no longer restores service, at any amount
+- the balance is still owed and still appears in aging
+- coming back is a **new subscription**, with a new installation fee
+
+That is why nothing here is automatic. The 60 days only decides when a name
+appears on a list; a person decides everything after that, which is the client's
+explicit instruction. It is also why `unrevoke` exists: a revocation made by
+mistake has to be undoable without charging somebody a second installation for a
+clerical error.
+
+The new-installation rule needs no code. The installation fee lands on the first
+invoice of any subscription, and a new subscription has no prior invoices.
+
+### Enforcement, in the three places it could have leaked
+
+| Where | What would have happened |
+| --- | --- |
+| `queueReconnectionIfSettled` | a revoked customer pays their old balance and is silently reconnected |
+| the provisioning worker's `UPDATE subscriptions` | any `activate` job reaching that ONU flips a revoked account back to `active` |
+| the worker's precondition gate | "Restore service" on the ONU screen hands the internet back to somebody a technician is on the way to collect a modem from |
+
+All three now exclude `for_recovery`. The first is exported and tested directly,
+because it is a single `!==` carrying the whole rule.
+
+### Closing a pull-out: one question, opposite consequences
+
+| Answer | Modem | NAP port |
+| --- | --- | --- |
+| recovered | back to stock, and **un-blacklisted at the OLT** | freed |
+| not recovered | written off, and **stays blacklisted** | freed |
+
+The port is freed either way: holding it because a technician could not retrieve
+a modem would slowly starve a NAP for no benefit.
+
+The un-blacklist is the detail that would have been discovered in the field. On
+this OLT, "activate" is literally `blacklist delete mac`. A recovered modem left
+blacklisted is a brick the next time a technician seats it, months later, with
+nothing on the screen to explain why. So closing as recovered queues that
+command — and the worker records the result as `unprovisioned`, not `active`,
+because a modem in a box is not a modem in service and must not inflate the
+"modems up" figure on the dashboard.
+
+A modem that did NOT come back stays blacklisted on purpose. It is on somebody's
+shelf, and it should not work if they plug it in.
+
+### Verified end to end, against MySQL and the running API
+
+A suspended subscriber was seeded 70 days in the past, with an unpaid invoice, a
+modem on a NAP port and an OLT attached, and the whole flow walked over HTTP:
+
+| Step | Result |
+| --- | --- |
+| candidate list | ✅ one row: 70 days, ₱1,200 owed, MAC, NAP label and port |
+| close before revoking | ✅ 409, pointing at `terminate` for a normal departure |
+| close with no outcome | ✅ 400 from the validator |
+| revoke | ✅ leaves the candidate list, joins the pull-out list with the address |
+| revoke twice | ✅ 409 |
+| terminate a pull-out | ✅ 409, pointing at `close` so the modem is accounted for |
+| unrevoke, then revoke again | ✅ both accepted |
+| close as recovered | ✅ ONU unprovisioned, NAP port NULL, `recordStatus` Active, un-blacklist job queued |
+| close as not recovered | ✅ ONU still `suspended`, `recordStatus` Inactive, NAP port NULL, no job |
+| the debt | ✅ the invoice is still `overdue` and still in aging after closing |
+
+Backend suite: 355 tests. Backend and frontend lint: 0 errors. Frontend builds.
+The screen is at `front/shots/04b-recovery.png`.
+
+The fixture was removed afterwards; the database is back to empty, as the owner
+asked while waiting on the Excel import.
+
+---
+
+## S14 — HitPay, and a gateway per branch ✅
+
+The client's decision: **HitPay** for the two Taguig branches, **GCash Business**
+floated for Batangas. One company, two merchant relationships, split by
+geography.
+
+### The adapter was written from the API, not from memory
+
+Payment integrations are the wrong place to work from recollection, and the
+signature scheme in particular. The facts below were read from HitPay's own
+documentation and their published PHP wrapper before any code was written:
+
+| | |
+| --- | --- |
+| Endpoint | `api.hit-pay.com/v1/payment-requests`, sandbox at `api.sandbox.hit-pay.com` |
+| Auth | `X-BUSINESS-API-KEY`, plus `X-Requested-With: XMLHttpRequest` |
+| Body | form-encoded |
+| **Amount** | **major units as a decimal** — `"1200.00"` is twelve hundred pesos |
+| Our reference | `reference_number` |
+| Paid status | `completed` |
+
+The amount unit is the one that would have hurt. It happens to match our
+canonical form exactly, so the conversion is the identity — and it is still
+routed through `amounts.js` rather than passed through, because "these two
+formats agree today" is not a thing to leave implicit next to a number that
+moves real money.
+
+### Two webhook schemes, both accepted
+
+HitPay has changed how it signs callbacks, and which one arrives depends on how
+the merchant's account is configured rather than on anything in our code:
+
+| | Body | Signature |
+| --- | --- | --- |
+| **v2**, current | JSON | HMAC-SHA256 over the raw bytes, in `Hitpay-Signature` |
+| **v1**, deprecated | form-encoded | an `hmac` field over `"{key}{value}"` pairs sorted by key |
+
+Building only v2 works right up until the client's account turns out to be on
+the old scheme, and the symptom then is every callback rejected as an invalid
+signature — which is indistinguishable from a wrong salt, and is an afternoon
+nobody gets back. The adapter accepts both and chooses by what the request
+actually looks like, so there is no third setting to get wrong. The deprecated
+`webhook` parameter is deliberately not sent on create, so new requests use the
+current scheme.
+
+The v1 algorithm is verified against an independent reimplementation in the
+test, written out longhand from HitPay's PHP wrapper, rather than against the
+adapter agreeing with itself.
+
+### HitPay sends no event id
+
+The replay guard needs a key that repeats on a resend and differs for a
+genuinely new event. HitPay provides none, so the adapter keys on the **payment
+id**: one per movement of money, stable however many times it is announced. A
+failure notification carrying no payment falls back to the payment request plus
+its status, which is still stable on retry and still distinct from the later
+success for the same request.
+
+### A gateway per branch
+
+`branches.paymentProvider` names the gateway; NULL follows `PAYMENT_PROVIDER`.
+Set on SuperAdmin → Company Management → Branches. NULL rather than a default
+slug, deliberately: a branch nobody has thought about should follow the company
+default rather than be silently pinned to whichever gateway happened to be
+first, because being pinned keeps working, on the wrong merchant account, until
+somebody reconciles the statements.
+
+Three places now resolve per branch rather than per company:
+
+| | Was | Now |
+| --- | --- | --- |
+| opening a checkout | company default | the invoice's branch |
+| the Pay button's existence on the public page | company default | the invoice's branch |
+| the mock's simulator endpoint | company default | the invoice's branch |
+
+That third one matters more than it looks. The simulator must not exist for a
+branch taking real money, and resolving it per company would have left it
+reachable on a live branch for as long as any other branch was still on the
+mock.
+
+**The limit, stated plainly:** credentials remain per provider, not per branch.
+Two branches both on HitPay share one merchant account. That is exactly what the
+client wants today, and it is the direct consequence of keeping secrets in the
+environment — which is itself required, because a callback must be verified
+before we know whose invoice it is. Separate HitPay merchants per branch would
+reopen that.
+
+Per-branch routing does not touch verification: the callback URL carries the
+provider slug (`/webhooks/hitpay`), so the secret is chosen from the URL and the
+branch is discovered afterwards from the invoice. No circularity.
+
+### An unknown slug falls back rather than failing
+
+A branch pointed at a provider with no adapter collects through the company
+default and writes a 🚨 line naming the branch and the slug. A typo in a
+settings field should cost a log line, not a branch's billing.
+
+### GCash Business is designed for, not built
+
+Setting a branch to `gcash` today resolves to a 501 listing the adapters that do
+exist. Writing it is one file plus a line in `index.js`; nothing in billing,
+settlement, the pay page or the webhook controller changes. The port was drawn
+against three gateways precisely so the fourth is cheap.
+
+### Verified
+
+| Check | Result |
+| --- | --- |
+| HitPay adapter | ✅ 25 tests: amount unit, both signature schemes, tamper and wrong-salt rejection, fail-closed with no salt, event-id stability, status mapping |
+| Branch routing | ✅ 11 tests, plus a live check against MySQL: a branch set to `hitpay` resolves to HitPay, one set to a nonsense slug falls back and logs |
+| Round trip through the UI | ✅ picked HitPay in the SuperAdmin branch drawer, saved, and confirmed the column and the resolver both moved |
+| Two branches, two gateways | ✅ one company resolving to HitPay and the mock simultaneously |
+| Backend suite | ✅ 391 tests |
+| Backend lint / frontend lint / frontend build | ✅ 0 errors |
+
+Branches were reverted to "Company default" afterwards, because HitPay has no
+credentials yet and pinning them now would leave the dev flow with no Pay
+button. They get set the day the client's keys arrive.
+
+### What is still needed from the client
+
+| | |
+| --- | --- |
+| `PAYMENT_HITPAY_API_KEY` | Dashboard → Settings → API Keys |
+| `PAYMENT_HITPAY_SALT` | same screen, a **different** value |
+| Webhook registered | Developers → Webhook Endpoints → `payment_request.completed`, pointed at `<PUBLIC_APP_URL>/api/v1/public/webhooks/hitpay` |
+| A sandbox transaction | the first end-to-end proof, and the only one that can confirm the signature scheme their account actually uses |
+
+---
+
 ## ⚠️ Needs attention
 
 | # | Item | Detail |
@@ -1092,6 +1573,8 @@ part that decides whether two records are the same modem).
 | ~~A1~~ | ~~The migration has not been applied to any database~~ | ✅ **Resolved 2026-09-07.** The owner supplied `back/.env`; `schema.sql`, `001` and `002` all applied cleanly to MySQL 8.0.45, and re-running is a verified no-op. See "Database verification" below. |
 | **A2** | **The company, branches and roles still need creating** | Admin / Billing / Technician are created through the SuperAdmin portal at runtime, not by `setup-database.js` (which seeds only permissions + the superadmin account). The three D1 roles have to be created per branch before users can be assigned to them. Their **permission rows** arrive with each ISP module in S2–S10, per the `new-module` contract. |
 | **A3** | **`users.branchId` is now a home-branch pointer, not an access boundary** | Any future query that scopes on `users.branchId` directly instead of going through `branchScope()` will silently under- or over-report. The helper is the only correct entry point. |
+| ~~A5~~ | ~~No frontend screen has ever been rendered~~ | ✅ **Resolved 2026-09-09.** `playwright-core` drives the machine's installed Chrome; `cd front && npm run shoot` captures every admin screen, every form drawer, a mobile viewport and dark mode, and reports console errors, page errors and failed requests. Two real defects were found this way — see below. Re-run it after any UI change. |
+| **A6** | **The screenshot pass needs data to be useful** | Empty tables hide almost every layout problem there is: column widths, truncation, badge alignment, pagination. `npm run shoot` against an empty database proves very little. Seed customers, invoices and NAPs first. |
 | **A4** | **`sharp` carries a high-severity advisory** | `sharp <0.35.0` inherits four libvips CVEs. The fix is a **breaking** major bump on a dependency the template already uses for image compression, so it is not something to change mid-migration. Belongs to the Phase 6 security pass (M14). |
 
 ---
@@ -1102,6 +1585,6 @@ part that decides whether two records are the same modem).
 | --- | --- | --- |
 | ~~P1~~ | ~~Whether `plans` are company-wide or per-branch~~ | ✅ resolved in S2 — [D3](00-decisions.md#d3--service-plans-are-company-wide-not-branch-scoped) |
 | P2 | Which ISP tables store `branchId` vs inherit it through a parent | Partly resolved: `customers` stores it, `plans` has none. Network inventory decided in S3. |
-| P3 | 60-day blacklist/revocation — six open client questions | Phase 7 (parked) |
+| ~~P3~~ | ~~60-day blacklist/revocation — six open client questions~~ | ✅ **resolved 2026-09-10** and built in S13. Staff-confirmed, 60 days from the disconnection, TERANETWORK owns the modem, the NAP port is released when the technician reports back, reinstatement is a new signup with a new installation fee, and the screen labels are Suspended / For pull-out / Closed. |
 | P4 | MikroTik router IP, RouterOS version, API port, read-only credentials | Phase 7 (parked) |
-| **P5** | **Which payment gateway.** Xendit was the first choice; the client wants to evaluate others available in PH. The S8 port makes this a one-file change, and two gateways can run at once — so the practical constraint is not the code but **saved payment methods**: autodebit mandates and card tokens do not transfer between providers, so switching gets expensive only once subscribers start enrolling. Recommendation: pick a primary and start collecting, but hold off pushing autodebit enrolment until they are confident. | before go-live |
+| ~~P5~~ | ✅ **resolved 2026-09-10.** HitPay for the Taguig branches, GCash Business floated for Batangas; the adapter and per-branch routing are built (S14), waiting on merchant credentials. Original note: **Which payment gateway.** Xendit was the first choice; the client wants to evaluate others available in PH. The S8 port makes this a one-file change, and two gateways can run at once — so the practical constraint is not the code but **saved payment methods**: autodebit mandates and card tokens do not transfer between providers, so switching gets expensive only once subscribers start enrolling. Recommendation: pick a primary and start collecting, but hold off pushing autodebit enrolment until they are confident. | before go-live |

@@ -15,13 +15,14 @@ interface would assume agreement. Check your provider against each row **before*
 writing code — every one of these has a cheap right answer and an expensive
 wrong one.
 
-| | Xendit | PayMongo | Dragonpay |
-| --- | --- | --- | --- |
-| **Amount unit** | whole pesos (`1200`) | centavos (`120000`) | decimal string (`"1200.00"`) |
-| **Callback body** | JSON, snake_case | JSON, JSON:API nesting | **form-encoded** |
-| **Authentication** | static token in `x-callback-token` | HMAC-SHA256 over `` `${t}.${rawBody}` `` in `Paymongo-Signature` | SHA1 digest of `txnid:refno:status:message:secret` |
-| **Paid status** | `PAID`, `SETTLED` | `link.payment.paid` | `S` |
-| **Our reference** | `externalId` | `remarks` / checkout metadata | `txnid` |
+| | HitPay *(built)* | Xendit | PayMongo | Dragonpay |
+| --- | --- | --- | --- | --- |
+| **Amount unit** | decimal string (`"1200.00"`) | whole pesos (`1200`) | centavos (`120000`) | decimal string (`"1200.00"`) |
+| **Callback body** | JSON *(v2)* or **form-encoded** *(v1)* | JSON, snake_case | JSON, JSON:API nesting | **form-encoded** |
+| **Authentication** | HMAC-SHA256 over the raw body in `Hitpay-Signature` *(v2)*, or an `hmac` field over sorted `key+value` pairs *(v1)* | static token in `x-callback-token` | HMAC-SHA256 over `` `${t}.${rawBody}` `` in `Paymongo-Signature` | SHA1 digest of `txnid:refno:status:message:secret` |
+| **Paid status** | `completed` | `PAID`, `SETTLED` | `link.payment.paid` | `S` |
+| **Our reference** | `reference_number` | `externalId` | `remarks` / checkout metadata | `txnid` |
+| **Event id** | none — key on the payment id | `id` | `id` | none — key on `refno` |
 
 ### The amount unit is the one that will hurt you
 
@@ -43,6 +44,11 @@ fromCentavos(120000);    // "1200.00" — inbound
 
 `toWholePesos()` throws on a fractional amount rather than rounding, because
 rounding hides exactly the mistake it exists to catch.
+
+HitPay is the easy case: major units as a decimal, which is already our
+canonical form. It is still routed through `amounts.js` rather than passed
+through, because "these two formats happen to agree today" is not a thing to
+leave implicit next to a number that moves real money.
 
 The Xendit figure is not inference: V2 confirmed `amount: 4999` with
 `currency: 'PHP'` renders as PHP 4,999.00 on a live sandbox checkout. Xendit's
@@ -177,3 +183,60 @@ point `PAYMENT_PROVIDER` at the new one, and let the old one's callbacks keep
 settling invoices already in flight. `payments.provider` records which gateway
 took each payment, so revenue stays attributable and the ledger reads correctly
 with both in it.
+
+---
+
+## Which gateway a branch collects through
+
+One company can collect through more than one provider. `branches.paymentProvider`
+names the gateway for a branch; NULL follows `PAYMENT_PROVIDER`. Resolution goes
+through `resolveGatewayForBranch(db, branchId)`, and the SuperAdmin branch form
+is where it is set.
+
+The client's arrangement today: HitPay for the two Taguig branches, GCash
+Business floated for Batangas.
+
+**Credentials are still per provider, not per branch.** Every branch collecting
+through HitPay shares one merchant account, because secrets live in the
+environment. That is what the client wants — both Taguig branches bill under one
+HitPay account — but it is a real limit: separate HitPay merchants per branch
+would need the credential story reopened, and that is the circularity problem in
+"Why credentials come from the environment" above.
+
+**Per-branch routing does not touch webhook verification.** The callback URL
+carries the provider slug (`/webhooks/hitpay`), so verification picks its secret
+from the URL and never needs to know the branch first. The branch is discovered
+afterwards, from the invoice the reference points at.
+
+---
+
+## HitPay, specifically
+
+Register the callback in Dashboard → Developers → Webhook Endpoints, subscribing
+to `payment_request.completed`:
+
+```
+<PUBLIC_APP_URL>/api/v1/public/webhooks/hitpay
+```
+
+Two credentials, both from Dashboard → Settings → API Keys, and they are
+different values: `PAYMENT_HITPAY_API_KEY` authenticates outbound calls,
+`PAYMENT_HITPAY_SALT` verifies inbound ones. With only the key you get a working
+checkout whose every callback is rejected as an invalid signature, which is a
+confusing enough symptom to be worth naming here.
+
+`PAYMENT_HITPAY_MODE` is `sandbox` or `live`, and defaults to `sandbox` when
+unset. HitPay's keys carry no prefix that distinguishes the two, so the adapter
+reports test mode from this variable and returns `null` — "unknown" — for
+anything it does not recognise, rather than picking the reassuring answer.
+
+**The adapter accepts both of HitPay's callback schemes**, choosing by what the
+request looks like rather than by configuration. The current one is the
+dashboard-registered endpoint above. The older one, triggered by a `webhook`
+parameter on the payment request, is deprecated by HitPay with no removal date
+announced; it is still verified because supporting it costs thirty lines, and
+the alternative failure — an account configured the old way, every callback
+rejected — is indistinguishable from a wrong salt.
+
+The `webhook` parameter is deliberately **not** sent on create, so new payment
+requests use the current scheme.

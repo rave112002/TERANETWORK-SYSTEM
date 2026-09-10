@@ -13,6 +13,8 @@ import {
   updateSubscriptionApi,
   transitionSubscriptionApi,
   deleteSubscriptionApi,
+  getRecoveryCandidatesApi,
+  getPendingPullOutsApi,
 } from "../../api/admin/subscriptions";
 
 /**
@@ -22,6 +24,10 @@ import {
 const invalidateRelated = (queryClient) => {
   queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
   queryClient.invalidateQueries({ queryKey: ["onus"] });
+  // Revoking, un-revoking and closing all move an account between the two
+  // recovery lists, so both are stale after any transition.
+  queryClient.invalidateQueries({ queryKey: ["recoveryCandidates"] });
+  queryClient.invalidateQueries({ queryKey: ["pendingPullOuts"] });
 };
 
 export const useGetSubscriptions = (filters = {}, options = {}) => {
@@ -81,14 +87,31 @@ export const useTransitionSubscription = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ subscriptionId, action, reason }) =>
-      transitionSubscriptionApi(subscriptionId, { action, reason }),
-    onSuccess: (_res, variables) => {
-      toast.success(
-        variables.action === "activate"
-          ? "Subscription activated — billing starts from today"
-          : "Subscription terminated",
-      );
+    mutationFn: ({ subscriptionId, action, reason, outcome }) =>
+      transitionSubscriptionApi(subscriptionId, { action, reason, outcome }),
+    onSuccess: (res, variables) => {
+      // Each transition says what it actually did, because they differ in ways
+      // that matter to whoever pressed the button — especially the two that
+      // decide where a modem ends up.
+      const messages = {
+        activate: "Subscription activated — billing starts from today",
+        terminate: "Subscription terminated",
+        revoke: "Marked for pull-out — paying no longer restores service",
+        unrevoke: "Pull-out cancelled — the account is suspended again",
+      };
+
+      if (variables.action === "close") {
+        toast.success(
+          variables.outcome === "recovered"
+            ? res?.data?.unblacklistQueued
+              ? "Closed — the modem is back in stock and is being un-blacklisted"
+              : "Closed — the modem is back in stock"
+            : "Closed — the modem is written off and stays blacklisted",
+        );
+      } else {
+        toast.success(messages[variables.action] ?? "Subscription updated");
+      }
+
       invalidateRelated(queryClient);
     },
     onError: (error) => {
@@ -111,5 +134,25 @@ export const useDeleteSubscription = () => {
     onError: (error) => {
       toast.error(error.response?.data?.message || "Failed to delete subscription");
     },
+  });
+};
+
+export const useGetRecoveryCandidates = (filters = {}, options = {}) => {
+  return useQuery({
+    queryKey: ["recoveryCandidates", filters],
+    queryFn: () => getRecoveryCandidatesApi(filters),
+    placeholderData: keepPreviousData,
+    staleTime: 60 * 1000,
+    ...options,
+  });
+};
+
+export const useGetPendingPullOuts = (filters = {}, options = {}) => {
+  return useQuery({
+    queryKey: ["pendingPullOuts", filters],
+    queryFn: () => getPendingPullOutsApi(filters),
+    placeholderData: keepPreviousData,
+    staleTime: 60 * 1000,
+    ...options,
   });
 };

@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { CirclePlay, CircleStop, Pencil, Trash2 } from "lucide-react";
+import { CirclePlay, CircleStop, PackageX, Pencil, Trash2, Undo2 } from "lucide-react";
 import dayjs from "dayjs";
 
 import RowActions from "../../../components/RowActions";
@@ -19,12 +19,24 @@ import { formatPeso } from "../../../utils/currency";
 /**
  * `suspended` reads red because it means a real customer has no internet right
  * now — it is the only status on this screen that describes an outage.
+ *
+ * ── The labels are not the database values ──────────────────────────────────
+ *
+ * `for_recovery` shows as **For pull-out** and `terminated` as **Closed**,
+ * because that is what the people using this screen call them. "For recovery"
+ * reads like the customer is recovering; "Terminated" sounds like a punishment
+ * rather than a closed account. The stored values stay as they are — a label is
+ * a presentation decision and does not belong in a WHERE clause.
+ *
+ * For pull-out is amber, not red: nobody is losing service at that point. They
+ * already lost it two months ago. What is outstanding is a van.
  */
 export const SUBSCRIPTION_STATUS = {
   pending: { label: "Pending", color: "var(--color-text-muted)" },
   active: { label: "Active", color: "var(--color-success)" },
   suspended: { label: "Suspended", color: "var(--color-error)" },
-  terminated: { label: "Terminated", color: "var(--color-text-muted)" },
+  for_recovery: { label: "For pull-out", color: "var(--color-warning)" },
+  terminated: { label: "Closed", color: "var(--color-text-muted)" },
 };
 
 export const useSubscriptionsData = () => {
@@ -145,6 +157,42 @@ export const useSubscriptionsData = () => {
     [transitionMutation],
   );
 
+  const handleRevoke = useCallback(
+    async (record) => {
+      const ok = await confirm({
+        title: "Mark for pull-out?",
+        description:
+          `Give up on ${decodeHTML(record.customerName)}'s account. Paying will no longer ` +
+          `restore their service, and coming back means a new subscription with a new ` +
+          `installation fee. Their balance is still owed. A technician then collects the modem.`,
+        confirmText: "Mark for pull-out",
+        cancelText: "Cancel",
+        danger: true,
+      });
+      if (ok) {
+        transitionMutation.mutate({ subscriptionId: record.subscriptionId, action: "revoke" });
+      }
+    },
+    [transitionMutation],
+  );
+
+  const handleUnrevoke = useCallback(
+    async (record) => {
+      const ok = await confirm({
+        title: "Cancel the pull-out?",
+        description:
+          "For a pull-out marked by mistake. The account goes back to suspended — service " +
+          "still only returns once the balance is settled.",
+        confirmText: "Cancel pull-out",
+        cancelText: "Leave it",
+      });
+      if (ok) {
+        transitionMutation.mutate({ subscriptionId: record.subscriptionId, action: "unrevoke" });
+      }
+    },
+    [transitionMutation],
+  );
+
   const handleDeleteRequest = useCallback(
     async (record) => {
       const ok = await confirm({
@@ -198,6 +246,31 @@ export const useSubscriptionsData = () => {
         );
       }
 
+      // Marking for pull-out is offered here as well as on the Recovery screen,
+      // because this is where somebody ends up when they go looking at one
+      // specific customer rather than working through a list.
+      if (record.status === "suspended") {
+        items.push({
+          key: "revoke",
+          label: "Mark for pull-out",
+          icon: <PackageX className="w-4 h-4" />,
+          danger: true,
+          onClick: () => handleRevoke(record),
+        });
+      }
+
+      // Closing is deliberately NOT here: it needs the technician's answer about
+      // whether the modem came back, and that is a question, not a confirmation.
+      // It lives on the Recovery screen.
+      if (record.status === "for_recovery") {
+        items.push({
+          key: "unrevoke",
+          label: "Cancel pull-out",
+          icon: <Undo2 className="w-4 h-4" />,
+          onClick: () => handleUnrevoke(record),
+        });
+      }
+
       if (record.status === "pending" && !record.activatedAt) {
         items.push({
           key: "delete",
@@ -210,7 +283,15 @@ export const useSubscriptionsData = () => {
 
       return items;
     },
-    [canWrite, handleActivate, handleEdit, handleTerminate, handleDeleteRequest],
+    [
+      canWrite,
+      handleActivate,
+      handleEdit,
+      handleTerminate,
+      handleRevoke,
+      handleUnrevoke,
+      handleDeleteRequest,
+    ],
   );
 
   const columns = useMemo(
