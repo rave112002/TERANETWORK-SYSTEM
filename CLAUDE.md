@@ -1,13 +1,9 @@
 # Full-Stack Multi-Tenant Template
 
-A multi-tenant admin platform with two portals: **SuperAdmin** (manages systems across the whole
-platform) and **Admin** (manages users, roles, and resources scoped to a single system).
-Tenancy is enforced by scoping every Admin query to the authenticated user's `systemId`;
-SuperAdmin operates across all systems.
-
-A **system** is the tenant: a `PROVINCE` or a `CITY_MUNICIPALITY`, with the hierarchy held
-inside the `systems` table itself via a self-referencing `parentSystemId`. There is no separate
-branch table and no second `branchId` scoping axis.
+A multi-tenant admin platform with two portals: **SuperAdmin** (manages companies across the whole
+platform) and **Admin** (manages users, roles, and resources scoped to a single company + branch).
+Tenancy is enforced by scoping every Admin query to the authenticated user's `companyId` /
+`branchId`; SuperAdmin operates across all companies.
 
 ## Repository layout
 
@@ -44,6 +40,18 @@ in every session. **Load the relevant skill before writing code** — the rules 
 
 ## Cross-cutting facts
 
+- **Production is ONE BRANCH PER INSTALLATION.** Each TERANETWORK branch runs its own locally
+  deployed server + MySQL database; there is no central server, no cross-branch dashboard or
+  report, and no Superadmin spanning branches. A production database holds one company row and
+  one branch row, so `companyId`/`branchId` scoping from `req.user` is sufficient. Existing
+  multi-branch code (`branchScope()`, `user_branches`) is kept because it is harmless — **do not
+  extend it or build multi-branch features.** See decision D7 in
+  [docs/migration/00-decisions.md](docs/migration/00-decisions.md).
+- **Payments: GCash Business merchant QR on the invoice** (one reusable QR, transactions matched
+  to invoices afterwards) is the acting method; HitPay is parked, not removed. **Do not build the
+  GCash integration or add a public endpoint for it** until the client's GCash Business
+  documentation arrives. See D8 and [docs/gcash-payment-flow.md](docs/gcash-payment-flow.md).
+
 - **Backend response envelope:** every endpoint replies via `res.sendSuccess()` →
   `{ success, message, data: { ... } }`. The frontend unwraps `apiData?.data?.<entity>`.
 - **Permissions are shared front-to-back:** a page's `<ProtectedRoute module/submodule>` uses the
@@ -51,7 +59,7 @@ in every session. **Load the relevant skill before writing code** — the rules 
 - **Soft deletes everywhere:** rows are never physically deleted — set `status = 'Deleted'` and
   filter with `status != 'Deleted'`.
 - **Business IDs, not numeric IDs:** APIs, URLs, and FKs use the `varchar` business ID
-  (`accountId`, `systemId`, `roleId`, …), never the internal auto-increment `id`.
+  (`accountId`, `companyId`, `roleId`, …), never the internal auto-increment `id`.
 - **Phone number format:** every phone is stored and sent as **`09XX XXXX XXX`** — a
   Philippine mobile number, 11 digits grouped **4-4-3** with single spaces (e.g.
   `0912 3456 789`). In the UI the placeholder/hint is the concrete example
