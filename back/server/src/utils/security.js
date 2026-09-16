@@ -70,7 +70,7 @@ export function securityHeaders(options = {}) {
   const {
     isDevelopment = process.env.NODE_ENV === "development",
     allowedOrigins = [process.env.FRONTEND_URL || "http://localhost:3000"],
-    enableCSP = false,
+    enableCSP = true,
   } = options;
   return [
     helmet({
@@ -124,7 +124,14 @@ export function securityHeaders(options = {}) {
               connectSrc: ["'self'"],
               fontSrc: ["'self'"],
               mediaSrc: ["'self'"],
-              upgradeInsecureRequests: [],
+              // Only in production. On a local HTTP backend this rewrites every
+              // request to https:// and the API stops answering.
+              //
+              // `null`, not "omitted": helmet merges these directives over its
+              // own defaults, and `upgrade-insecure-requests` is one of them —
+              // leaving the key out keeps the default, so it has to be
+              // explicitly cancelled.
+              upgradeInsecureRequests: isDevelopment ? null : [],
             },
           }
         : false,

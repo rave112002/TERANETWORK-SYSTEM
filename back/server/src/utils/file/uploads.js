@@ -12,7 +12,6 @@ const FILE_TYPE_CONFIGS = {
     "image/png": [".png"],
     "image/gif": [".gif"],
     "image/webp": [".webp"],
-    "image/svg+xml": [".svg"],
     "image/bmp": [".bmp"],
     "image/tiff": [".tiff", ".tif"],
     "image/heic": [".heic"],
@@ -70,26 +69,92 @@ const validateFile = (allowedTypes, mimeType, fileExt) => {
   return { valid: true };
 };
 
+// The only shape a path segment is ever allowed to take.
+//
+// Every segment of an upload path is a business ID (`companyId`, `branchId`,
+// `accountId`) — and for SuperAdmin uploads the convention takes it from
+// `req.body.companyId`, which is client-controlled. `path.join` resolves `..`
+// happily, so an unchecked segment is an arbitrary-write primitive: a
+// `companyId` of `../../../..` walks straight out of `public/`.
+const SAFE_SEGMENT = /^[A-Za-z0-9_-]{1,64}$/;
+
+// `public/uploads`, absolute — the boundary nothing may be written outside of.
+const UPLOAD_ROOT = path.resolve("public", "uploads");
+
+/**
+ * Resolve an upload destination, or throw.
+ *
+ * Exported so the guard can be tested directly — a path-traversal check that
+ * only ever runs inside a multer callback is a check nobody can prove still
+ * works.
+ *
+ * @param {string} relativePath e.g. `uploads/admin/avatars/{companyId}/{branchId}/{accountId}`
+ * @returns {string} the absolute directory, guaranteed to sit under public/uploads
+ */
+export const resolveUploadDir = (relativePath) => {
+  // Every segment must be a plain business ID. Checked before the join,
+  // because after it the traversal has already happened. Splitting on "/" alone
+  // is enough: SAFE_SEGMENT allows no backslash, so a Windows-style separator
+  // smuggled into a segment fails the test below rather than slipping past it.
+  const segments = String(relativePath).split("/").filter(Boolean);
+  const unsafe = segments.find((segment) => !SAFE_SEGMENT.test(segment));
+  if (unsafe !== undefined) {
+    throw new APIError(
+      `Invalid upload path segment: '${unsafe}'`,
+      400,
+      ERROR_CODES.VALIDATION_FAILED
+    );
+  }
+
+  const destPath = path.resolve("public", ...segments);
+
+  // Belt and braces: even with every segment clean, the result has to land
+  // under public/uploads. A future filePath() that forgets the prefix fails
+  // here rather than scattering files across the disk.
+  if (destPath !== UPLOAD_ROOT && !destPath.startsWith(UPLOAD_ROOT + path.sep)) {
+    throw new APIError(
+      "Upload path escapes the uploads directory",
+      400,
+      ERROR_CODES.VALIDATION_FAILED
+    );
+  }
+
+  return destPath;
+};
+
+/**
+ * Build a stored filename.
+ *
+ * 16 random bytes, not a hash of the clock. The previous name was
+ * sha256(Date.now()) — one input, resolving to the same digest for every upload
+ * in the same millisecond. That made stored files both collidable and
+ * *enumerable*: `public/` is served without authentication, so anyone who could
+ * guess a timestamp could walk out with the file behind it.
+ */
+export const buildUploadFilename = (originalName) => {
+  const ext = path.extname(originalName).toLowerCase();
+  const date = moment().format("YYYYMMDDHHmmss");
+  return `${crypto.randomBytes(16).toString("hex")}${date}${ext}`;
+};
+
 const storage = (options) =>
   multer.diskStorage({
     destination: (req, _file, cb) => {
-      const destPath = path.join("public", options.filePath(req, _file));
-      const isExists = fs.existsSync(destPath);
-      if (!isExists) {
+      let destPath;
+      try {
+        destPath = resolveUploadDir(options.filePath(req, _file));
+      } catch (err) {
+        return cb(err);
+      }
+
+      if (!fs.existsSync(destPath)) {
         fs.mkdirSync(destPath, { recursive: true });
       }
 
       cb(null, destPath);
     },
     filename: (_req, file, cb) => {
-      const ext = path.extname(file.originalname).toLowerCase();
-      const date = moment().format("YYYYMMDDHHmmss");
-      const filename = `${crypto
-        .createHash("sha256")
-        .update(Date.now().toString())
-        .digest("hex")}${date}${ext}`;
-
-      cb(null, filename);
+      cb(null, buildUploadFilename(file.originalname));
     },
   });
 

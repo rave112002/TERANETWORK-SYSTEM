@@ -22,7 +22,7 @@
 | **S8** | Payment gateway | ✅ complete — the port, the mock, and the HitPay adapter (S14) |
 | **S9** | Dunning | ✅ complete |
 | **S10** | Discovery | ✅ complete — OLT half; the router half is blocked on M22/P4 |
-| **S11** | Phase-6 surface | 🟡 dashboard, reports and runbooks done — M14/M15/M17 remain |
+| **S11** | Phase-6 surface | 🟡 dashboard, reports, runbooks and the security pass done — M13/M15/M17 remain |
 | **S12** | Client billing schedule | ✅ complete — the schedule is admin-editable and seeded with the client's real dates |
 | **S13** | Revocation and modem recovery | ✅ complete — the lifecycle now has an end, and the modem comes back |
 | **S14** | HitPay + per-branch gateways | ✅ built and tested — waiting only on the client's merchant credentials |
@@ -1200,12 +1200,66 @@ a days-past-due of `-23` arrived as text and an accountant's `SUM()` over a
 column of credits would have silently returned zero. Plain numbers are now
 exempt from the guard.
 
+### The security pass — M14 ✅
+
+Run 2026-09-13 over `back/`. Five of the seven findings were reachable by an
+authenticated user of any tenant; one was a production defect that would have
+silently swallowed payments.
+
+| # | Finding | Fix |
+| --- | --- | --- |
+| F1 | **`sharp@0.34.1`, four libvips CVEs.** Not theoretical — `sharp` parses every uploaded image, so the vulnerable decoder sat directly behind an authenticated upload. This is A4. | `sharp@^0.35.4` (libvips 8.18.6). The bump was accepted only after exercising every call `image-compress.js` makes against the new version. |
+| F2 | **SVG upload → stored XSS on the API's own origin.** `image/svg+xml` was an accepted image type, `public/` is served statically, and CSP was off. An SVG is a document that can carry `<script>`, and it would have run on the origin holding the CSRF cookie. | SVG dropped from the accepted image types, and `/public` now answers with `default-src 'none'; sandbox` + `nosniff` so anything already on disk is inert. |
+| F3 | **Stored filenames were `sha256(Date.now())`.** One input, the clock. Verified to return an *identical* digest for two uploads in the same millisecond — so files both collided and were **enumerable**, and `public/` has no authentication in front of it. | `crypto.randomBytes(16)`. Tenant-scoped paths were obscurity; now the name itself is the barrier. |
+| F4 | **Path traversal into the filesystem.** The SuperAdmin logo path takes `companyId` from `req.body` — per the convention, and unvalidated. Verified that `../../../..` resolves outside `public/`: an authenticated arbitrary-file-write. | `resolveUploadDir()` validates every segment against `/^[A-Za-z0-9_-]{1,64}$/` **before** the join, then re-checks the resolved path is under `public/uploads`. |
+| F5 | **Gateway webhooks sat behind the bot User-Agent gate.** The third of the three landmines [the plan §370](03-final-migration-plan.md) named. CORS-with-no-Origin and the raw-body/sanitiser problem had both been handled; this one had not. A gateway sends whatever User-Agent it likes — often none — so the callback would have been 403'd before the signature was ever read. **The customer is debited and the invoice stays open.** | `/api/v1/public/webhooks/*` skips the gate. It costs nothing: those routes carry no cookie and no session, and the HMAC signature is the only credential they accept. |
+| F6 | vitest 2.1.9 pulled a critical advisory through vite/esbuild. Dev-only — it never ships. | vitest 5. All 391 existing tests pass on it unchanged. |
+| F7 | **CSP was disabled** (`enableCSP: false`). | On, and now the default. `upgrade-insecure-requests` is cancelled in development — helmet *merges* over its own defaults, so omitting the key silently kept it and broke a local HTTP backend. |
+
+### What the pass confirmed was already sound
+
+Worth recording, so the next pass doesn't re-derive it: SQL injection has no
+surface — `sortBy` is allowlisted **in the controller** (the loose
+`z.string().max(40)` in `billing.validator.js` is backstopped there) and
+`sortOrder` is coerced to `ASC`/`DESC`; device credentials use AES-GCM envelope
+encryption with per-record data keys and random IVs; login and password reset
+are rate limited; and `DISABLE_CSRF` **throws** in production rather than
+quietly disabling.
+
+### Verified, not assumed
+
+Every fix was checked against a running API rather than by reading the diff.
+
+- The bot gate **still** returns 403 for `UA: evilbot` and for a missing
+  User-Agent on a normal route — the protection was not widened.
+- The same two requests to `/api/v1/public/webhooks/hitpay` now return **401**:
+  the signature check rejecting them, which is the gate that is supposed to.
+- CSP is present on API responses and carries `upgrade-insecure-requests` in
+  production but not in development, asserted both ways.
+- `/public` answers `Content-Security-Policy: default-src 'none'; sandbox`.
+- `npm audit` — **0 vulnerabilities**, production and dev.
+- **409 tests pass** (391 + 18 new), eslint reports 0 errors.
+
+The traversal guard and the filename entropy carry regression tests in
+`server/src/utils/file/uploads.test.js`. Both were extracted into exported
+functions purely so they could be tested — a path-traversal check that only ever
+runs inside a multer callback is a check nobody can prove still works.
+
+### ⚠️ Raised by the pass, not fixed
+
+**`back/package-lock.json` is gitignored and untracked** (`back/.gitignore:7`).
+A fresh deploy therefore resolves `^0.35.4` to whatever is current and floats
+every transitive dependency, so the `sharp` fix above is not reproducible and a
+compromised transitive release would land unannounced. Committing the lockfile
+is a repo-policy change and was left for the owner to make deliberately.
+
+---
+
 ### What is left in S11
 
 | # | Item | Note |
 | --- | --- | --- |
 | M13 | Observability — partial | Dead letters, failing jobs and at-risk accounts surface on the dashboard, and 🚨 markers are in the logs. There is no alerting **out** of the system yet: no NOC email on a dead letter or a failed sweep. |
-| M14 | Security pass | Includes the `sharp` advisory (A4). |
 | M15 | Backup automation | `docs/runbooks.md` says what to back up and why `CREDENTIAL_MASTER_KEY` needs its own copy. Nothing automates it. |
 | M17 | Data export / anonymise | Not started. |
 
@@ -1575,7 +1629,7 @@ button. They get set the day the client's keys arrive.
 | **A3** | **`users.branchId` is now a home-branch pointer, not an access boundary** | Any future query that scopes on `users.branchId` directly instead of going through `branchScope()` will silently under- or over-report. The helper is the only correct entry point. |
 | ~~A5~~ | ~~No frontend screen has ever been rendered~~ | ✅ **Resolved 2026-09-09.** `playwright-core` drives the machine's installed Chrome; `cd front && npm run shoot` captures every admin screen, every form drawer, a mobile viewport and dark mode, and reports console errors, page errors and failed requests. Two real defects were found this way — see below. Re-run it after any UI change. |
 | **A6** | **The screenshot pass needs data to be useful** | Empty tables hide almost every layout problem there is: column widths, truncation, badge alignment, pagination. `npm run shoot` against an empty database proves very little. Seed customers, invoices and NAPs first. |
-| **A4** | **`sharp` carries a high-severity advisory** | `sharp <0.35.0` inherits four libvips CVEs. The fix is a **breaking** major bump on a dependency the template already uses for image compression, so it is not something to change mid-migration. Belongs to the Phase 6 security pass (M14). |
+| ~~A4~~ | ~~`sharp` carries a high-severity advisory~~ | ✅ **Resolved 2026-09-13** in the M14 security pass. `sharp@0.35.4` on libvips 8.18.6; `npm audit --omit=dev` reports zero. The `image-compress.js` API surface was exercised against the new version before the bump was accepted. |
 
 ---
 

@@ -71,7 +71,11 @@ const options = {
   isDevelopment: process.env.NODE_ENV === "development",
   allowedOrigins: [...new Set(origins)],
   enableRateLimit: true,
-  enableCSP: false,
+  // On. The API serves `/public` straight off its own origin, so a CSP is the
+  // difference between "an uploaded file is data" and "an uploaded file is
+  // script running where the CSRF cookie lives". JSON responses are unaffected
+  // — nothing renders them.
+  enableCSP: true,
 };
 // Apply security headers
 app.use(...securityHeaders(options));
@@ -79,8 +83,24 @@ app.use(...securityHeaders(options));
 // Generate unique request ID for tracing (must be early in the chain)
 app.use(requestIdMiddleware);
 
+// Paths a payment gateway calls. A gateway is a server: it sends whatever
+// User-Agent it likes (HitPay and Xendit both send none on some callbacks), and
+// it will not retry forever. The bot gate below would answer 403 long before
+// the signature is ever checked, and the payment would simply never be
+// confirmed — the customer is debited and the invoice stays open.
+//
+// This is the third of the three landmines the migration plan named for
+// webhooks. CORS already allows a missing Origin, and `req.rawBody` already
+// survives the sanitiser; the User-Agent gate was the one still live.
+//
+// Skipping the gate costs nothing: these routes carry no cookie and no session,
+// and the HMAC signature is the only credential they accept.
+const WEBHOOK_PATHS = /^\/api\/v1\/public\/webhooks(\/|$)/;
+
 // Enhanced bot protection with blocking
 app.use((req, res, next) => {
+  if (WEBHOOK_PATHS.test(req.path)) return next();
+
   const userAgent = req.get("User-Agent") || "";
 
   // Whitelist of legitimate bots
@@ -180,7 +200,22 @@ app.use(compression())
 app.use(sanitizeMiddleware);
 
 // Serve static files from /public
-app.use("/public", express.static("public"));
+//
+// These are user-uploaded bytes served from the API's own origin, so they are
+// pinned down twice: `sandbox` strips script execution, same-origin privileges
+// and form submission from anything opened here, and `nosniff` stops a file
+// whose declared type is wrong from being re-interpreted as HTML. SVG is no
+// longer an accepted upload type (see utils/file/uploads.js) — this is the
+// backstop for anything already on disk from before that change.
+app.use(
+  "/public",
+  (req, res, next) => {
+    res.setHeader("Content-Security-Policy", "default-src 'none'; sandbox");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    next();
+  },
+  express.static("public")
+);
 
 // Misc server settings
 // Pretty-print JSON only in development — in production it just inflates
