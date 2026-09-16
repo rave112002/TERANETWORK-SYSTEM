@@ -20,3 +20,5 @@ front/package-lock.json
 back/package-lock.json
 
 /OLD
+# Local login notes — real credentials, never tracked.
+docs/credentials.txt

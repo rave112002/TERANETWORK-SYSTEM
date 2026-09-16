@@ -19,6 +19,8 @@
  *   2. this app on :5173     VITE_API_URL=http://localhost:3100 npm run dev
  *   3. data worth looking at — empty tables hide almost every layout problem
  *      there is, so seed a few customers, invoices and NAPs first.
+ *   4. an admin to log in as, passed in rather than written down here:
+ *      SHOT_EMAIL=you@example.com SHOT_PASSWORD=... npm run shoot
  *
  * Shots land in `front/shots/` (git-ignored). The console/network capture at
  * the end matters as much as the images: a page can look right and still fire
@@ -36,9 +38,22 @@ const ONLY = (process.env.ONLY || "").split(",").map((n) => n.trim()).filter(Boo
 const CHROME = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
 
 const ADMIN = {
-  email: "new.lower.bicutan@teranetwork.ph",
-  password: "TeraAdmin123!",
+  email: process.env.SHOT_EMAIL,
+  password: process.env.SHOT_PASSWORD,
 };
+
+if (!ADMIN.email || !ADMIN.password) {
+  console.error(
+    [
+      "Set SHOT_EMAIL and SHOT_PASSWORD to an admin account on the API this run",
+      "points at. They are deliberately not kept in this file — a password",
+      "committed here is a password published.",
+      "",
+      "  SHOT_EMAIL=admin@example.com SHOT_PASSWORD=... npm run shoot",
+    ].join("\n")
+  );
+  process.exit(1);
+}
 
 /** Only pages worth a look. Drawers are opened by `action`. */
 const PAGES = [
