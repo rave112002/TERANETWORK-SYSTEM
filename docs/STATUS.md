@@ -31,7 +31,7 @@ Customer signs up → subscription → ONU provisioned on the OLT
 | What | Why it matters |
 | --- | --- |
 | **Cut-off / reconnect on the real HSGQ OLT** | Only ever run against a fake OLT. Needs bench access. |
-| **GCash Check on a real statement** | Tested on statement-shaped PDFs only. Run `npm run gcash:inspect` on a real one (safe output). |
+| **GCash Check on longer statements** | Checked on one real 1-page statement (7 rows, 2026-09-17): all rows, references, directions and the credit total read correctly. Not yet seen: a multi-page statement. Run `npm run gcash:inspect` on one when available. |
 
 ## ⏳ Waiting on the client
 
@@ -45,7 +45,8 @@ Customer signs up → subscription → ONU provisioned on the OLT
 
 1. **Commit the 2026-09-17 work.** Doc cleanup, GCash Check, payment settings, invoice layout and
    PDF preview are all still uncommitted.
-2. **Run the GCash Check on a real statement** and adjust the parser if needed.
+2. **Run `npm run gcash:inspect` on a multi-page statement** when one is available (the 1-page
+   real statement is fully confirmed, including two-line descriptions).
 3. **One full dry run** on dev data: bill → pay → record → check → sweep → reconnect.
 4. **Automatic backups** (the runbook describes them, but nothing runs them yet).
 5. **Per installation, before go-live:** fill in Settings → How customers pay, including Terms

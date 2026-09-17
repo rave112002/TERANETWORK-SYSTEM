@@ -88,12 +88,19 @@ Cash is not in the statement.
 | How-to-pay text (shared by PDF and emails) | `back/server/src/lib/payments/instructions.js` |
 | The four settings | `back/server/src/validators/settings.validator.js`, `front/src/pages/Admin/Settings/index.jsx` |
 
-### ⚠️ The parser has not yet read a real statement
+### The statement reader, and checking a new layout
 
-GCash doesn't publish the PDF layout, and the real sample is password-protected. The parser
-finds rows by what they must contain (date and time, reference digits, amounts under
-Debit/Credit/Balance headings, or the running balance when there are no headings), and it warns
-when totals don't add up. It is tested against statement-shaped PDFs, **not a real one yet**.
+GCash doesn't publish the PDF layout. The parser finds rows by what they must contain (date and
+time, reference digits, amounts under Debit/Credit/Balance headings, or the running balance when
+there are no headings), and it warns when totals don't add up.
+
+**Checked on a real statement on 2026-09-17:** a 1-page personal GCash history with 7 rows. All
+rows, references, directions and the credit total were read correctly. One fix came out of it:
+GCash centres two-line descriptions on their row, so a description's first line sits *above*
+the row's date. Wrapped lines now go to the nearest row. The parser test "real GCash layout"
+rebuilds that page's exact positions with made-up values. **Not yet seen:** a multi-page
+statement.
+
 To check a real file without exposing its contents:
 
 ```bash

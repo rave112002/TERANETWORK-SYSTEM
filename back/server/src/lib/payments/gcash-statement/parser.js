@@ -205,9 +205,11 @@ const nearest = (center, columns) =>
     .filter(([, c]) => c !== null)
     .sort((a, b) => Math.abs(a[1] - center) - Math.abs(b[1] - center))[0]?.[0];
 
-/** One transaction from the tokens of its row (date line plus wrapped lines). */
-const readRow = (tokens, dateTokenCount, header) => {
-  const body = tokens.slice(dateTokenCount);
+/**
+ * One transaction from the tokens of its row, date and time already removed:
+ * the date line plus any wrapped description lines, top to bottom.
+ */
+const readRow = (body, header) => {
   const used = new Set();
 
   const amounts = [];
@@ -342,6 +344,25 @@ const collectWarnings = (transactions, totalCredit) => {
 };
 
 /**
+ * Give each wrapped description line to the NEAREST row on its page, not the
+ * row above it. GCash centres a row's cells vertically, so a two-line
+ * description starts slightly above its own date and time and ends slightly
+ * below (seen on a real statement, 2026-09-17).
+ */
+const attachWrappedLines = (rows, loose) => {
+  for (const part of loose) {
+    let best = null;
+    for (const row of rows) {
+      if (row.page !== part.page) continue;
+      const distance = Math.abs(row.y - part.y);
+      // Strictly closer wins; on a tie the earlier row keeps it.
+      if (distance <= WRAP_GAP && (!best || distance < best.distance)) best = { row, distance };
+    }
+    best?.row.parts.push(part);
+  }
+};
+
+/**
  * @param {import('./pdfText.js').TextLine[]} lines
  * @returns {{
  *   transactions: Array<{ transactedAt: string, description: string, referenceNo: string|null,
@@ -356,7 +377,9 @@ export const parseGcashStatement = (lines) => {
   let startingBalance = null;
   let totalCredit = null;
   const rows = [];
-  let open = null; // the row still collecting wrapped lines
+  // Lines inside the table that are not a row of their own: wrapped descriptions.
+  const loose = [];
+  let inTable = false;
 
   for (const line of lines) {
     const text = lineText(line);
@@ -366,12 +389,12 @@ export const parseGcashStatement = (lines) => {
     if (heading) {
       header = heading;
       headerFound = true;
-      open = null;
+      inTable = true;
       continue;
     }
 
     if (FOOTER.test(text)) {
-      open = null;
+      inTable = false;
       if (/total credit/i.test(text)) {
         const amount = tokens.map((t) => t.text).find((t) => AMOUNT.test(t));
         if (amount) totalCredit = money(parseAmount(amount)).abs().toFixed(2);
@@ -394,31 +417,36 @@ export const parseGcashStatement = (lines) => {
         length += tokens[consumed].text.length + 1;
         consumed++;
       }
-      open = { transactedAt: dateTime.value, line, tokens: [...tokens], dateTokenCount: consumed };
-      rows.push(open);
+      rows.push({
+        transactedAt: dateTime.value,
+        page: line.page,
+        y: line.y,
+        parts: [{ y: line.y, tokens: tokens.slice(consumed) }],
+      });
+      inTable = true;
       continue;
     }
 
-    // A wrapped description line belongs to the row above it — same page, close by.
-    if (open && open.line.page === line.page && line.y - (open.lastY ?? open.line.y) <= WRAP_GAP) {
-      open.tokens.push(...tokens);
-      open.lastY = line.y;
-      continue;
-    }
-    open = null;
-
-    if (!period) {
-      const dates = findDates(text);
-      if (dates.length >= 2) {
+    const dates = findDates(text);
+    if (dates.length >= 2 && !tokens.some((t) => AMOUNT.test(t.text))) {
+      if (!period) {
         const [start, end] = [dates[0], dates[1]].sort();
         period = { start, end };
       }
+      continue;
     }
+
+    if (inTable) loose.push({ page: line.page, y: line.y, tokens });
   }
+
+  attachWrappedLines(rows, loose);
 
   const parsed = rows.map((r) => ({
     transactedAt: r.transactedAt,
-    ...readRow(r.tokens, r.dateTokenCount, header),
+    ...readRow(
+      [...r.parts].sort((a, b) => a.y - b.y).flatMap((p) => p.tokens),
+      header
+    ),
   }));
 
   const byBalance = headerFound ? null : directionsFromBalances(parsed, startingBalance);
