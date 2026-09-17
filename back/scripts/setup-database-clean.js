@@ -2,17 +2,19 @@
  * Database Setup (Clean) Script (ESM)
  *
  * DROPS all existing tables, re-applies every migration from scratch, then
- * seeds default permissions + a superadmin account.
+ * seeds a complete SINGLE-BRANCH installation — the same seed as
+ * setup-database.js (see scripts/lib/branch-install.js).
  * ⚠️  WARNING: This will destroy all existing data!
+ *
+ * Needs: COMPANY_EMAIL, BRANCH_NAME  (COMPANY_NAME optional)
  *
  * Usage: node scripts/setup-database-clean.js
  */
 
 import "dotenv/config";
 import mysql from "mysql2/promise";
-import argon2 from "argon2";
-import moment from "moment-timezone";
 import { runMigrations } from "./migrate.js";
+import { seedBranchInstallation, seedPermissions, seedSuperadmin } from "./lib/branch-install.js";
 
 const DB_CONFIG = {
   host: process.env.DB_HOST,
@@ -23,21 +25,6 @@ const DB_CONFIG = {
 };
 
 const DB_NAME = process.env.DB_DATABASE;
-
-// Storage is Asia/Manila local (matches getCurrentTimestampLocal + pool tz +08:00).
-function now() {
-  return moment().tz(process.env.TIMEZONE || "Asia/Manila").format("YYYY-MM-DD HH:mm:ss");
-}
-
-async function hashPassword(password) {
-  // Argon2 embeds a random salt in the encoded hash — no separate salt needed.
-  return argon2.hash(password, {
-    type: argon2.argon2id,
-    memoryCost: 19456, // 19 MiB (OWASP minimum for Argon2id)
-    timeCost: 3,
-    parallelism: 1,
-  });
-}
 
 async function main() {
   let connection;
@@ -72,54 +59,17 @@ async function main() {
     console.log("\n📋 Applying migrations...\n");
     await runMigrations(connection);
 
-    // Seed permissions
     console.log("\n🔐 Seeding permissions...");
-    const timestamp = now();
+    await seedPermissions(connection);
 
-    const permissions = [
-      { module: "dashboard", submodule: null, description: "Dashboard access" },
-      { module: "users", submodule: "list", description: "Users list management" },
-      { module: "users", submodule: "roles", description: "Roles management" },
-      { module: "settings", submodule: null, description: "Settings management" },
-      { module: "audit_trail", submodule: null, description: "Audit Trail access" },
-    ];
-
-    for (const perm of permissions) {
-      const [uuidRow] = await connection.query(`SELECT UUID() as id`);
-      await connection.query(
-        `INSERT INTO permissions (permissionId, module, submodule, description, portal, status, dateCreated, dateUpdated)
-         VALUES (?, ?, ?, ?, 'ADMIN', 'Active', ?, ?)`,
-        [uuidRow[0].id, perm.module, perm.submodule, perm.description, timestamp, timestamp]
-      );
-    }
-    console.log(`   ✅ ${permissions.length} permissions seeded`);
-
-    // Seed default superadmin
     console.log("\n👤 Creating default superadmin...");
+    await seedSuperadmin(connection);
 
-    const [uuidRow] = await connection.query(`SELECT UUID() as id`);
-    const accountId = uuidRow[0].id;
+    console.log("\n🏢 Setting up this installation's branch...");
+    const install = await seedBranchInstallation(connection);
 
-    await connection.query(
-      `INSERT INTO superadmins (accountId, firstName, lastName, status, dateCreated, dateUpdated)
-       VALUES (?, 'Super', 'Admin', 'Active', ?, ?)`,
-      [accountId, timestamp, timestamp]
-    );
-
-    const hash = await hashPassword("superadmin123");
-    await connection.query(
-      `INSERT INTO credentials (accountId, email, password, type, status, dateCreated, dateUpdated)
-       VALUES (?, 'superadmin@template.com', ?, 'SUPERADMIN', 'Active', ?, ?)`,
-      [accountId, hash, timestamp, timestamp]
-    );
-
-    console.log("\n   📋 SuperAdmin Credentials:");
-    console.log("   ┌──────────────────────────────────────────────────┐");
-    console.log("   │ Email:    superadmin@template.com                │");
-    console.log("   │ Password: superadmin123                          │");
-    console.log("   └──────────────────────────────────────────────────┘");
-
-    console.log("\n🎉 Clean database setup complete!");
+    console.log(`\n🎉 Clean database setup complete — installation for branch "${install.branchName}".`);
+    console.log("   Optional development data: npm run db:seed:dev");
   } catch (error) {
     console.error("\n❌ Database setup failed:", error.message);
     process.exit(1);

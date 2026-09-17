@@ -15,7 +15,8 @@ Add near the related tables, following the file's top-to-bottom read order.
 CREATE TABLE IF NOT EXISTS {{table}} (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   {{entityId}} VARCHAR(50) NOT NULL UNIQUE,
-  systemId VARCHAR(50) NOT NULL,
+  companyId VARCHAR(50) NOT NULL,
+  branchId VARCHAR(50) NOT NULL,
 
   -- ── module fields ──
   name VARCHAR(100) NOT NULL,
@@ -25,17 +26,19 @@ CREATE TABLE IF NOT EXISTS {{table}} (
   status ENUM('Active','Inactive','Deleted') NOT NULL DEFAULT 'Active',
   dateCreated DATETIME NOT NULL,
   dateUpdated DATETIME NOT NULL,
-  INDEX idx_{{table}}_systemId (systemId),
-  INDEX idx_{{table}}_tenant (systemId, status),
-  CONSTRAINT fk_{{table}}_system FOREIGN KEY (systemId) REFERENCES systems(systemId)
+  INDEX idx_{{table}}_companyId (companyId),
+  INDEX idx_{{table}}_branchId (branchId),
+  INDEX idx_{{table}}_tenant (companyId, branchId, status),
+  CONSTRAINT fk_{{table}}_company FOREIGN KEY (companyId) REFERENCES companies(companyId),
+  CONSTRAINT fk_{{table}}_branch  FOREIGN KEY (branchId)  REFERENCES branches(branchId)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
 Rules: `id` + business ID + `dateCreated`/`dateUpdated` always. FKs reference **business ID**
 columns. `ON DELETE RESTRICT` (the default) is intentional — rows are soft-deleted.
 `status` includes `'Deleted'` unless the entity genuinely only toggles Active/Inactive (like
-`roles`, which soft-deletes to `'Inactive'`). Platform-wide, SuperAdmin-owned entities drop
-`systemId` along with its FK and indexes.
+`roles`, which soft-deletes to `'Inactive'`). SuperAdmin-owned entities drop `branchId` (and
+`companyId` if platform-wide) along with their FKs and indexes.
 
 Column lengths must match the validator's `.max()` exactly. Phone columns are always
 `VARCHAR(20) NULL`.
@@ -67,12 +70,12 @@ WHERE NOT EXISTS (
   SELECT 1 FROM permissions WHERE module = '{{module}}' AND submodule IS NULL
 );
 
--- Grant it to every existing Admin role at write level, so each tenant's admin sees the page
+-- Grant it to every existing Owner role at write level, so each tenant's owner sees the page
 INSERT INTO role_permissions (roleId, permissionId, accessLevel, dateCreated)
 SELECT r.roleId, p.permissionId, 'write', CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', '+08:00')
 FROM roles r
 CROSS JOIN permissions p
-WHERE r.roleName = 'Admin'
+WHERE r.roleName = 'Owner'
   AND p.module = '{{module}}' AND p.submodule IS NULL
   AND NOT EXISTS (
     SELECT 1 FROM role_permissions rp
@@ -186,11 +189,11 @@ router.get(
       sortBy = "dateCreated",
       sortOrder = "DESC",
     } = req.query;
-    const { systemId } = req.user;
+    const { companyId, branchId } = req.user;
     const offset = (page - 1) * pageSize;
 
-    const params = [systemId];
-    let whereClause = "WHERE t.systemId = ?";
+    const params = [companyId, branchId];
+    let whereClause = "WHERE t.companyId = ? AND t.branchId = ?";
 
     // No status filter → hide soft-deleted. Explicit ?status=Deleted → show them.
     if (status) {
@@ -213,7 +216,7 @@ router.get(
     const [countRows, {{entities}}] = await Promise.all([
       req.db.query(`SELECT COUNT(*) as total FROM {{table}} t ${whereClause}`, params),
       req.db.query(
-        `SELECT t.{{entityId}}, t.systemId, t.name, t.description, t.phone,
+        `SELECT t.{{entityId}}, t.companyId, t.branchId, t.name, t.description, t.phone,
                 t.status, t.dateCreated, t.dateUpdated
          FROM {{table}} t
          ${whereClause}
@@ -244,15 +247,15 @@ router.get(
   checkPermission("{{module}}", null, "read"),
   catchAsync(async (req, res) => {
     const { {{entityId}} } = req.params;
-    const { systemId } = req.user;
+    const { companyId, branchId } = req.user;
 
     const rows = await req.db.query(
-      `SELECT {{entityId}}, systemId, name, description, phone,
+      `SELECT {{entityId}}, companyId, branchId, name, description, phone,
               status, dateCreated, dateUpdated
        FROM {{table}}
-       WHERE {{entityId}} = ? AND systemId = ? AND status != 'Deleted'
+       WHERE {{entityId}} = ? AND companyId = ? AND branchId = ? AND status != 'Deleted'
        LIMIT 1`,
-      [{{entityId}}, systemId]
+      [{{entityId}}, companyId, branchId]
     );
 
     if (rows.length === 0) {
@@ -274,7 +277,7 @@ router.post(
   validateBody(create{{Entity}}Schema),
   catchAsync(async (req, res) => {
     const { name, description, phone } = req.body;
-    const { systemId } = req.user;
+    const { companyId, branchId } = req.user;
     const now = getCurrentTimestampLocal();
 
     let conn;
@@ -286,9 +289,9 @@ router.post(
 
       const [existing] = await conn.execute(
         `SELECT {{entityId}} FROM {{table}}
-         WHERE name = ? AND systemId = ? AND status != 'Deleted'
+         WHERE name = ? AND companyId = ? AND branchId = ? AND status != 'Deleted'
          LIMIT 1 FOR UPDATE`,
-        [name, systemId]
+        [name, companyId, branchId]
       );
 
       if (existing.length > 0) {
@@ -298,9 +301,9 @@ router.post(
 
       await conn.execute(
         `INSERT INTO {{table}}
-           ({{entityId}}, systemId, name, description, phone, status, dateCreated, dateUpdated)
+           ({{entityId}}, companyId, branchId, name, description, phone, status, dateCreated, dateUpdated)
          VALUES (?, ?, ?, ?, ?, ?, 'Active', ?, ?)`,
-        [{{entityId}}, systemId, name, description || null, phone || null, now, now]
+        [{{entityId}}, companyId, branchId, name, description || null, phone || null, now, now]
       );
 
       await req.db.commit(conn);
@@ -322,15 +325,15 @@ router.put(
   catchAsync(async (req, res) => {
     const { {{entityId}} } = req.params;
     const { name, description, phone, status } = req.body;
-    const { systemId } = req.user;
+    const { companyId, branchId } = req.user;
     const now = getCurrentTimestampLocal();
 
     const result = await req.db.query(
       `UPDATE {{table}}
        SET name = ?, description = ?, phone = ?, status = ?, dateUpdated = ?
-       WHERE {{entityId}} = ? AND systemId = ? AND status != 'Deleted'`,
+       WHERE {{entityId}} = ? AND companyId = ? AND branchId = ? AND status != 'Deleted'`,
       [name, description || null, phone || null, status || "Active", now,
-       {{entityId}}, systemId]
+       {{entityId}}, companyId, branchId]
     );
 
     if (result.affectedRows === 0) {
@@ -349,13 +352,13 @@ router.delete(
   checkPermission("{{module}}", null, "write"),
   catchAsync(async (req, res) => {
     const { {{entityId}} } = req.params;
-    const { systemId } = req.user;
+    const { companyId, branchId } = req.user;
     const now = getCurrentTimestampLocal();
 
     const result = await req.db.query(
       `UPDATE {{table}} SET status = 'Deleted', dateUpdated = ?
-       WHERE {{entityId}} = ? AND systemId = ? AND status != 'Deleted'`,
-      [now, {{entityId}}, systemId]
+       WHERE {{entityId}} = ? AND companyId = ? AND branchId = ? AND status != 'Deleted'`,
+      [now, {{entityId}}, companyId, branchId]
     );
 
     if (result.affectedRows === 0) {
@@ -380,7 +383,7 @@ inside a transaction — it takes a different connection and isn't part of it.
 ### SuperAdmin variant
 
 Drop every `checkPermission` (SuperAdmin has unrestricted access by design) and drop the
-`systemId` scoping — `req.user` carries none. When SuperAdmin acts on a specific
+`companyId`/`branchId` scoping — `req.user` carries neither. When SuperAdmin acts on a specific
 tenant's rows, take the tenant ID from `req.params`/`req.body`, and mount the router behind
 `requireSuperAdmin`.
 

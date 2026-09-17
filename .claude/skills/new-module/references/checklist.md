@@ -9,12 +9,12 @@ reason — don't silently drop it.
       describing the same end state (no drift). No previously-applied migration was edited.
 - [ ] `id BIGINT PRIMARY KEY AUTO_INCREMENT` + `{{entityId}} VARCHAR(50) UNIQUE NOT NULL` +
       `dateCreated`/`dateUpdated DATETIME NOT NULL`
-- [ ] Tenant column `systemId` present (Admin portal) with an FK to the **business ID**
+- [ ] Tenant columns `companyId`/`branchId` present (Admin portal) with FKs to the **business ID**
       columns, plus the `idx_*_tenant` index
 - [ ] Phone columns are `VARCHAR(20) NULL`; validator `.max()` matches every `varchar(n)`; every
       `z.enum` matches the column's ENUM exactly
 - [ ] Permission row inserted idempotently in the migration **and** added to the
-      `setup-database.js` seed array; granted to the `Admin` role
+      `setup-database.js` seed array; granted to the `Owner` role
 - [ ] Validator file `{{entities}}.validator.js` exists with create / update / list-query schemas
 - [ ] Optional fields use `optionalString` / `optionalEmail` / `optionalPhone`, never a bare
       `.optional().nullable()`; query filters use `queryEnum` / `queryEnumDefault` / `queryInt`
@@ -25,7 +25,7 @@ reason — don't silently drop it.
 - [ ] Middleware order is `checkPermission` → `validate*` → `catchAsync`
 - [ ] IDs from `SELECT UUID()`; timestamps from `getCurrentTimestampLocal()` — no
       `crypto.randomUUID()`, `uuidv4()`, `NOW()`, `new Date()`, or `moment()` in app code
-- [ ] `systemId` read from `req.user` only — never from `req.body`/`req.query`
+- [ ] `companyId`/`branchId` read from `req.user` only — never from `req.body`/`req.query`
 - [ ] Every query filters `status != 'Deleted'` unless an explicit `?status=` was passed; DELETE is
       a soft delete (`status = 'Deleted'`), never `DELETE FROM`
 - [ ] Transactions: `let conn;` before `try`, `conn.execute` with `[rows]` destructured,
@@ -96,4 +96,4 @@ cd back && npm run db:migrate
 
 State what was created (file list), what the lint/build actually said, whether the migration was
 applied or is still pending, and anything the user must do by hand (e.g. granting the new
-permission to non-Admin roles via the Roles page).
+permission to non-Owner roles via the Roles page).

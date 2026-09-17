@@ -25,6 +25,10 @@ network action must be logged, reversible, idempotent, and guarded. That single 
 the architecture — the job queue, the audit log, the dry-run kill switch, and the rule that DB state
 only changes *after* a confirmed device response.
 
+> **Updated 2026-09-16:** one installation **per branch**, no central server ([D7](00-decisions.md#d7--one-branch-per-installation)).
+> Payments are a GCash Business merchant QR, not Xendit, and a public webhook is **not** assumed
+> ([D8](00-decisions.md#d8--gcash-business-merchant-qr-on-the-invoice-option-a-hitpay-parked)). The paragraph below is the original V1/V2 reading.
+
 **Deployment is local/on-premise**: one on-site box on the same LAN as the OLT and MikroTik. The
 *only* internet exposure is inbound `/webhook/xendit`; the admin UI stays LAN-only. Outbound is
 limited to Xendit + email.

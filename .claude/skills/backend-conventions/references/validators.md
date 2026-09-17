@@ -16,13 +16,13 @@ server/src/validators/
 
 > **Current state:** every mutating controller is validated. Validator files:
 > `auth`, `admin-users`, `roles`, `permissions`, `user-permissions`, `audit-trail`,
-> `systems`, `superadmin-users`, `upload`, plus shared helpers in
+> `companies`, `branches`, `superadmin-users`, `upload`, plus shared helpers in
 > `_helpers.js` (`emptyToUndefined` / `optionalString` / `optionalEmail` — HTML forms
 > and multipart both send `""` for cleared optional fields). When you add a new
 > controller, create a sibling `<name>.validator.js`. If two portals share a controller
 > base name, disambiguate the file (e.g. `admin-users.validator.js`).
 >
-> **Multipart routes** (uploads): place `validateBody` **after**
+> **Multipart routes** (company create/update, uploads): place `validateBody` **after**
 > the multer middleware (`upload.single()` / `compressImage`) so `req.body` is populated.
 > Validation errors return `400` with `{ success, message, code: "VALIDATION_FAILED", errors }`.
 
@@ -102,6 +102,8 @@ export const createUserSchema = z.object({
   lastName: z.string().min(1, "Last name is required").max(50),
   email: z.string().email("Invalid email address").max(100),
   password: z.string().min(8, "Password must be at least 8 characters").max(255),
+  companyId: z.string().min(1, "Company ID is required").max(50),
+  branchId: z.string().min(1, "Branch ID is required").max(50),
   roleId: z.string().min(1, "Role ID is required").max(50),
   phone: optionalPhone(),
 });

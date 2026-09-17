@@ -5,6 +5,10 @@ the customer — not for whoever wrote the code.
 
 Each entry states the symptom first, because that is what you have.
 
+> **Every branch is its own installation** — its own server, database, worker, backups and
+> settings ([D7](migration/00-decisions.md#d7--one-branch-per-installation)). Everything below
+> applies to one installation; do it on the branch that has the problem.
+
 ---
 
 ## The system in one paragraph
@@ -260,6 +264,13 @@ happened to the modem.
 
 ## "Change the payment gateway"
 
+> ⏸️ **HitPay is parked (2026-09-16).** The acting method is a GCash Business merchant QR on the
+> invoice, and its integration is not built yet — see
+> [gcash-payment-flow.md](gcash-payment-flow.md). Until then, record GCash payments by hand from
+> the invoice (Billing → Invoices → Record payment), putting the GCash reference number in the
+> notes, and **check the reference has not already been recorded** — nothing enforces that yet.
+> The rest of this section describes the parked gateway set-up.
+
 There are two levels, and they answer different questions.
 
 **Which gateway a branch collects through** is a field: SuperAdmin → Company
@@ -288,6 +299,9 @@ means every enrolled customer re-authorises. See
 ---
 
 ## "Payments are not working for one branch"
+
+> ⏸️ Written for HitPay, which is parked. With one installation per branch, "one branch" means
+> "this installation".
 
 Work down these, in order.
 

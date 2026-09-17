@@ -2,6 +2,15 @@
 
 All protected endpoints receive the authenticated user's data via `req.user`, set by the Passport JWT middleware.
 
+> **One branch per installation.** Production runs a separate server + database per TERANETWORK
+> branch (decision D7, `docs/migration/00-decisions.md`), so a database holds exactly one company
+> and one branch, and `companyId = ? AND branchId = ?` is the correct tenant predicate.
+>
+> You will also find `req.user.branchIds`, `server/src/utils/branchScope.js` and the
+> `user_branches` table in the code. They were built for an earlier multi-branch design. With one
+> branch they return the same rows, so existing code using them is correct and stays — but do
+> **not** build new cross-branch behaviour on them.
+
 ---
 
 ## Available on `req.user`
@@ -15,58 +24,55 @@ All protected endpoints receive the authenticated user's data via `req.user`, se
 | `lastName`  | `string` | Last name                              | All users       |
 | `email`     | `string` | Email address (from credentials)       | All users       |
 | `type`      | `string` | `'SUPERADMIN'`, `'ADMIN'`, or `'USER'` | All users       |
-| `systemId`  | `string` | System the user belongs to             | ADMIN/USER only |
+| `companyId`   | `string` | Company the user belongs to              | ADMIN/USER only |
+| `branchId`  | `string` | Branch the user belongs to             | ADMIN/USER only |
 | `roleId`    | `string` | Assigned role ID                       | ADMIN/USER only |
 | `roleName`  | `string` | Role display name                      | ADMIN/USER only |
 | `status`    | `string` | Account status                         | All users       |
-
-Tenancy is a **single level**: `systemId`. There is no second `branchId` axis — the
-province → city/municipality hierarchy lives inside the `systems` table itself
-(`parentSystemId`), not in a separate table, so a scoped query never joins to resolve a tenant.
 
 ---
 
 ## Rules
 
-### 1. Never trust client-sent `systemId` / `accountId`
+### 1. Never trust client-sent `companyId` / `branchId` / `accountId`
 
-Always use `req.user.systemId` and `req.user.accountId` for scoping queries.
+Always use `req.user.companyId`, `req.user.branchId`, `req.user.accountId` for scoping queries.
 Never accept these from `req.body` or `req.query` for the current user's own context.
 
 ```js
-// ✅ CORRECT — scope query to the authenticated user's system
+// ✅ CORRECT — scope query to the authenticated user's company
 const roles = await req.db.query(
-  `SELECT * FROM roles WHERE systemId = ? AND status != 'Deleted'`,
-  [req.user.systemId],
+  `SELECT * FROM roles WHERE companyId = ? AND branchId = ? AND status != 'Deleted'`,
+  [req.user.companyId, req.user.branchId],
 );
 
-// ❌ WRONG — trusting client-provided systemId
-const { systemId } = req.body; // attacker can send any systemId
-const roles = await req.db.query(`SELECT * FROM roles WHERE systemId = ?`, [
-  systemId,
+// ❌ WRONG — trusting client-provided companyId
+const { companyId } = req.body; // attacker can send any companyId
+const roles = await req.db.query(`SELECT * FROM roles WHERE companyId = ?`, [
+  companyId,
 ]);
 ```
 
-### 2. Scope all data queries by system
+### 2. Scope all data queries by company/branch
 
-Admin portal endpoints must always filter by the user's `systemId` to enforce multi-tenant isolation.
+Admin portal endpoints must always filter by the user's `companyId` and/or `branchId` to enforce multi-tenant isolation.
 
 ```js
-// List users — scoped to the current system
+// List users — scoped to current company/branch
 const users = await req.db.query(
-  `SELECT * FROM accounts WHERE systemId = ? AND status != 'Deleted'`,
-  [req.user.systemId],
+  `SELECT * FROM users WHERE companyId = ? AND branchId = ? AND status != 'Deleted'`,
+  [req.user.companyId, req.user.branchId],
 );
 ```
 
-### 3. Superadmin has no system scope
+### 3. Superadmin has no company/branch scope
 
-SuperAdmin endpoints query across all systems — they don't have `systemId` on `req.user`.
+SuperAdmin endpoints query across all companies — they don't have `companyId`/`branchId` on `req.user`.
 
 ```js
-// SuperAdmin can list all systems
+// SuperAdmin can list all companies
 if (req.user.type === "SUPERADMIN") {
-  // No system scoping needed
+  // No company/branch scoping needed
 }
 ```
 
@@ -98,11 +104,11 @@ if (req.user.type !== "SUPERADMIN") {
 router.get(
   "/",
   catchAsync(async (req, res) => {
-    const { accountId, systemId } = req.user;
+    const { accountId, companyId, branchId } = req.user;
 
     const items = await req.db.query(
-      `SELECT * FROM some_table WHERE systemId = ? AND status != 'Deleted'`,
-      [systemId],
+      `SELECT * FROM some_table WHERE companyId = ? AND branchId = ? AND status != 'Deleted'`,
+      [companyId, branchId],
     );
 
     return res.sendSuccess("Items retrieved", { items });
@@ -112,24 +118,24 @@ router.get(
 
 ---
 
-## Pattern for Create Endpoints (auto-assign the system)
+## Pattern for Create Endpoints (auto-assign company/branch)
 
-When creating resources, always assign `systemId` from `req.user` — never from the request body:
+When creating resources, always assign `companyId` and `branchId` from `req.user` — never from the request body:
 
 ```js
 router.post(
   "/",
   validateBody(createSchema),
   catchAsync(async (req, res) => {
-    const { systemId, accountId } = req.user;
+    const { companyId, branchId, accountId } = req.user;
     const { name, description } = req.body;
     const now = getCurrentTimestampLocal();
 
-    // systemId comes from the authenticated user, NOT from req.body
+    // companyId and branchId come from the authenticated user, NOT from req.body
     await conn.execute(
-      `INSERT INTO resources (resourceId, systemId, name, description, createdBy, dateCreated, dateUpdated)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [resourceId, systemId, name, description, accountId, now, now],
+      `INSERT INTO resources (resourceId, companyId, branchId, name, description, createdBy, dateCreated, dateUpdated)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [resourceId, companyId, branchId, name, description, accountId, now, now],
     );
   }),
 );
@@ -141,14 +147,14 @@ router.post(
 
 **Do:**
 
-- Use `req.user.systemId` for multi-tenant scoping
+- Use `req.user.companyId` and `req.user.branchId` for multi-tenant scoping
 - Use `req.user.accountId` for audit/ownership
 - Use `req.user.type` for portal-level guards
 - Treat `req.user` as the single source of truth for the authenticated context
 
 **Don't:**
 
-- Accept `systemId` from the request body for scoping queries
+- Accept `companyId`/`branchId` from request body for scoping queries
 - Accept `accountId` from the client to determine "who is making this request"
-- Skip system filtering on Admin portal endpoints
-- Assume `req.user` has `systemId` for SuperAdmin users (it doesn't)
+- Skip company/branch filtering on Admin portal endpoints
+- Assume `req.user` has `companyId`/`branchId` for SuperAdmin users (it doesn't)

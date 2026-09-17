@@ -26,7 +26,7 @@ src/pages/[Portal]/[Module]/[SubModule]/hooks.jsx
 | Users         | `useUserHooks`         |
 | Roles         | `useRolesData`         |
 | Dashboard     | `useDashboardHooks`    |
-| Systems | `useSystemHooks` |
+| Companies | `useCompanyHooks` |
 
 Pattern: `use[Entity]Hooks` or `use[Entity]Data`. Pick one per project — `useXHooks` is preferred.
 

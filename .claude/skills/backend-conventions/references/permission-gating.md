@@ -88,7 +88,7 @@ export const checkPermission = (
       // 2. If no user-specific permission found, check role permissions
       if (!userAccessLevel) {
         const [user] = await req.db.query(
-          "SELECT roleId FROM accounts WHERE accountId = ? AND status != 'Deleted' LIMIT 1",
+          "SELECT roleId FROM users WHERE accountId = ? AND status != 'Deleted' LIMIT 1",
           [userId],
         );
 
@@ -285,25 +285,15 @@ req.userPermission = {
 
 ---
 
-## The `Admin` Role Convention
+## Owner Role Convention
 
-`roleName = 'Admin'` is the platform-managed role auto-provisioned for a system when
-`POST /superadmin/systems` creates it, holding every active permission at `write` level. The
-account assigned to it is that system's administrator — created, edited and removed **only** by
-SuperAdmin.
-
-> **Careful:** "Admin" is overloaded here. The **Admin role** is this one row per system. The
-> **Admin portal** is `/api/v1/admin/*`, which every account in a system uses, whatever its role.
-> The rules below are about hiding the *role* from the *portal*.
+The "Owner" role is system-managed, created when a branch is created from SuperAdmin. It must never be visible from the Admin portal.
 
 ### Rules
 
-1. **The `Admin` role is invisible in the Admin portal** — every role list query carries
-   `AND r.roleName != 'Admin'`
-2. **Accounts holding it are invisible too** — every account list query joins `roles` and carries
-   the same `AND r.roleName != 'Admin'`
-3. **It cannot be assigned from the Admin portal** — reject if the posted `roleId` resolves to it
-4. **It cannot be edited or deleted from the Admin portal** — reject PUT/DELETE targeting it
-5. **Only SuperAdmin sees it**, under the *Admins* tab of `/superadmin/users`
-6. **It is created automatically** with the system, and deliberately survives deletion of the
-   account holding it, so a replacement administrator can be provisioned straight away
+1. **Hide Owner role from Admin portal** — all role list queries: `AND r.roleName != 'Owner'`
+2. **Hide Owner users from Admin user list** — all user list queries: `AND r.roleName != 'Owner'` (JOIN roles)
+3. **Cannot assign Owner from Admin** — reject if roleId resolves to Owner
+4. **Cannot modify/delete Owner from Admin** — reject PUT/DELETE on Owner role
+5. **Owner is only visible in SuperAdmin** portal
+6. **Owner is created automatically** during `POST /superadmin/branches` (with all permissions at `write` level)

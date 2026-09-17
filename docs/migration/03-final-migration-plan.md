@@ -354,6 +354,10 @@ Registration is one array in `front/src/routes/pageRoutes/AdminRoute.jsx` — la
 
 ### 7.2 SuperAdmin portal (per D1)
 
+> **Superseded in part by [D7](00-decisions.md#d7--one-branch-per-installation) (2026-09-16).** Each
+> installation serves one branch, so multi-branch management and user-to-several-branches
+> assignment are not production features. The rows below record what was planned and built.
+
 | Task | Note |
 | --- | --- |
 | **Company profile page** | Single-company edit: TERANETWORK logo, phone, email, address. The existing Companies *list* becomes a single-company view — confirm with the owner whether to keep the list UI or collapse it to one detail page. |
@@ -362,6 +366,10 @@ Registration is one array in `front/src/routes/pageRoutes/AdminRoute.jsx` — la
 | **System settings** | `DRY_RUN` toggle (+ the global warning banner), `GRACE_DAYS`, `VAT_RATE` — Superadmin only. |
 
 ### 7.3 Public surface (no auth)
+
+> **Superseded in part by [D8](00-decisions.md#d8--gcash-business-merchant-qr-on-the-invoice-option-a-hitpay-parked) (2026-09-16).**
+> Xendit was never adopted and HitPay is parked. GCash Business uses a merchant QR on the invoice,
+> and a public webhook is not a requirement unless its documentation calls for one.
 
 | Task | Note |
 | --- | --- |

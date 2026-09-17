@@ -25,7 +25,19 @@
 | **S11** | Phase-6 surface | 🟡 dashboard, reports, runbooks and the security pass done — M13/M15/M17 remain |
 | **S12** | Client billing schedule | ✅ complete — the schedule is admin-editable and seeded with the client's real dates |
 | **S13** | Revocation and modem recovery | ✅ complete — the lifecycle now has an end, and the modem comes back |
-| **S14** | HitPay + per-branch gateways | ✅ built and tested — waiting only on the client's merchant credentials |
+| **S14** | HitPay + per-branch gateways | ✅ built and tested — ⏸️ **PARKED** 2026-09-16: GCash Business is the acting payment method ([D8](00-decisions.md#d8--gcash-business-merchant-qr-on-the-invoice-option-a-hitpay-parked)) |
+| **S15** | Single-branch installation, roles, dev seed data | ✅ complete — see [S15](#s15--single-branch-installation-roles-and-dev-seed-data) |
+
+> ### ⚠️ Production architecture: ONE BRANCH PER INSTALLATION
+>
+> Decided 2026-09-16 — [D7](00-decisions.md#d7--one-branch-per-installation). Each TERANETWORK branch runs its **own server and own
+> database**. There is no central server, no cross-branch dashboard or report, and no Superadmin
+> spanning branches. **A production database holds one company and one branch.** S0 below built
+> multi-branch scoping for the earlier model; that code remains and is harmless, but it is not the
+> production model and must not be extended.
+>
+> **Payments:** GCash Business with a reusable merchant QR on the invoice is the acting method;
+> HitPay (S14) is parked — [D8](00-decisions.md#d8--gcash-business-merchant-qr-on-the-invoice-option-a-hitpay-parked), [gcash-payment-flow.md](../gcash-payment-flow.md).
 
 ---
 
@@ -33,6 +45,10 @@
 
 Implements decision [D1](00-decisions.md#d1--tenancy--authorization-model): TERANETWORK is one
 company with several branches; a user works in one **or more** of them.
+
+> **Superseded model — [D7](00-decisions.md#d7--one-branch-per-installation).** Production is one branch per installation. What S0 built is
+> kept and harmless (with one branch, `branchId IN (...)` returns the same rows as
+> `branchId = ?`), but do not build on the multi-branch parts.
 
 ### Built
 
@@ -1245,7 +1261,10 @@ The traversal guard and the filename entropy carry regression tests in
 functions purely so they could be tested — a path-traversal check that only ever
 runs inside a multer callback is a check nobody can prove still works.
 
-### ⚠️ Raised by the pass, not fixed
+### ⚠️ Raised by the pass — ✅ resolved 2026-09-16
+
+> **Resolved in S15.** Both lockfiles are tracked; the ignore entries were removed from the root
+> and `back/` `.gitignore`.
 
 **`back/package-lock.json` is gitignored and untracked** (`back/.gitignore:7`).
 A fresh deploy therefore resolves `^0.35.4` to whatever is current and floats
@@ -1589,6 +1608,11 @@ settings field should cost a log line, not a branch's billing.
 
 ### GCash Business is designed for, not built
 
+> **Superseded 2026-09-16 — [D8](00-decisions.md#d8--gcash-business-merchant-qr-on-the-invoice-option-a-hitpay-parked).** GCash is now the acting payment method, but as a
+> **reusable merchant QR on the invoice** with transactions matched afterwards — not as a
+> checkout-session adapter behind this port. Design and open questions:
+> [gcash-payment-flow.md](../gcash-payment-flow.md).
+
 Setting a branch to `gcash` today resolves to a 501 listing the adapters that do
 exist. Writing it is one file plus a line in `index.js`; nothing in billing,
 settlement, the pay page or the webhook controller changes. The port was drawn
@@ -1611,6 +1635,9 @@ button. They get set the day the client's keys arrive.
 
 ### What is still needed from the client
 
+> ⏸️ **Parked 2026-09-16.** Nothing below is being requested while HitPay is parked. Kept for the
+> day the client adopts it.
+
 | | |
 | --- | --- |
 | `PAYMENT_HITPAY_API_KEY` | Dashboard → Settings → API Keys |
@@ -1620,15 +1647,123 @@ button. They get set the day the client's keys arrive.
 
 ---
 
+## S15 — Single-branch installation, roles, and dev seed data ✅
+
+**2026-09-16.** Follows the client confirming one installation per branch ([D7](00-decisions.md#d7--one-branch-per-installation)) and GCash
+Option A ([D8](00-decisions.md#d8--gcash-business-merchant-qr-on-the-invoice-option-a-hitpay-parked)).
+
+### Built
+
+| # | Item | File |
+| --- | --- | --- |
+| 1 | Shared single-branch installation seed: permissions, SuperAdmin, company, **one** branch, Owner / Admin / Billing / Technician | `back/scripts/lib/branch-install.js` |
+| 2 | `db:setup` and `db:setup:clean` both use it (the clean script had drifted to 5 of 23 permissions) | `back/scripts/setup-database.js`, `setup-database-clean.js` |
+| 3 | `COMPANY_NAME` / `COMPANY_EMAIL` / `BRANCH_NAME`; HitPay marked parked; GCash section rewritten for Option A | `back/.env.example` |
+| 4 | Development seed for one branch — `npm run db:seed:dev` | `back/scripts/seed-dev-data.js` |
+| 5 | Lockfiles tracked | `.gitignore`, `back/.gitignore`, `back/package-lock.json` |
+| 6 | Decisions D7 and D8; GCash design doc | `00-decisions.md`, `docs/gcash-payment-flow.md` |
+| 7 | **Fresh installs work.** On a new database the runner applies `schema.sql` and records 001–014 as included instead of executing them on top | `back/scripts/migrate.js` |
+
+### 🐛 A fresh install had never worked
+
+Found by testing the per-branch install path on an empty database. `schema.sql` is kept current
+with every migration (the "two edits" rule), but the runner applied the baseline **and then all 14
+migrations on top of it**. Migration 008 drops `xenditRef`, which the final baseline never had, so
+`npm run db:setup` on an empty database died with `Can't DROP 'xenditRef'`. The dev database never
+hit it because it received each migration incrementally. Under D7 every branch is a fresh install,
+so this blocked the rollout.
+
+**Fix:** when the baseline is applied in the same run, the migrations are recorded in `_migrations`
+as included in it, not executed. Databases that recorded the baseline earlier still run pending
+migrations exactly as before.
+
+**Proven, not assumed:** `schema.sql` alone was diffed against the fully migrated dev database over
+`information_schema`: 712 columns, indexes and foreign keys, identical except one index **name**
+(`payments.xenditPaymentId` on the dev DB, `providerPaymentId` in the baseline, over the same
+column). The migrations' data seeds need no replacement: permissions and Owner grants come from
+setup, and settings fall back to their defaults.
+
+### The role matrix
+
+Agreed with the owner 2026-09-16. Owner has every permission at `write`.
+
+| Permission | Admin | Billing | Technician |
+| --- | --- | --- | --- |
+| dashboard | write | read | read |
+| customers | write | write | read |
+| subscriptions | write | write | read |
+| plans | write | read | — |
+| billing/invoices · payments · adjustments · cycle · dunning | write | write | — |
+| network/olts · pon_ports · splitters · naps · onus · topology · discovery · action_logs | read | — | write |
+| network/provisioning | write | — | write |
+| users/list · users/roles | write | — | — |
+| settings · system | write | — | — |
+| audit_trail | read | read | — |
+
+**A re-run never changes an existing role's permissions**, because an administrator may have tuned
+them on the Roles screen. Only Owner is topped up with permissions it is missing, since Owner is
+defined as "everything".
+
+### The dev seed
+
+Built relative to the day it runs, through the billing engine's own helpers
+(`computeBilledPeriod`, `serviceDaysInPeriod`, `buildInvoiceComputation`,
+`allocateInvoiceNo`, `nextAccountNo`). Refuses `NODE_ENV=production`, and refuses a branch that
+already has plans, OLTs or customers.
+
+Run on 2026-09-16: 6 plans · 2 OLTs · 6 PON ports · 5 splitters (cascaded) · 5 NAPs · 21 ONUs ·
+20 customers. Subscriptions **active 14 · suspended 2 · for_recovery 2 · terminated 1 ·
+pending 1**. Invoices **paid 91 · overdue 7 · void 1** · 91 payments (GCash and cash) ·
+6 adjustments · 3 exemptions (one revoked) · 216 email events · 29 device action logs.
+
+**Why a running worker can't do damage with it:** no `jobs` rows; the OLTs use the `mock` driver on
+RFC 5737 TEST-NET addresses; every active subscription with an overdue invoice has a live
+exemption; emails are `@example.com`, and phones use the unassigned `0900` prefix.
+
+### Verified
+
+| Check | Result |
+| --- | --- |
+| `db:setup` on the existing dev DB | ✅ created Admin (23 perms, 14 write), Billing (10, 7 write), Technician (12, 9 write) for New Lower Bicutan only |
+| `db:setup` re-run | ✅ every step skipped, roles untouched |
+| `db:setup` on a two-branch DB without `BRANCH_NAME` | ✅ refuses and names the branches |
+| `db:seed:dev` re-run | ✅ refuses to seed over existing data |
+| **Fresh install** in a throwaway database: `db:setup:clean` → `db:seed:dev` → `db:setup` | ✅ baseline + 14 migrations recorded, 23 permissions, 1 company, 1 branch, 4 roles, full seed, re-run skipped everything; database dropped afterwards |
+| Fresh install without `BRANCH_NAME` | ✅ refuses with a message naming the variable |
+| Invoice total = sum of its lines | ✅ every invoice |
+| Each paid invoice has exactly one payment of the exact total; no payment on an unpaid invoice | ✅ |
+| Nothing dated in the future; nothing paid before its statement date | ✅ |
+| No invoice issued after its subscription was suspended | ✅ |
+| Dunning sweep candidates on the seeded data | ✅ **zero** |
+| `reports.service`: aging, collections, subscriber roster, operations summary | ✅ aging spans 1–30 / 31–60 / 61–90 / 90+; seven months of billed-vs-collected; 20 subscribers |
+| Backend tests / lint | ✅ **409 passed** / 0 errors |
+
+**Not verified:** the screens themselves. `npm run shoot` needs an admin login
+(`SHOT_EMAIL` / `SHOT_PASSWORD`), and none was used.
+
+### Known about the seeded data
+
+- **No invoice sits in the aging "Current" bucket** when the seed runs between the 2nd and the
+  25th. Every issued invoice is already past due, and the next isn't issued until the statement
+  day. That is correct behaviour, not a gap in the seed.
+- **"Billed this month" reads ₱0** on the dashboard until the statement day, for the same reason.
+- **The dev database still holds Bagumbayan**, with its Owner, from before D7. Seeding touched only
+  New Lower Bicutan. For a production-shaped database, run `BRANCH_NAME=... npm run db:setup:clean`
+  and then `npm run db:seed:dev`. This **drops all data**.
+
+---
+
 ## ⚠️ Needs attention
 
 | # | Item | Detail |
 | --- | --- | --- |
 | ~~A1~~ | ~~The migration has not been applied to any database~~ | ✅ **Resolved 2026-09-07.** The owner supplied `back/.env`; `schema.sql`, `001` and `002` all applied cleanly to MySQL 8.0.45, and re-running is a verified no-op. See "Database verification" below. |
-| **A2** | **The company, branches and roles still need creating** | Admin / Billing / Technician are created through the SuperAdmin portal at runtime, not by `setup-database.js` (which seeds only permissions + the superadmin account). The three D1 roles have to be created per branch before users can be assigned to them. Their **permission rows** arrive with each ISP module in S2–S10, per the `new-module` contract. |
-| **A3** | **`users.branchId` is now a home-branch pointer, not an access boundary** | Any future query that scopes on `users.branchId` directly instead of going through `branchScope()` will silently under- or over-report. The helper is the only correct entry point. |
+| ~~A2~~ | ~~The company, branches and roles still need creating~~ | ✅ **Resolved 2026-09-16 (S15).** `npm run db:setup` creates the company, the installation's one branch and all four roles. Only the Owner **login** is still created from the SuperAdmin portal. |
+| ~~A3~~ | ~~`users.branchId` is now a home-branch pointer, not an access boundary~~ | ✅ **Moot 2026-09-16 — [D7](00-decisions.md#d7--one-branch-per-installation).** One branch per installation, so `branchId = ?` and `branchScope()` return the same rows; either is correct. Do not build multi-branch features on `user_branches`. |
 | ~~A5~~ | ~~No frontend screen has ever been rendered~~ | ✅ **Resolved 2026-09-09.** `playwright-core` drives the machine's installed Chrome; `cd front && npm run shoot` captures every admin screen, every form drawer, a mobile viewport and dark mode, and reports console errors, page errors and failed requests. Two real defects were found this way — see below. Re-run it after any UI change. |
-| **A6** | **The screenshot pass needs data to be useful** | Empty tables hide almost every layout problem there is: column widths, truncation, badge alignment, pagination. `npm run shoot` against an empty database proves very little. Seed customers, invoices and NAPs first. |
+| ~~A6~~ | ~~The screenshot pass needs data to be useful~~ | ✅ **Resolved 2026-09-16 (S15).** `npm run db:seed:dev` seeds one branch with a realistic dataset. |
+| **A7** | **Business numbers collide across installations** | Counters are per company, so every branch issues `ACC-000001` and `INV-2026-000001`. Harmless while branches never combine data; a branch prefix is needed before any consolidation (accounting, BIR, merged export). See D7. |
+| **A8** | **Manual GCash payments have no duplicate guard** | The Record payment drawer has no reference-number field, so a GCash reference can only go in `notes` and the same transaction can be entered twice. Store it as `providerPaymentId`. See [gcash-payment-flow.md §5](../gcash-payment-flow.md). |
 | ~~A4~~ | ~~`sharp` carries a high-severity advisory~~ | ✅ **Resolved 2026-09-13** in the M14 security pass. `sharp@0.35.4` on libvips 8.18.6; `npm audit --omit=dev` reports zero. The `image-compress.js` API surface was exercised against the new version before the bump was accepted. |
 
 ---
@@ -1638,7 +1773,8 @@ button. They get set the day the client's keys arrive.
 | # | Decision | Needed by |
 | --- | --- | --- |
 | ~~P1~~ | ~~Whether `plans` are company-wide or per-branch~~ | ✅ resolved in S2 — [D3](00-decisions.md#d3--service-plans-are-company-wide-not-branch-scoped) |
-| P2 | Which ISP tables store `branchId` vs inherit it through a parent | Partly resolved: `customers` stores it, `plans` has none. Network inventory decided in S3. |
+| ~~P2~~ | ~~Which ISP tables store `branchId` vs inherit it through a parent~~ | ✅ Settled by the built schema, and moot under D7: every installation holds one branch. |
 | ~~P3~~ | ~~60-day blacklist/revocation — six open client questions~~ | ✅ **resolved 2026-09-10** and built in S13. Staff-confirmed, 60 days from the disconnection, TERANETWORK owns the modem, the NAP port is released when the technician reports back, reinstatement is a new signup with a new installation fee, and the screen labels are Suspended / For pull-out / Closed. |
 | P4 | MikroTik router IP, RouterOS version, API port, read-only credentials | Phase 7 (parked) |
-| ~~P5~~ | ✅ **resolved 2026-09-10.** HitPay for the Taguig branches, GCash Business floated for Batangas; the adapter and per-branch routing are built (S14), waiting on merchant credentials. Original note: **Which payment gateway.** Xendit was the first choice; the client wants to evaluate others available in PH. The S8 port makes this a one-file change, and two gateways can run at once — so the practical constraint is not the code but **saved payment methods**: autodebit mandates and card tokens do not transfer between providers, so switching gets expensive only once subscribers start enrolling. Recommendation: pick a primary and start collecting, but hold off pushing autodebit enrolment until they are confident. | before go-live |
+| ~~P5~~ | ~~Which payment gateway~~ | ✅ **Re-decided 2026-09-16 — [D8](00-decisions.md#d8--gcash-business-merchant-qr-on-the-invoice-option-a-hitpay-parked).** GCash Business, reusable merchant QR on the invoice, transactions matched afterwards. HitPay parked. |
+| P6 | GCash Business product, API or report access, fees, transaction fields, MikroTik restore step | Before the GCash integration is built — Q1–Q10 in [gcash-payment-flow.md](../gcash-payment-flow.md) |

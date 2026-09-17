@@ -94,7 +94,7 @@ src/services/
 │   │   └── user-permissions.js
 │   └── superadmin/
 │       ├── auth.js
-│       └── systems.js
+│       └── companies.js
 │
 └── requests/                     # React Query hooks (same structure as api/)
     ├── [portal]/
@@ -108,7 +108,7 @@ src/services/
     │   └── user.js
     └── superadmin/
         ├── auth.js
-        └── systems.js
+        └── companies.js
 ```
 
 ---
@@ -119,7 +119,7 @@ src/services/
 2. **`requests/` files** — React Query hooks (`useQuery`, `useMutation`). Import from the corresponding `api/` file.
 3. **No try/catch** — Let errors propagate to React Query's `onError` handlers.
 4. **Folder mirrors** — `api/` and `requests/` always have the same folder structure.
-5. **File naming** — Use the module name in lowercase (e.g., `user.js`, `roles.js`, `systems.js`).
+5. **File naming** — Use the module name in lowercase (e.g., `user.js`, `roles.js`, `companies.js`).
 
 ---
 

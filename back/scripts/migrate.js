@@ -6,8 +6,10 @@
  * tracked in a `_migrations` table so each runs exactly once; the baseline is
  * recorded under the name `schema.sql`. Safe to re-run.
  *
- * database/migrations/ is empty in a fresh template — it exists for incremental
- * changes made after the baseline has been applied somewhere.
+ * database/migrations/ holds incremental changes for databases that recorded the
+ * baseline before those changes existed. schema.sql is kept current with every
+ * migration, so a FRESH database gets the baseline and has the migrations
+ * recorded as included rather than run on top of it.
  *
  * Usage: node scripts/migrate.js   (or: npm run db:migrate)
  *
@@ -69,11 +71,13 @@ export async function runMigrations(
   // 1. Baseline — the full schema. Every statement is CREATE TABLE IF NOT
   //    EXISTS, so applying it to an already-provisioned database is a no-op.
   const baselineName = path.basename(baselineFile);
+  let baselineAppliedNow = false;
   if (applied.has(baselineName)) {
     console.log(`   ⏭️  ${baselineName} (already applied)`);
   } else {
     await apply(baselineName, fs.readFileSync(baselineFile, "utf-8"));
     ranNow.push(baselineName);
+    baselineAppliedNow = true;
   }
 
   // 2. Incremental migrations on top. The directory is empty in a fresh
@@ -85,6 +89,18 @@ export async function runMigrations(
   for (const file of files) {
     if (applied.has(file)) {
       console.log(`   ⏭️  ${file} (already applied)`);
+      continue;
+    }
+    // A database that received the baseline just now already has everything
+    // the migrations add: schema.sql is kept current with every one of them
+    // (the "two edits" rule in schema-conventions). Running them on top fails —
+    // 008 drops columns the baseline never had. So on a fresh provision they
+    // are recorded as included, not executed. Their data seeds (permissions,
+    // Owner grants, settings) either need rows that do not exist yet or are
+    // done by setup-database.js.
+    if (baselineAppliedNow) {
+      await connection.query(`INSERT INTO _migrations (name, appliedAt) VALUES (?, ?)`, [file, now()]);
+      console.log(`   ⏭️  ${file} (included in ${baselineName})`);
       continue;
     }
     await apply(file, fs.readFileSync(path.join(migrationsDir, file), "utf-8"));

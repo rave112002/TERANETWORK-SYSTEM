@@ -15,10 +15,6 @@ Thumbs.db
 # Node (safety net — front/ and back/ have their own .gitignore)
 node_modules/
 
-# Package
-front/package-lock.json
-back/package-lock.json
-
 /OLD
 # Local login notes — real credentials, never tracked.
 docs/credentials.txt

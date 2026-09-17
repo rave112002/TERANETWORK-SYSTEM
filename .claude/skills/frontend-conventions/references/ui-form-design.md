@@ -401,7 +401,7 @@ For image upload, use a hidden `<input type="file">` triggered by a `<Button typ
 keep `validateImageFile` + `getImageUrl` (`utils/upload.js`) and `deleteFileApi`
 (`services/api/upload.js`), preview via `FileReader`, and upload on submit via `FormData` through
 the `"multipart"` axios instance. Include the staged file in the dirty check
-(`isDirty || !!logoFile`). See `SystemFormDrawer.jsx`.
+(`isDirty || !!logoFile`). See `CompanyFormDrawer.jsx`.
 
 ---
 

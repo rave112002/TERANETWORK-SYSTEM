@@ -22,6 +22,7 @@
     "db:migrate": "node scripts/migrate.js",
     "db:reset": "node scripts/reset-database.js",
     "db:check": "node scripts/check-database.js",
+    "db:seed:dev": "node scripts/seed-dev-data.js",
     "keys": "node scripts/generate-keys.js",
     "test": "vitest run",
     "test:watch": "vitest"

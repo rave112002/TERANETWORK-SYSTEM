@@ -43,7 +43,7 @@ if the user gave only a module name, ask for the fields.
 
 Plus a **field table** — for each field: column name, MySQL type + nullability, required in the
 form?, UI control (Input / Textarea / Select / StatusToggle / PasswordInput / phone), and any
-enum values. Every module also gets, automatically: `id`, `{{entityId}}`, `systemId`
+enum values. Every module also gets, automatically: `id`, `{{entityId}}`, `companyId`, `branchId`
 (Admin portal only), `status`, `dateCreated`, `dateUpdated`.
 
 **Required-ness must match the DB.** A column that is `NULL` in the schema must NOT be `.min(1)`
@@ -55,7 +55,7 @@ table before writing the form.
 - The field list is missing or ambiguous (types, enum values, which are required).
 - The module needs a permission that doesn't exist yet **and** the DB is already seeded — creating
   it changes existing installs (Step 3 handles it, but confirm the module/submodule slug first).
-- The entity is not tenant-scoped (no `systemId`) — that breaks multi-tenant isolation
+- The entity is not tenant-scoped (no `companyId`/`branchId`) — that breaks multi-tenant isolation
   and must be a deliberate choice.
 - It belongs under an existing parent module (e.g. `UserManagement/`) rather than at the top level.
 
@@ -86,13 +86,13 @@ Copy-paste templates with every placeholder marked:
 
 ## Step 3 — The permission row is not optional
 
-A page whose permission isn't in the `permissions` table is invisible to every non-Admin user and
+A page whose permission isn't in the `permissions` table is invisible to every non-Owner user and
 its API returns 403. `setup-database.js` skips seeding entirely when the table is non-empty, so an
 already-provisioned DB will never pick up a new entry there — that is why the row goes in **both**
 the seed array (fresh installs) and the numbered migration (existing installs). The migration
 INSERT must be idempotent (`WHERE NOT EXISTS`). See `references/backend.md` §3.
 
-Grant it to the Admin role too, or the tenant's own admin can't see the page — the migration
+Grant it to the Owner role too, or the tenant's own admin can't see the page — the migration
 template does this.
 
 ## Step 4 — Verify before reporting done
@@ -120,7 +120,7 @@ Then walk the checklist in `references/checklist.md`. Report anything you skippe
 - **UUIDs come from MySQL** — `SELECT UUID()`, never `crypto.randomUUID()` / `uuidv4()`.
 - **Timestamps come from `getCurrentTimestampLocal()`** — never `NOW()`, `new Date()`, or `moment()`
   in application code.
-- **Tenant scope from `req.user`** — `systemId` is read off `req.user`, never off
+- **Tenant scope from `req.user`** — `companyId`/`branchId` are read off `req.user`, never off
   `req.body`/`req.query`. SuperAdmin routes have neither.
 - **Soft delete** — `UPDATE … SET status = 'Deleted'`. No `DELETE FROM`. List queries filter
   `status != 'Deleted'` unless an explicit `?status=` was passed.

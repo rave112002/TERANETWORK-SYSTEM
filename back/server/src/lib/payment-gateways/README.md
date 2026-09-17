@@ -1,5 +1,12 @@
 # Adding a payment gateway
 
+> ⏸️ **Status 2026-09-16:** HitPay (built) is **parked**. The acting payment method is a **GCash
+> Business merchant QR printed on the invoice**, with transactions matched to invoices afterwards
+> ([D8](../../../../../docs/migration/00-decisions.md), [gcash-payment-flow.md](../../../../../docs/gcash-payment-flow.md)).
+> That model has no checkout session and no per-invoice reference, so it does **not** fit this
+> adapter interface. Don't write a GCash adapter here from memory; it gets designed once the
+> client's GCash Business documentation arrives.
+
 Everything provider-specific lives in this folder. Nothing outside it knows
 which gateway is collecting money — not the billing engine, not settlement, not
 the pay page, not the webhook controller.

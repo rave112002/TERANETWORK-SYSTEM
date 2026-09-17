@@ -9,7 +9,7 @@ These conventions apply to all database tables and backend controller code in th
 Every table MUST follow this structure:
 
 1. **`id`** — `BIGINT PRIMARY KEY AUTO_INCREMENT` — internal surrogate key, never exposed to the frontend.
-2. **Business ID** — a separate `varchar(50) UNIQUE NOT NULL` column (e.g., `accountId`, `systemId`, `roleId`, `permissionId`) used in all API responses, URLs, and foreign key references.
+2. **Business ID** — a separate `varchar(50) UNIQUE NOT NULL` column (e.g., `accountId`, `companyId`, `branchId`, `roleId`, `permissionId`) used in all API responses, URLs, and foreign key references.
 3. **Timestamp columns** — `dateCreated DATETIME NOT NULL`, `dateUpdated DATETIME NOT NULL` (see Timestamp section below).
 
 ```sql
@@ -40,7 +40,7 @@ const accountId = uuidRow[0].id;
 
 // For pool queries (non-transaction):
 const uuidResult = await req.db.query(`SELECT UUID() as id`);
-const systemId = uuidResult[0].id;
+const companyId = uuidResult[0].id;
 ```
 
 ### Rules
@@ -64,7 +64,7 @@ try {
   const accountId = uuidRow[0].id;
 
   await conn.execute(
-    `INSERT INTO accounts (accountId, firstName, lastName, status, dateCreated, dateUpdated)
+    `INSERT INTO users (accountId, firstName, lastName, status, dateCreated, dateUpdated)
      VALUES (?, ?, ?, 'Active', ?, ?)`,
     [accountId, firstName, lastName, now, now],
   );
@@ -85,7 +85,7 @@ import { v4 as uuidv4 } from "uuid";
 const accountId = uuidv4(); // ❌ Wrong
 
 // Never use crypto.randomUUID()
-const systemId = crypto.randomUUID(); // ❌ Wrong
+const companyId = crypto.randomUUID(); // ❌ Wrong
 
 // Never hardcode or generate IDs from timestamps/random strings
 const roleId = `role_${Date.now()}`; // ❌ Wrong
@@ -123,9 +123,9 @@ const now = getCurrentTimestampLocal();
 
 ```js
 await conn.execute(
-  `INSERT INTO systems (systemId, name, level, status, dateCreated, dateUpdated)
+  `INSERT INTO companies (companyId, name, email, status, dateCreated, dateUpdated)
    VALUES (?, ?, ?, 'Active', ?, ?)`,
-  [systemId, name, level, now, now],
+  [companyId, name, email, now, now],
 );
 ```
 
@@ -133,8 +133,8 @@ await conn.execute(
 
 ```js
 await req.db.query(
-  `UPDATE systems SET name = ?, dateUpdated = ? WHERE systemId = ? AND status != 'Deleted'`,
-  [name, now, systemId],
+  `UPDATE companies SET name = ?, dateUpdated = ? WHERE companyId = ? AND status != 'Deleted'`,
+  [name, now, companyId],
 );
 ```
 
@@ -157,7 +157,7 @@ phone VARCHAR(20) NULL,
 ```
 
 `VARCHAR(20)` rather than 13 leaves headroom for legacy rows written before the convention.
-Phone is **optional on every table that has it** — `accounts`,
+Phone is **optional on every table that has it** — `companies`, `branches`, `users`,
 `superadmins` — so `NULL` is the "no number" value and controllers write `phone || null`.
 
 Never format or sanitise a phone in a controller. The `optionalPhone()` validator normalises
@@ -174,19 +174,18 @@ They are declared inline on the tenant hierarchy + permission mappings (see
 `database/schema.sql`):
 
 ```sql
--- roles.systemId              → systems.systemId
--- accounts.systemId / roleId  → systems / roles
--- settings.systemId           → systems.systemId
--- sensors.systemId              → systems.systemId
+-- branches.companyId          → companies.companyId
+-- roles.companyId / branchId  → companies.companyId / branches.branchId
+-- users.companyId / branchId / roleId → companies / branches / roles
 -- role_permissions.roleId / permissionId → roles / permissions
--- user_permissions.accountId / permissionId → accounts / permissions
+-- user_permissions.accountId / permissionId → users / permissions
 ```
 
 `ON DELETE RESTRICT` is intentional: rows are soft-deleted (`status = 'Deleted'`),
 never physically removed, so a RESTRICT never fires in normal operation.
 
 **Deliberately unconstrained** (polymorphic accountId): `credentials.accountId`,
-`superadmins/accounts.accountId`, `refresh_tokens.accountId`, and all of
+`superadmins/users.accountId`, `refresh_tokens.accountId`, and all of
 `audit_trail` (audit rows must outlive their referents).
 
 ---
@@ -199,12 +198,12 @@ Tables with a `status` column use soft deletes by setting `status = 'Deleted'` �
 // Soft delete
 const now = getCurrentTimestampLocal();
 await req.db.query(
-  `UPDATE accounts SET status = 'Deleted', dateUpdated = ? WHERE accountId = ?`,
+  `UPDATE users SET status = 'Deleted', dateUpdated = ? WHERE accountId = ?`,
   [now, accountId],
 );
 
 // Always filter out deleted rows in SELECT queries
-`SELECT * FROM accounts WHERE status != 'Deleted'`;
+`SELECT * FROM users WHERE status != 'Deleted'`;
 ```
 
 ---
@@ -239,17 +238,18 @@ Key tables:
 
 | Table              | Business ID        | Purpose                                             |
 | ------------------ | ------------------ | --------------------------------------------------- |
-| `systems`            | `systemId`         | The tenant — one system in one city/municipality   |
+| `companies`           | `companyId`          | Multi-tenant company (the company)       |
+| `branches`         | `branchId`         | Physical locations under a company                    |
 | `superadmins`      | `accountId`        | Platform-level superadmin users                     |
 | `credentials`      | `accountId`        | Auth credentials (shared across portals via `type`) |
-| `accounts`         | `accountId`        | Admin/staff users (belong to a system)              |
-| `roles`            | `roleId`           | Permission roles (scoped to a system)               |
+| `users`            | `accountId`        | Admin/staff users (belong to a company + branch)      |
+| `roles`            | `roleId`           | Permission roles (scoped to company + branch)         |
 | `permissions`      | `permissionId`     | Master permission definitions                       |
 | `role_permissions` | (composite)        | Maps roles → permissions                            |
 | `user_permissions` | `userPermissionId` | Per-user permission overrides                       |
 | `refresh_tokens`   | `jti`              | Issued refresh tokens (rotation/revocation)         |
 | `password_reset_tokens` | `tokenHash`   | Single-use forgot/reset-password tokens             |
-| `settings`         | (composite)        | Key/value store scoped to a system                  |
+| `settings`         | (composite)        | Key/value store scoped to a company + branch        |
 | `audit_trail`      | `auditId`          | Append-only action log (no FKs by design)           |
 | `idempotency_keys` | `idempotencyKey`   | Cached responses for idempotent mutations           |
 

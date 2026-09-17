@@ -8,6 +8,13 @@ either old codebase. Newest at the bottom.
 
 ## D1 — Tenancy & authorization model
 
+> ⚠️ **Partly superseded by [D7](#d7--one-branch-per-installation) (2026-09-16).** Production is
+> **one server + one database per branch**, with no central server. Everything below about a
+> Superadmin operating *across* branches, users assigned to *several* branches, and
+> `branchId IN (...)` scoping describes what S0 built — that code still exists and is harmless —
+> but it is **not** the production model and must not be extended. The role list and the "one
+> company, branch is the scoping unit" framing still stand. Read D7 before touching tenancy.
+
 **Decided:** 2026-09-07, Phase 1 exit.
 **Supersedes:** the ISP docs' single-tenant, four-fixed-role model (`super_admin` / `billing` /
 `noc` / `auditor`) as built in V1 and V2.
@@ -175,3 +182,89 @@ back when the customer pays, not when someone clicks.
 
 **Consequence for S6:** the provisioning worker writes `subscriptions.status` directly, not through
 this controller. That is the intended path, not a workaround.
+
+---
+
+## D7 — One branch per installation
+
+**Decided:** 2026-09-16, by the client. **Supersedes** the cross-branch parts of [D1](#d1--tenancy--authorization-model).
+
+**Every TERANETWORK branch runs its own, locally deployed instance of this system** — its own
+server, its own MySQL database, its own worker. There is **no central server**, no combined
+dashboard or report across branches, and no Superadmin that manages more than one branch's
+database.
+
+```
+New Lower Bicutan  →  server A  +  database A   (1 company row, 1 branch row)
+Bagumbayan         →  server B  +  database B   (1 company row, 1 branch row)
+                      nothing connects A and B
+```
+
+**Treat every installation as a single-branch ISP system.** A production database holds exactly
+one `companies` row and exactly one `branches` row.
+
+### What this means for code
+
+| Topic | Rule |
+| --- | --- |
+| **Scoping** | `WHERE companyId = ? AND branchId = ?` from `req.user` is correct and sufficient, as the `backend-conventions` skill teaches. |
+| **`branchScope()`, `user_branches`, `req.user.branchIds`** | **Keep, do not extend.** Built in S0 for the superseded model. With one branch they return exactly the rows `branchId = ?` does, so they are harmless, and removing them from ~26 files buys nothing. New code may use either form. |
+| **Do not build** | Cross-branch dashboards or reports, assigning a user to several branches, branch switchers, or anything that assumes two branches share a database. |
+| **Setup** | `npm run db:setup` creates the company, **this installation's one branch** (`BRANCH_NAME`), and its Owner / Admin / Billing / Technician roles. It never creates a second branch. |
+| **SuperAdmin portal** | Still exists, and on each installation manages **that installation only** — creating the branch Owner login, company profile, system settings. The branch-assignment drawer from S0 is vestigial. |
+| **`branches.paymentProvider`** (S14) | Redundant — each installation has its own `.env`. Harmless; leave NULL. |
+
+### What this means for operations
+
+- **Everything is per installation:** backups, migrations, upgrades, the worker, `DRY_RUN`, the
+  billing schedule settings, SMTP and payment configuration. The runbooks describe one
+  installation; repeat them for each branch.
+- **Business numbers are unique only within an installation.** `counters` are keyed by
+  `companyId`, so both branches will issue `ACC-000001` and `INV-2026-000001`. Harmless while
+  nothing is consolidated. **If the client ever combines branch data — accounting, a BIR report, a
+  merged export — numbers will collide.** A branch prefix in the numbering is the fix; it is not
+  built. Raise it with the client before any consolidation is discussed.
+
+### Development databases
+
+A dev database created before this decision may hold both Taguig branches. `db:setup` and
+`db:seed:dev` then require `BRANCH_NAME` and touch only that branch. For a production-shaped
+database: `npm run db:setup:clean` with `BRANCH_NAME` set, then `npm run db:seed:dev`.
+
+---
+
+## D8 — GCash Business merchant QR on the invoice ("Option A"); HitPay parked
+
+**Decided:** 2026-09-16, by the client. **Supersedes** the payment direction in S14 and P5.
+
+The client has applied for **GCash for Business**, and it is the acting payment method. **HitPay
+is parked** — the adapter, its tests and per-branch routing stay in the codebase, unused, for when
+the client adopts it. Nothing HitPay-related is deleted.
+
+### The flow
+
+The client's current process is **GCash → Google Sheets → MikroTik**. **This system replaces
+Google Sheets entirely:**
+
+```
+invoice (carries the client's GCash Business merchant QR)
+  → sent to the subscriber by email / SMS
+  → subscriber scans the QR in the GCash app and pays
+  → money lands in the ISP's GCash Business account
+  → this system obtains the GCash transaction information
+  → matches the payment to the customer and invoice
+  → updates payment and invoice status
+  → applies the service action (reconnection), including MikroTik where applicable
+```
+
+### Rules
+
+| | |
+| --- | --- |
+| **One reusable merchant QR** | The client's GCash Business merchant QR goes on every invoice. **No unique QR per subscriber or per invoice** is generated. The system identifies the payment from the transaction data, not from the QR. |
+| **No public endpoint by default** | This is a locally deployed system. A public HTTPS endpoint, webhook, Cloudflare Tunnel or port-forward is **not** a requirement — it becomes one **only** if the GCash Business product the client receives documents that GCash must call us from the internet. |
+| **Do not build the integration blind** | How transactions are retrieved — an API, a report export, manual entry — is decided from the client's actual GCash Business product documentation and credentials. Nothing about GCash's API is assumed or invented before then. |
+| **Keep it flexible** | Retrieval (how transactions arrive) and matching (which invoice a transaction settles) are separate concerns. Settlement already exists — `settleInvoice()` — and is what a matched GCash payment goes through. |
+
+Design, open questions for the client, and what not to do:
+**[docs/gcash-payment-flow.md](../gcash-payment-flow.md)**.

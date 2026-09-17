@@ -7,7 +7,12 @@ description: The non-negotiable conventions for this repo's Node + Express + MyS
 
 Node + Express · MySQL via a custom `Database` class wrapping `mysql2/promise`
 (`server/config/database.js`, injected as `req.db`) · Passport JWT · Zod validators ·
-multi-tenant scoping by `systemId`.
+multi-tenant scoping by `companyId`/`branchId`.
+
+**Production is one branch per installation** (decision D7 in `docs/migration/00-decisions.md`):
+each database holds one company and one branch. Scope by `req.user.companyId` / `branchId`.
+`branchScope()` and `user_branches` exist from an earlier multi-branch design — harmless, usable,
+but never extend them into cross-branch features.
 
 These rules are **non-negotiable** unless the user says otherwise. Reference implementation:
 `server/src/controllers/v1/admin/roles.controller.js`.
@@ -23,7 +28,7 @@ validators + permission-gating; a schema change needs schema-conventions.
 | [db-patterns.md](references/db-patterns.md) | Any query. The `req.db.query` vs `conn.execute` return shapes, the transaction template, race-safe check-then-insert, soft-delete filtering. |
 | [schema-conventions.md](references/schema-conventions.md) | Adding or changing a table/column — table structure, business IDs, `SELECT UUID()`, timestamps, phone columns, FKs, soft deletes, migrations. |
 | [validators.md](references/validators.md) | Any POST/PUT/PATCH, or a GET with query filters. Schema naming, the `_helpers.js` wrappers, `optionalPhone()`. |
-| [permission-gating.md](references/permission-gating.md) | Any route group — one module/submodule permission per group, GET = read / mutations = write, the Admin-role rules. |
+| [permission-gating.md](references/permission-gating.md) | Any route group — one module/submodule permission per group, GET = read / mutations = write, the Owner-role rules. |
 | [file-uploads.md](references/file-uploads.md) | Anything writing to `public/uploads/` — the portal-prefixed, tenant-scoped path convention. |
 
 ## Rules that are violated most often
@@ -40,7 +45,7 @@ Load the relevant doc for the detail; these are the ones worth knowing cold.
   manual `conn.release()` — commit and rollback both release.
 - **Check-then-insert needs one transaction with `FOR UPDATE`**, or two concurrent requests both
   pass the check before either inserts.
-- **Never trust client-sent `systemId` / `accountId`.** Scope from `req.user`.
+- **Never trust client-sent `companyId` / `branchId` / `accountId`.** Scope from `req.user`.
   SuperAdmin has neither — don't assume they're present.
 - **IDs come from MySQL** — `SELECT UUID()`, never `crypto.randomUUID()`, `uuidv4()`, or
   `role_${Date.now()}`. Generate inside the transaction with `conn.execute`.
