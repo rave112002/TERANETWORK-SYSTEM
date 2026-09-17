@@ -11,10 +11,10 @@
  * that, and a double entry marks a second customer's invoice paid with money
  * that belongs to the first.
  *
- * It is also the key a future GCash import will settle through
- * (docs/gcash-payment-flow.md), so a payment entered by hand today and the same
- * transaction imported tomorrow collide instead of counting twice — provided
- * both go through `normalizePaymentReference`.
+ * It is also the key the GCash statement check matches on (docs/payments.md):
+ * a reference in the uploaded transaction history and a reference typed by a
+ * clerk are the same transaction only if both go through
+ * `normalizePaymentReference`.
  *
  * ── Normalised, because people copy them inconsistently ─────────────────────
  *
@@ -23,8 +23,16 @@
  * or the duplicate guard only catches identical typing.
  */
 
-/** A reference is required for the merchant-QR channels, where double entry is the real risk. */
-export const REFERENCE_REQUIRED_CHANNELS = ["GCASH", "QRPH"];
+/**
+ * Channels whose money lands in TERANETWORK's GCash account (docs/decisions.md D9):
+ * a GCash send, or a Maya / QR Ph / online-bank transfer into that account.
+ * Every one of them shows up in the GCash transaction history, so every one is
+ * checked against the uploaded statement — and needs a reference to be checked by.
+ */
+export const STATEMENT_CHANNELS = ["GCASH", "MAYA", "QRPH", "BANK_TRANSFER"];
+
+/** Required wherever the statement check can see the money, and double entry is the real risk. */
+export const REFERENCE_REQUIRED_CHANNELS = STATEMENT_CHANNELS;
 
 /** Cash has no transaction id, and accepting one would let a typo block a real payment later. */
 export const REFERENCE_FORBIDDEN_CHANNELS = ["CASH"];
@@ -46,6 +54,7 @@ export const normalizePaymentReference = (raw) =>
     .toUpperCase();
 
 export default {
+  STATEMENT_CHANNELS,
   REFERENCE_REQUIRED_CHANNELS,
   REFERENCE_FORBIDDEN_CHANNELS,
   REFERENCE_PATTERN,

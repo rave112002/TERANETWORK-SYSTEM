@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { Ban, Download, Eye, HandCoins, Send } from "lucide-react";
+import { Ban, Download, Eye, FileText, HandCoins, Send } from "lucide-react";
 import dayjs from "dayjs";
 
 import RowActions from "../../../../components/RowActions";
@@ -40,6 +40,7 @@ export const useInvoicesData = () => {
 
   const [detailInvoice, setDetailInvoice] = useState(null);
   const [payInvoice, setPayInvoice] = useState(null);
+  const [pdfInvoice, setPdfInvoice] = useState(null);
   const [cycleOpen, setCycleOpen] = useState(false);
 
   const { data, isLoading, isFetching, error, refetch } = useGetInvoices({
@@ -75,6 +76,8 @@ export const useInvoicesData = () => {
   const handleCloseDetail = useCallback(() => setDetailInvoice(null), []);
   const handlePay = useCallback((record) => setPayInvoice(record), []);
   const handleClosePay = useCallback(() => setPayInvoice(null), []);
+  const handlePreviewPdf = useCallback((record) => setPdfInvoice(record), []);
+  const handleClosePdf = useCallback(() => setPdfInvoice(null), []);
   const handleOpenCycle = useCallback(() => setCycleOpen(true), []);
   const handleCloseCycle = useCallback(() => setCycleOpen(false), []);
 
@@ -95,6 +98,12 @@ export const useInvoicesData = () => {
           label: "View invoice",
           icon: <Eye className="w-4 h-4" />,
           onClick: () => handleView(record),
+        },
+        {
+          key: "preview",
+          label: "View PDF",
+          icon: <FileText className="w-4 h-4" />,
+          onClick: () => handlePreviewPdf(record),
         },
         {
           key: "pdf",
@@ -143,7 +152,15 @@ export const useInvoicesData = () => {
 
       return items;
     },
-    [canWriteInvoices, canRecordPayment, handleView, handleDownload, handlePay, handleResend]
+    [
+      canWriteInvoices,
+      canRecordPayment,
+      handleView,
+      handlePreviewPdf,
+      handleDownload,
+      handlePay,
+      handleResend,
+    ]
   );
 
   const columns = useMemo(
@@ -293,6 +310,9 @@ export const useInvoicesData = () => {
     payInvoice,
     handlePay,
     handleClosePay,
+    pdfInvoice,
+    handlePreviewPdf,
+    handleClosePdf,
     cycleOpen,
     handleOpenCycle,
     handleCloseCycle,

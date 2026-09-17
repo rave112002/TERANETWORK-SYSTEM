@@ -20,6 +20,7 @@ import subscriptionsController from "../../../controllers/v1/admin/subscriptions
 import systemController from "../../../controllers/v1/admin/system.controller.js";
 import invoicesController from "../../../controllers/v1/admin/invoices.controller.js";
 import paymentsController from "../../../controllers/v1/admin/payments.controller.js";
+import paymentStatementsController from "../../../controllers/v1/admin/payment-statements.controller.js";
 import adjustmentsController from "../../../controllers/v1/admin/adjustments.controller.js";
 import dunningController from "../../../controllers/v1/admin/dunning.controller.js";
 import reportsController from "../../../controllers/v1/admin/reports.controller.js";
@@ -67,6 +68,12 @@ router.use("/system", requireAuth, auditTrail("system"), systemController);
 // ── Billing ──
 router.use("/invoices", requireAuth, auditTrail("billing"), invoicesController);
 router.use("/payments", requireAuth, auditTrail("billing"), paymentsController);
+router.use(
+  "/payment-statements",
+  requireAuth,
+  auditTrail("billing"),
+  paymentStatementsController
+);
 router.use("/adjustments", requireAuth, auditTrail("billing"), adjustmentsController);
 router.use("/dunning", requireAuth, auditTrail("billing"), dunningController);
 

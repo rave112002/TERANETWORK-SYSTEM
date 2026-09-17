@@ -3,7 +3,7 @@
 All protected endpoints receive the authenticated user's data via `req.user`, set by the Passport JWT middleware.
 
 > **One branch per installation.** Production runs a separate server + database per TERANETWORK
-> branch (decision D7, `docs/migration/00-decisions.md`), so a database holds exactly one company
+> branch (decision D7, `docs/decisions.md`), so a database holds exactly one company
 > and one branch, and `companyId = ? AND branchId = ?` is the correct tenant predicate.
 >
 > You will also find `req.user.branchIds`, `server/src/utils/branchScope.js` and the

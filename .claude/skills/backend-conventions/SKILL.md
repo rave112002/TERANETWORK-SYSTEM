@@ -9,7 +9,7 @@ Node + Express · MySQL via a custom `Database` class wrapping `mysql2/promise`
 (`server/config/database.js`, injected as `req.db`) · Passport JWT · Zod validators ·
 multi-tenant scoping by `companyId`/`branchId`.
 
-**Production is one branch per installation** (decision D7 in `docs/migration/00-decisions.md`):
+**Production is one branch per installation** (decision D7 in `docs/decisions.md`):
 each database holds one company and one branch. Scope by `req.user.companyId` / `branchId`.
 `branchScope()` and `user_branches` exist from an earlier multi-branch design — harmless, usable,
 but never extend them into cross-branch features.

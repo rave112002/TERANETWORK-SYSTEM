@@ -14,8 +14,14 @@ import {
   getInvoiceByIdApi,
   getInvoicePdfApi,
   getInvoicesApi,
+  deletePaymentStatementApi,
+  fixPaymentReferenceApi,
+  getPaymentStatementsApi,
   getPaymentsApi,
+  getStatementReconciliationApi,
   recordPaymentApi,
+  reviewStatementTransactionApi,
+  uploadPaymentStatementApi,
   resendInvoiceApi,
   runBillingCycleApi,
   runDailyBillingApi,
@@ -37,6 +43,7 @@ import {
 const invalidateBilling = (queryClient) => {
   queryClient.invalidateQueries({ queryKey: ["invoices"] });
   queryClient.invalidateQueries({ queryKey: ["payments"] });
+  queryClient.invalidateQueries({ queryKey: ["payment-statements"] });
   queryClient.invalidateQueries({ queryKey: ["adjustments"] });
 };
 
@@ -57,6 +64,25 @@ export const useGetInvoiceById = (invoiceId, options = {}) =>
     queryFn: () => getInvoiceByIdApi(invoiceId),
     enabled: !!invoiceId,
     staleTime: 60 * 1000,
+    ...options,
+  });
+
+/**
+ * The invoice PDF as a Blob, for showing it in the preview drawer.
+ *
+ * Fetched with the session's Bearer token, which an `<iframe src>` pointing at
+ * the API could not send. Never cached (`gcTime: 0`): the backend re-renders the
+ * document on every request, so a cached copy could show an old GCash number or
+ * an "unpaid" invoice that has since been paid.
+ */
+export const useGetInvoicePdf = (invoiceId, options = {}) =>
+  useQuery({
+    queryKey: ["invoices", invoiceId, "pdf"],
+    queryFn: () => getInvoicePdfApi(invoiceId),
+    enabled: !!invoiceId,
+    staleTime: 0,
+    gcTime: 0,
+    retry: false,
     ...options,
   });
 
@@ -231,6 +257,92 @@ export const useRecordPayment = () => {
       // The exact-amount refusal names both figures; passing it through
       // verbatim is what tells them whether to take more or give change.
       toast.error(error.response?.data?.message || "Could not record the payment");
+    },
+  });
+};
+
+/* ── GCash Check (statement reconciliation) ─────────────────────────────── */
+
+/**
+ * Anything that changes a check's outcome also changes the payments list (a
+ * corrected reference) and the dashboard's attention list (the GCash alert).
+ */
+const invalidateStatements = (queryClient) => {
+  queryClient.invalidateQueries({ queryKey: ["payment-statements"] });
+  queryClient.invalidateQueries({ queryKey: ["payments"] });
+  queryClient.invalidateQueries({ queryKey: ["reports", "operations"] });
+};
+
+export const useGetPaymentStatements = (options = {}) =>
+  useQuery({
+    queryKey: ["payment-statements", "list"],
+    queryFn: getPaymentStatementsApi,
+    staleTime: 60 * 1000,
+    ...options,
+  });
+
+export const useGetStatementReconciliation = (statementId, options = {}) =>
+  useQuery({
+    queryKey: ["payment-statements", statementId, "reconciliation"],
+    queryFn: () => getStatementReconciliationApi(statementId),
+    enabled: !!statementId,
+    staleTime: 30 * 1000,
+    placeholderData: keepPreviousData,
+    ...options,
+  });
+
+export const useUploadPaymentStatement = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: uploadPaymentStatementApi,
+    onSuccess: () => invalidateStatements(queryClient),
+    // No toast here: a wrong password is answered inside the drawer, next to
+    // the field the person has to fix.
+  });
+};
+
+export const useDeletePaymentStatement = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: deletePaymentStatementApi,
+    onSuccess: () => {
+      toast.success("Statement removed");
+      invalidateStatements(queryClient);
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.message || "Could not remove the statement");
+    },
+  });
+};
+
+export const useReviewStatementTransaction = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: reviewStatementTransactionApi,
+    onSuccess: (res) => {
+      toast.success(res?.message || "Updated");
+      invalidateStatements(queryClient);
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.message || "Could not update the line");
+    },
+  });
+};
+
+export const useFixPaymentReference = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: fixPaymentReferenceApi,
+    onSuccess: (res) => {
+      toast.success(res?.message || "Reference corrected");
+      invalidateStatements(queryClient);
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.message || "Could not correct the reference");
     },
   });
 };

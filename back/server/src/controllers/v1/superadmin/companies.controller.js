@@ -108,7 +108,7 @@ router.get(
 
 /* ── Company profile ──────────────────────────────────────────────────────
  * TERANETWORK runs as a single company with several branches (see
- * docs/migration/00-decisions.md, D1). These two routes address "the" company
+ * docs/decisions.md, D1). These two routes address "the" company
  * without the caller having to know its ID, and expose only the branding and
  * contact fields that customer-facing documents render — invoice PDFs and
  * notification emails read them instead of hardcoding a name and logo.

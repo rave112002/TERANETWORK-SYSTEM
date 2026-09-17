@@ -43,6 +43,11 @@ describe("recordPaymentSchema — reference numbers", () => {
     expect(parse({ channel: "QRPH", referenceNo: "" }).success).toBe(false);
   });
 
+  it("requires a reference for Maya and bank transfers — that money lands in the GCash account too", () => {
+    expect(parse({ channel: "MAYA" }).success).toBe(false);
+    expect(parse({ channel: "BANK_TRANSFER", referenceNo: "" }).success).toBe(false);
+  });
+
   it("hands the controller the normalised reference, not what was typed", () => {
     const result = parse({ channel: "GCASH", referenceNo: "1234 567 890123" });
     expect(result.success).toBe(true);
@@ -61,10 +66,10 @@ describe("recordPaymentSchema — reference numbers", () => {
     expect(parse({ channel: "GCASH", referenceNo: " - " }).success).toBe(false);
   });
 
-  it("leaves the reference optional for bank transfers, but still checks its shape", () => {
-    expect(parse({ channel: "BANK_TRANSFER" }).success).toBe(true);
-    expect(parse({ channel: "BANK_TRANSFER", referenceNo: "FT26091700123" }).success).toBe(true);
-    expect(parse({ channel: "BANK_TRANSFER", referenceNo: "12#45" }).success).toBe(false);
+  it("leaves the reference optional for channels outside the GCash account, but still checks its shape", () => {
+    expect(parse({ channel: "OTHER" }).success).toBe(true);
+    expect(parse({ channel: "CARD", referenceNo: "FT26091700123" }).success).toBe(true);
+    expect(parse({ channel: "OTHER", referenceNo: "12#45" }).success).toBe(false);
   });
 
   it("rejects a reference too short to be a transaction id", () => {

@@ -1,8 +1,18 @@
 import { useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
-import { Building2, Calendar, CircleAlert, Clock, Loader2, Mail } from "lucide-react";
+import {
+  Building2,
+  Calendar,
+  CircleAlert,
+  Clock,
+  Link2,
+  Loader2,
+  Mail,
+  Smartphone,
+  UserRound,
+} from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -15,6 +25,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -37,6 +48,11 @@ import {
   useGetSettings,
   useUpdateSettings,
 } from "../../../services/requests/admin/settings";
+import {
+  formatPhoneOnChange,
+  PHONE_PLACEHOLDER,
+  zPhone,
+} from "../../../utils/phoneFormat";
 
 const DATE_FORMAT_OPTIONS = [
   { value: "MMM D, YYYY", label: "MMM D, YYYY  (Jan 5, 2025)" },
@@ -61,6 +77,16 @@ const schema = z.object({
   dateFormat: z.string(),
   timezone: z.string(),
   weekStartsOn: z.string(),
+  gcashNumber: zPhone,
+  gcashAccountName: z.string().max(100, "Must be 100 characters or fewer"),
+  facebookPageUrl: z
+    .string()
+    .max(255, "Must be 255 characters or fewer")
+    .refine(
+      (v) => v === "" || /^https?:\/\/\S+$/i.test(v.trim()),
+      "Enter the full link, starting with https://",
+    ),
+  invoiceTerms: z.string().max(1500, "Must be 1,500 characters or fewer"),
 });
 
 const EMPTY = {
@@ -69,6 +95,71 @@ const EMPTY = {
   dateFormat: "MMM D, YYYY",
   timezone: "",
   weekStartsOn: "Monday",
+  gcashNumber: "",
+  gcashAccountName: "",
+  facebookPageUrl: "",
+  invoiceTerms: "",
+};
+
+/** Stored values over the blanks. A cleared setting comes back as null. */
+const toFormValues = (settings) =>
+  Object.fromEntries(
+    Object.entries({ ...EMPTY, ...settings }).map(([k, v]) => [k, v ?? ""]),
+  );
+
+/**
+ * What customers will read on invoices and billing emails. Mirrors
+ * back/server/src/lib/payments/instructions.js closely enough to check the
+ * wording; the backend version is the one that is sent.
+ */
+const PaymentPreview = ({ control }) => {
+  const [number, name, page] = useWatch({
+    control,
+    name: ["gcashNumber", "gcashAccountName", "facebookPageUrl"],
+  });
+  const lines = number
+    ? [
+        `1. Send PHP 1,399.00 by GCash to ${number}${name ? ` (${name})` : ""}.`,
+        "Paying from Maya or a bank app? Send it to the same GCash number.",
+        "2. Before sending, write your account number ACC-000001 in the GCash message.",
+        ...(page
+          ? ["3. Send a screenshot of your payment to our Facebook page:", page]
+          : ["3. Send a screenshot of your payment to TERANETWORK."]),
+      ]
+    : [
+        page
+          ? `To pay, message TERANETWORK on Facebook: ${page}`
+          : "To pay, please contact TERANETWORK.",
+      ];
+
+  return (
+    <div
+      className="mt-2 px-4 py-3.5"
+      style={{
+        borderRadius: 10,
+        border: "1px solid var(--color-line)",
+        background: "var(--color-surface-sunken)",
+      }}
+    >
+      <p className="m-0 mb-2" style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+        Preview: how to pay, as printed on invoices and billing emails
+      </p>
+      {lines.map((line) => (
+        <p
+          key={line}
+          className="m-0 mb-1 wrap-break-word"
+          style={{ fontSize: 13, color: "var(--color-text-secondary)" }}
+        >
+          {line}
+        </p>
+      ))}
+      {!number && (
+        <p className="m-0 mt-2" style={{ fontSize: 12, color: "var(--color-warning)" }}>
+          Add the GCash number so customers know where to send payment.
+        </p>
+      )}
+    </div>
+  );
 };
 
 const SettingsPage = () => {
@@ -85,14 +176,14 @@ const SettingsPage = () => {
   } = form;
 
   useEffect(() => {
-    if (settings) form.reset({ ...EMPTY, ...settings });
+    if (settings) form.reset(toFormValues(settings));
   }, [settings, form]);
 
   const onSubmit = (values) => {
     updateMutation.mutate(values, {
       onSuccess: (response) => {
         const saved = response?.data?.settings;
-        if (saved) form.reset({ ...EMPTY, ...saved });
+        if (saved) form.reset(toFormValues(saved));
       },
     });
   };
@@ -247,6 +338,125 @@ const SettingsPage = () => {
                           onChange={field.onChange}
                           options={WEEK_START_OPTIONS}
                         />
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="mt-7">
+                  <SectionLabel>How customers pay</SectionLabel>
+                  <FormField
+                    control={form.control}
+                    name="gcashNumber"
+                    render={({ field }) => (
+                      <FormItem className="mb-5">
+                        <FormLabel>GCash number</FormLabel>
+                        <div className="relative">
+                          <Smartphone
+                            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
+                            style={{ color: "var(--color-text-muted)" }}
+                          />
+                          <FormControl>
+                            <Input
+                              placeholder={PHONE_PLACEHOLDER}
+                              className="h-10 pl-9 font-mono"
+                              inputMode="numeric"
+                              disabled={!canWrite}
+                              {...field}
+                              onChange={(e) =>
+                                field.onChange(formatPhoneOnChange(e.target.value))
+                              }
+                            />
+                          </FormControl>
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="gcashAccountName"
+                    render={({ field }) => (
+                      <FormItem className="mb-5">
+                        <FormLabel>GCash account name</FormLabel>
+                        <div className="relative">
+                          <UserRound
+                            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
+                            style={{ color: "var(--color-text-muted)" }}
+                          />
+                          <FormControl>
+                            <Input
+                              placeholder="e.g., JU** DE** C."
+                              className="h-10 pl-9"
+                              disabled={!canWrite}
+                              {...field}
+                            />
+                          </FormControl>
+                        </div>
+                        <p
+                          className="m-0 mt-1.5"
+                          style={{ fontSize: 12, color: "var(--color-text-muted)" }}
+                        >
+                          Customers check this before sending, so write it the way GCash
+                          shows it.
+                        </p>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="facebookPageUrl"
+                    render={({ field }) => (
+                      <FormItem className="mb-5">
+                        <FormLabel>Facebook page link</FormLabel>
+                        <div className="relative">
+                          <Link2
+                            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
+                            style={{ color: "var(--color-text-muted)" }}
+                          />
+                          <FormControl>
+                            <Input
+                              placeholder="https://www.facebook.com/teranetwork"
+                              className="h-10 pl-9"
+                              disabled={!canWrite}
+                              {...field}
+                            />
+                          </FormControl>
+                        </div>
+                        <p
+                          className="m-0 mt-1.5"
+                          style={{ fontSize: 12, color: "var(--color-text-muted)" }}
+                        >
+                          Where customers send their proof of payment.
+                        </p>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <PaymentPreview control={form.control} />
+
+                  <FormField
+                    control={form.control}
+                    name="invoiceTerms"
+                    render={({ field }) => (
+                      <FormItem className="mt-5">
+                        <FormLabel>Terms and conditions</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            rows={4}
+                            placeholder="e.g., Pay by the due date to avoid temporary disconnection."
+                            disabled={!canWrite}
+                            {...field}
+                          />
+                        </FormControl>
+                        <p
+                          className="m-0 mt-1.5"
+                          style={{ fontSize: 12, color: "var(--color-text-muted)" }}
+                        >
+                          Printed at the bottom of every invoice. Leave blank to leave it off.
+                        </p>
                         <FormMessage />
                       </FormItem>
                     )}

@@ -6,7 +6,10 @@ import {
   buildPaymentReceivedEmail,
 } from "../../email/templates/invoiceEmails.js";
 import { ensureInvoicePdf, loadInvoiceForRender } from "../../billing/invoice.render.js";
-import { buildPayUrl } from "../../qr/payQr.js";
+import {
+  getPaymentInstructions,
+  paymentInstructionLines,
+} from "../../payments/instructions.js";
 import { getBillingSchedule } from "../../settings/settings.service.js";
 import { recordEmailEvent, sendEmail } from "../../email/email.service.js";
 
@@ -28,28 +31,10 @@ import { recordEmailEvent, sendEmail } from "../../email/email.service.js";
 
 /** Templates, by payload kind. */
 const RENDERERS = {
-  invoice_issued: ({ invoice, customer, payUrl, companyName }) =>
-    buildInvoiceIssuedEmail({ invoice, customer, payUrl, companyName }),
-  reminder: ({ invoice, customer, payUrl, companyName }) =>
-    buildInvoiceNoticeEmail({ kind: "reminder", invoice, customer, payUrl, companyName }),
-  final: ({ invoice, customer, payUrl, companyName, cutOffHour }) =>
-    buildInvoiceNoticeEmail({
-      kind: "final",
-      invoice,
-      customer,
-      payUrl,
-      cutOffHour,
-      companyName,
-    }),
-  overdue: ({ invoice, customer, payUrl, companyName, graceDays }) =>
-    buildInvoiceNoticeEmail({
-      kind: "overdue",
-      invoice,
-      customer,
-      payUrl,
-      graceDays,
-      companyName,
-    }),
+  invoice_issued: (args) => buildInvoiceIssuedEmail(args),
+  reminder: (args) => buildInvoiceNoticeEmail({ ...args, kind: "reminder" }),
+  final: (args) => buildInvoiceNoticeEmail({ ...args, kind: "final" }),
+  overdue: (args) => buildInvoiceNoticeEmail({ ...args, kind: "overdue" }),
   payment_received: ({ invoice, customer, payment, reconnecting, companyName }) =>
     buildPaymentReceivedEmail({ invoice, customer, payment, reconnecting, companyName }),
 };
@@ -133,7 +118,16 @@ export const emailProcessor = async (job, { db, logger }) => {
     return { skipped: true, reason: "the customer has no email address" };
   }
 
-  const payUrl = buildPayUrl(invoice.publicToken);
+  // How to pay, from the invoice's branch Settings at send time: a GCash number
+  // changed this morning is the one in this afternoon's reminders.
+  const companyName = company.name || "TERANETWORK";
+  const instructions = await getPaymentInstructions(db, invoice);
+  const paymentLines = paymentInstructionLines({
+    instructions,
+    total: invoice.total,
+    accountNo: customer.accountNo,
+    companyName,
+  });
 
   // The two notices that state a consequence need the schedule to state it
   // correctly: the overdue notice reads differently with no grace period, and
@@ -143,8 +137,9 @@ export const emailProcessor = async (job, { db, logger }) => {
   const message = render({
     invoice,
     customer,
-    payUrl,
-    companyName: company.name || "TERANETWORK",
+    paymentLines,
+    facebookPageUrl: instructions.facebookPageUrl,
+    companyName,
     graceDays: schedule?.graceDays ?? null,
     cutOffHour: schedule?.dunningHour ?? null,
     payment: payload.payment ?? null,

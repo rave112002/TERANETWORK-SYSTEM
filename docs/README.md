@@ -4,6 +4,20 @@ Home for **repo-level Markdown that isn't front- or back-specific** — anything
 apps or belongs to the project as a whole. Put it here instead of at the repo root (keep the root
 clean) or inside `front/` / `back/` (those hold code conventions only).
 
+## Start here
+
+| File | Read it for |
+| --- | --- |
+| **[STATUS.md](STATUS.md)** | Where the project stands: done, blocked, next. One page. |
+| [decisions.md](decisions.md) | Why things are the way they are (D1–D9). Newest at the bottom. |
+| [payments.md](payments.md) | How payments work: personal GCash, recording references, GCash Check. |
+| [runbooks.md](runbooks.md) | What to do when something goes wrong. |
+| [vendor-transcripts/](vendor-transcripts/) | Real OLT command output the drivers were written against. |
+| [archive/](archive/) | Finished migration docs and parked designs. History only. |
+
+When something moves, update **STATUS.md**. Record a new owner decision in **decisions.md**.
+Prefer updating an existing page over adding a new one.
+
 ## What lives here
 
 - **Plans** — implementation plans, design proposals, RFCs, migration strategies.

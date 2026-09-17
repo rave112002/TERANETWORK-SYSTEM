@@ -6,7 +6,7 @@ the customer — not for whoever wrote the code.
 Each entry states the symptom first, because that is what you have.
 
 > **Every branch is its own installation** — its own server, database, worker, backups and
-> settings ([D7](migration/00-decisions.md#d7--one-branch-per-installation)). Everything below
+> settings ([D7](decisions.md#d7--one-branch-per-installation)). Everything below
 > applies to one installation; do it on the branch that has the problem.
 
 ---
@@ -264,11 +264,10 @@ happened to the modem.
 
 ## "Change the payment gateway"
 
-> ⏸️ **HitPay is parked (2026-09-16).** The acting method is a GCash Business merchant QR on the
-> invoice, and its integration is not built yet — see
-> [gcash-payment-flow.md](gcash-payment-flow.md). Until then, record GCash payments by hand from
-> the invoice (Billing → Invoices → Record payment) and enter the transaction's **Reference no.**
-> It is required for GCash and QR Ph, and the system refuses a reference it has already seen,
+> ⏸️ **HitPay and GCash for Business are parked (2026-09-17).** Payments go to TERANETWORK's
+> personal GCash account — see [payments.md](payments.md). Record each one by hand from the
+> invoice (Billing → Invoices → Record payment) and enter the transaction's **Reference no.**
+> It is required for GCash, Maya, QR Ph and bank transfer, and the system refuses a reference it has already seen,
 > saying which invoice it went to. To check whether a payment is already in, search
 > Billing → Payments by the reference, in any spacing. The rest of this section describes the
 > parked gateway set-up.

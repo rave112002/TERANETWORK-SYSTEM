@@ -14,6 +14,7 @@ import {
 
 import { useInvoicesData } from "./hooks";
 import InvoiceDetailDrawer from "./components/InvoiceDetailDrawer";
+import InvoicePdfDrawer from "./components/InvoicePdfDrawer";
 import RecordPaymentDrawer from "./components/RecordPaymentDrawer";
 import RunCycleDrawer from "./components/RunCycleDrawer";
 import PageHeader from "../../../../components/PageHeader";
@@ -45,6 +46,9 @@ const InvoicesPage = () => {
     payInvoice,
     handlePay,
     handleClosePay,
+    pdfInvoice,
+    handlePreviewPdf,
+    handleClosePdf,
     cycleOpen,
     handleOpenCycle,
     handleCloseCycle,
@@ -237,7 +241,9 @@ const InvoicesPage = () => {
         invoice={detailInvoice}
         onClose={handleCloseDetail}
         onRecordPayment={handlePay}
+        onPreviewPdf={handlePreviewPdf}
       />
+      <InvoicePdfDrawer open={!!pdfInvoice} invoice={pdfInvoice} onClose={handleClosePdf} />
       <RecordPaymentDrawer open={!!payInvoice} invoice={payInvoice} onClose={handleClosePay} />
       <RunCycleDrawer open={cycleOpen} onClose={handleCloseCycle} />
     </div>

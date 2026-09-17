@@ -46,7 +46,7 @@ const Row = ({ label, value, mono = false, strong = false }) => (
   </div>
 );
 
-const InvoiceDetailDrawer = ({ open, invoice, onClose, onRecordPayment }) => {
+const InvoiceDetailDrawer = ({ open, invoice, onClose, onRecordPayment, onPreviewPdf }) => {
   const { hasPermission } = usePermissions();
   const canWrite = hasPermission("billing", "invoices", "write");
   const canRecordPayment = hasPermission("billing", "payments", "write");
@@ -350,6 +350,17 @@ const InvoiceDetailDrawer = ({ open, invoice, onClose, onRecordPayment }) => {
               paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))",
             }}
           >
+            {onPreviewPdf && (
+              <Button
+                type="button"
+                variant="outline"
+                size="lg"
+                onClick={() => onPreviewPdf({ ...invoice, ...full })}
+              >
+                <FileText />
+                Preview
+              </Button>
+            )}
             <Button
               type="button"
               variant="outline"

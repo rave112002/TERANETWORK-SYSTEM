@@ -5,7 +5,7 @@
  * ── One branch per installation ─────────────────────────────────────────────
  *
  * Production runs one server + one database per TERANETWORK branch (decision
- * D7 in docs/migration/00-decisions.md). There is no central server, so a
+ * D7 in docs/decisions.md). There is no central server, so a
  * database holds exactly one company row and exactly one branch row. This
  * module creates that shape:
  *

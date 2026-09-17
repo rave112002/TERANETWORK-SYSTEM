@@ -43,8 +43,10 @@ import { formatPeso } from "../../../../../utils/currency";
  *
  * ── The reference number is the duplicate guard ─────────────────────────────
  *
- * For GCash and QR Ph it is required, and the backend refuses a reference it
- * has already seen, naming the invoice it went to. Without it, the same GCash
+ * For everything that lands in TERANETWORK's GCash account — GCash, Maya,
+ * QR Ph, bank transfer — it is required, and the backend refuses a reference it
+ * has already seen, naming the invoice it went to. It is also what the GCash
+ * Check matches against the downloaded statement (docs/payments.md). Without it, the same GCash
  * screenshot recorded twice marks a second customer paid with the first one's
  * money. The rules mirror recordPaymentSchema in billing.validator.js.
  */
@@ -63,8 +65,8 @@ const CHANNELS = [
   { value: "OTHER", label: "Other" },
 ];
 
-/** Channels whose payments always carry a transaction reference. */
-const REFERENCE_REQUIRED = ["GCASH", "QRPH"];
+/** Channels whose money lands in the GCash account — each needs its reference. */
+const REFERENCE_REQUIRED = ["GCASH", "MAYA", "QRPH", "BANK_TRANSFER"];
 
 /** Same normalisation as the backend: separators out, upper-cased. */
 const normalizeReference = (value) => value.replace(/[\s\-_.]/g, "").toUpperCase();
@@ -317,7 +319,9 @@ const RecordPaymentDrawer = ({ open, invoice, onClose }) => {
                         style={{ fontSize: 12, color: "var(--color-text-muted)" }}
                       >
                         {referenceRequired
-                          ? "From the GCash Business portal or the payment confirmation. A reference can only be recorded once."
+                          ? channel === "GCASH"
+                            ? "From the customer's proof of payment. A reference can only be recorded once."
+                            : "Find this payment in TERANETWORK's GCash history and copy its reference number. A reference can only be recorded once."
                           : "Optional. If entered, it can only be recorded once."}
                       </p>
                       <FormMessage />

@@ -2,6 +2,10 @@ import moment from "moment-timezone";
 
 import { branchScope } from "../../utils/branchScope.js";
 import { getCurrentTimestampLocal } from "../../utils/dateUtils.js";
+import {
+  findLatestStatement,
+  loadReconciliation,
+} from "../payments/gcash-statement/statement.service.js";
 
 /**
  * The three reports an ISP actually needs, as SQL and nothing else.
@@ -392,6 +396,14 @@ export const operationsSummary = async (db, { user, branchIds }) => {
     [user.companyId, ...branchScope("de.branchId", branchIds).params, nowStamp]
   );
 
+  // The latest GCash check, recomputed — so the alert clears the moment a
+  // reference is fixed or a payment recorded, not at the next upload.
+  const latestStatement = await findLatestStatement(db, { companyId: user.companyId, branchIds });
+  const gcash = latestStatement
+    ? (await loadReconciliation(db, { companyId: user.companyId, branchIds, statement: latestStatement }))
+        .summary
+    : null;
+
   return {
     period: { monthStart, monthEnd },
     money: money[0],
@@ -402,6 +414,14 @@ export const operationsSummary = async (db, { user, branchIds }) => {
       atRisk: Number(dunning[0]?.atRisk ?? 0),
       unappliedAdjustments: Number(unappliedAdjustments?.n ?? 0),
       liveExemptions: Number(liveExemptions?.n ?? 0),
+      gcash: gcash && {
+        statementId: latestStatement.statementId,
+        periodEnd: latestStatement.periodEnd,
+        possibleTypos: gcash.possibleTypos,
+        inFileNotRecorded: gcash.inFileNotRecorded,
+        recordedNotInFile: gcash.recordedNotInFile,
+        amountDiffers: gcash.amountDiffers,
+      },
     },
     series,
   };
@@ -420,6 +440,7 @@ const emptySummary = (monthStart, monthEnd) => ({
     atRisk: 0,
     unappliedAdjustments: 0,
     liveExemptions: 0,
+    gcash: null,
   },
   series: [],
 });

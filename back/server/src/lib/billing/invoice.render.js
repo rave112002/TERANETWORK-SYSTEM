@@ -2,7 +2,10 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import { renderInvoicePdf } from "../pdf/invoicePdf.js";
-import { buildPayUrl, renderPayQrDataUrl } from "../qr/payQr.js";
+import {
+  getPaymentInstructions,
+  paymentInstructionLines,
+} from "../payments/instructions.js";
 import { getCurrentTimestampLocal } from "../../utils/dateUtils.js";
 
 /**
@@ -122,16 +125,23 @@ export const generateInvoicePdf = async (db, invoiceId) => {
 
   const { invoice, customer, company } = loaded;
 
-  const payUrl = buildPayUrl(invoice.publicToken);
-  const qrDataUrl = await renderPayQrDataUrl(payUrl);
+  // How to pay comes from the branch's Settings at render time, so a changed
+  // GCash number reaches every invoice rendered after the change.
+  const instructions = await getPaymentInstructions(db, invoice);
+  const paymentLines = paymentInstructionLines({
+    instructions,
+    total: invoice.total,
+    accountNo: customer.accountNo,
+    companyName: company.name || "TERANETWORK",
+  });
   const logoDataUrl = await readLogoDataUrl(company.logoUrl);
 
   const buffer = await renderInvoicePdf({
     invoice,
     customer,
     company: { ...company, logoDataUrl },
-    qrDataUrl,
-    payUrl,
+    paymentLines,
+    terms: instructions.invoiceTerms,
   });
 
   // Foldered by company and year so a directory stays browsable at a few
@@ -156,24 +166,19 @@ export const generateInvoicePdf = async (db, invoiceId) => {
 };
 
 /**
- * The absolute path of an invoice's stored PDF, generating it if it is missing.
+ * The absolute path of an invoice's PDF, rendered fresh.
+ *
+ * Always re-rendered rather than reused from `pdfPath`: the document carries
+ * the payment instructions from Settings and the invoice's status, and both
+ * change after the first render. A customer downloading last month's file with
+ * an old GCash number on it would send money to the wrong account. Rendering
+ * one page is cheap; the stored copy is kept as the latest projection.
  *
  * @param {Object} db
- * @param {Object} invoice a row with `invoiceId` and `pdfPath`.
+ * @param {Object} invoice a row with `invoiceId`.
  * @returns {Promise<string>}
  */
 export const ensureInvoicePdf = async (db, invoice) => {
-  if (invoice.pdfPath) {
-    const abs = path.resolve(process.cwd(), "storage", invoice.pdfPath);
-    try {
-      await fs.access(abs);
-      return abs;
-    } catch {
-      // Recorded but gone — a restore that missed the storage volume, say.
-      // Rendering again is cheaper than making a customer wait for support.
-    }
-  }
-
   const { filePath } = await generateInvoicePdf(db, invoice.invoiceId);
   return filePath;
 };

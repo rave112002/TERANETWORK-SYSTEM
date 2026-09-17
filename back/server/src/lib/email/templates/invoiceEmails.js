@@ -56,16 +56,31 @@ const shell = ({ companyName, bodyHtml, footerNote }) => `<!doctype html>
   </body>
 </html>`;
 
-const payButton = (payUrl) => `
-  <div style="text-align:center;margin:22px 0;">
-    <a href="${escapeHtml(payUrl)}"
-       style="display:inline-block;background:${BRAND};color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;">
-      Pay now
-    </a>
-  </div>
-  <p style="color:${MUTED};font-size:12px;text-align:center;margin:0;word-break:break-all;">
-    ${escapeHtml(payUrl)}
-  </p>`;
+/**
+ * How to pay, from lib/payments/instructions.js: the same lines the invoice PDF
+ * prints. The Facebook link is made clickable after escaping, never before.
+ */
+const howToPay = ({ paymentLines = [], facebookPageUrl }) => {
+  const safeUrl = facebookPageUrl ? escapeHtml(facebookPageUrl) : null;
+  const lines = paymentLines
+    .map((line) => {
+      let html = escapeHtml(line.trim());
+      if (safeUrl) {
+        html = html.replace(safeUrl, `<a href="${safeUrl}" style="color:${BRAND};">${safeUrl}</a>`);
+      }
+      return `<p style="margin:0 0 6px;color:#353a3e;">${html}</p>`;
+    })
+    .join("");
+
+  return `
+  <div style="margin:22px 0;padding:16px;border:1px solid ${LINE};border-radius:10px;background:#fafafa;">
+    <p style="margin:0 0 8px;font-weight:600;color:${BRAND};">How to pay</p>
+    ${lines}
+  </div>`;
+};
+
+/** The same instructions for the plain-text part. */
+const howToPayText = (paymentLines = []) => [`How to pay:`, ...paymentLines];
 
 const lineTable = (invoice) => {
   const rows = (invoice.lines || [])
@@ -94,14 +109,16 @@ const lineTable = (invoice) => {
  * @param {Object} args
  * @param {Object} args.invoice with `lines`.
  * @param {{name: string, email: string}} args.customer
- * @param {string} args.payUrl
+ * @param {string[]} args.paymentLines from lib/payments/instructions.js.
+ * @param {string|null} [args.facebookPageUrl] made clickable in the HTML.
  * @param {string} [args.companyName="TERANETWORK"]
  * @returns {{subject: string, html: string, text: string}}
  */
 export const buildInvoiceIssuedEmail = ({
   invoice,
   customer,
-  payUrl,
+  paymentLines,
+  facebookPageUrl,
   companyName = "TERANETWORK",
 }) => {
   const subject = `Invoice ${invoice.invoiceNo} — ${amount(invoice.total)} due ${dateOnly(invoice.dueDate)}`;
@@ -116,9 +133,9 @@ export const buildInvoiceIssuedEmail = ({
     <p style="color:#353a3e;margin:16px 0;">
       Due date: <strong>${escapeHtml(dateOnly(invoice.dueDate))}</strong>
     </p>
-    ${payButton(payUrl)}
+    ${howToPay({ paymentLines, facebookPageUrl })}
     <p style="color:${MUTED};font-size:12px;margin:18px 0 0;">
-      A PDF copy is attached. The payment link stays valid until this invoice is paid.
+      A PDF copy is attached.
     </p>`;
 
   const text = [
@@ -131,7 +148,7 @@ export const buildInvoiceIssuedEmail = ({
     `Total due: ${amount(invoice.total)}`,
     `Due date: ${dateOnly(invoice.dueDate)}`,
     ``,
-    `Pay online: ${payUrl}`,
+    ...howToPayText(paymentLines),
   ].join("\n");
 
   return {
@@ -158,7 +175,8 @@ export const buildInvoiceIssuedEmail = ({
  * @param {'reminder'|'final'|'overdue'} args.kind
  * @param {Object} args.invoice
  * @param {{name: string}} args.customer
- * @param {string} args.payUrl
+ * @param {string[]} args.paymentLines from lib/payments/instructions.js.
+ * @param {string|null} [args.facebookPageUrl] made clickable in the HTML.
  * @param {number} [args.graceDays] shapes the overdue notice's consequence line;
  *   0 means the disconnection has already happened by the time it is read.
  * @param {number} [args.cutOffHour] the hour the sweep runs, named on the final
@@ -170,7 +188,8 @@ export const buildInvoiceNoticeEmail = ({
   kind,
   invoice,
   customer,
-  payUrl,
+  paymentLines,
+  facebookPageUrl,
   graceDays = null,
   cutOffHour = null,
   companyName = "TERANETWORK",
@@ -232,7 +251,7 @@ export const buildInvoiceNoticeEmail = ({
       Hi ${escapeHtml(customer.name)}, ${escapeHtml(copy.lead)}
     </p>
     ${consequenceHtml}
-    ${payButton(payUrl)}
+    ${howToPay({ paymentLines, facebookPageUrl })}
     <p style="color:${MUTED};font-size:12px;margin:18px 0 0;">
       If you have already paid, please ignore this message — payments can take a short
       while to appear.
@@ -244,7 +263,7 @@ export const buildInvoiceNoticeEmail = ({
     `Hi ${customer.name}, ${copy.lead}`,
     ...(copy.consequence ? [``, copy.consequence] : []),
     ``,
-    `Pay online: ${payUrl}`,
+    ...howToPayText(paymentLines),
     ``,
     `If you have already paid, please ignore this message.`,
   ].join("\n");

@@ -32,6 +32,7 @@ const Discovery = lazy(() => import("../../pages/Admin/Network/Discovery"));
 const System = lazy(() => import("../../pages/Admin/System"));
 const Invoices = lazy(() => import("../../pages/Admin/Billing/Invoices"));
 const Payments = lazy(() => import("../../pages/Admin/Billing/Payments"));
+const GcashCheck = lazy(() => import("../../pages/Admin/Billing/GcashCheck"));
 const Adjustments = lazy(() => import("../../pages/Admin/Billing/Adjustments"));
 const Dunning = lazy(() => import("../../pages/Admin/Billing/Dunning"));
 const Reports = lazy(() => import("../../pages/Admin/Reports"));
@@ -252,6 +253,26 @@ const AdminRoute = () => {
             <Suspense fallback={<ComponentLoader />}>
               <ProtectedRoute module="billing" submodule="payments" accessLevel="read">
                 <Payments />
+              </ProtectedRoute>
+            </Suspense>
+          ),
+          permission: {
+            module: "billing",
+            submodule: "payments",
+            accessLevel: "read",
+          },
+          isFilter: true,
+          isShow: true,
+        },
+        {
+          // Same permission as Payments: the check is part of taking payments.
+          route: "/gcash-check",
+          name: "GCash Check",
+          label: "GCash Check",
+          component: (
+            <Suspense fallback={<ComponentLoader />}>
+              <ProtectedRoute module="billing" submodule="payments" accessLevel="read">
+                <GcashCheck />
               </ProtectedRoute>
             </Suspense>
           ),

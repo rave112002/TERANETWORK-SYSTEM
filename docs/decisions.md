@@ -1,6 +1,6 @@
-# Migration Decision Log
+# Decision Log
 
-**Created:** 2026-09-07
+**Created:** 2026-09-07 · moved from `docs/migration/00-decisions.md` on 2026-09-17
 Decisions made by the system owner during the migration. These override anything in the old docs or
 either old codebase. Newest at the bottom.
 
@@ -235,6 +235,9 @@ database: `npm run db:setup:clean` with `BRANCH_NAME` set, then `npm run db:seed
 
 ## D8 — GCash Business merchant QR on the invoice ("Option A"); HitPay parked
 
+> ⏸️ **Parked 2026-09-17 by [D9](#d9--personal-gcash-account-with-a-statement-check).** Kept for when
+> the client's GCash Business account and its real process are confirmed.
+
 **Decided:** 2026-09-16, by the client. **Supersedes** the payment direction in S14 and P5.
 
 The client has applied for **GCash for Business**, and it is the acting payment method. **HitPay
@@ -266,5 +269,53 @@ invoice (carries the client's GCash Business merchant QR)
 | **Do not build the integration blind** | How transactions are retrieved — an API, a report export, manual entry — is decided from the client's actual GCash Business product documentation and credentials. Nothing about GCash's API is assumed or invented before then. |
 | **Keep it flexible** | Retrieval (how transactions arrive) and matching (which invoice a transaction settles) are separate concerns. Settlement already exists — `settleInvoice()` — and is what a matched GCash payment goes through. |
 
-Design, open questions for the client, and what not to do:
-**[docs/gcash-payment-flow.md](../gcash-payment-flow.md)**.
+Design, open questions for the client, and what not to do (archived with D8):
+**[archive/gcash-business/gcash-payment-flow.md](archive/gcash-business/gcash-payment-flow.md)**.
+
+---
+
+## D9 — Personal GCash account, with a statement check
+
+**Decided:** 2026-09-17, by the owner. **Supersedes** [D8](#d8--gcash-business-merchant-qr-on-the-invoice-option-a-hitpay-parked)
+for now. **HitPay stays parked; GCash for Business is parked too** until GCash's actual process is
+confirmed. Nothing from either is deleted.
+
+### The flow
+
+```
+customer sends money to TERANETWORK's GCash number (Express Send, or from another
+  e-wallet / online bank into that GCash account)
+  → customer sends proof of payment to TERANETWORK's Facebook page
+  → staff record the payment on the invoice, typing the reference number
+      (for other e-wallets / banks, staff find the reference in the GCash history themselves)
+  → the invoice is paid; a suspended customer is reconnected   ← unchanged, already built
+  → periodically, staff download the GCash transaction history (password-protected PDF)
+  → staff upload it in Billing → GCash Check, typing the PDF password
+  → the system reads the PDF and compares it with the recorded references
+```
+
+Everything after "the invoice is paid" works as already built: unpaid customers are swept after
+the due date, paid customers stay online.
+
+### Rules
+
+| | |
+| --- | --- |
+| **The PDF and its password are never stored** | The file is read in memory and discarded. The password is used once to open it and is never written to the database, logs or the audit trail. Only the **incoming** transactions are kept (date, description, reference, amount), so results survive a reload and a later upload can overlap an earlier one without double-counting. |
+| **Money out is ignored** | A debit is never a customer payment, so debits are not stored. |
+| **It is a personal account** | Some incoming money is not from customers. Staff mark those lines **Not a customer payment**; they leave the "not recorded" list. |
+| **The check never changes a payment on its own** | It reports. Settlement still happens only when staff record a payment. The only write it offers is **Use this reference** on a suspected typo, done by a person and audited. |
+| **References that must match the statement** | Payments recorded as **GCash, Maya, QR Ph or Bank transfer** — all of them land in the GCash account. Each requires a reference. Cash does not appear in the statement. |
+
+### The four results, plus typos
+
+| Result | Meaning | Why it matters |
+| --- | --- | --- |
+| ✅ Matched | Reference is in both, same amount | Confirmed |
+| ⚠️ Amount differs | Same reference, different amount | A typo, or a fee taken off |
+| ❌ Recorded, not in the file | A recorded payment whose reference is not in the statement | The fraud check: a mistyped reference or a fake screenshot |
+| ➕ In the file, not recorded | Money arrived but no invoice was marked paid | That customer may still be disconnected after paying |
+| 🔎 Possible typo | A ❌ reference and a ➕ reference differ by one or two characters | Most likely the same payment typed wrong. Staff confirm and fix it in one click. |
+
+Design and details: **[payments.md](payments.md)**.
+

@@ -1,11 +1,10 @@
 # Adding a payment gateway
 
-> ⏸️ **Status 2026-09-16:** HitPay (built) is **parked**. The acting payment method is a **GCash
-> Business merchant QR printed on the invoice**, with transactions matched to invoices afterwards
-> ([D8](../../../../../docs/migration/00-decisions.md), [gcash-payment-flow.md](../../../../../docs/gcash-payment-flow.md)).
-> That model has no checkout session and no per-invoice reference, so it does **not** fit this
-> adapter interface. Don't write a GCash adapter here from memory; it gets designed once the
-> client's GCash Business documentation arrives.
+> ⏸️ **Status 2026-09-17:** every gateway here is **parked**. Payments go to TERANETWORK's
+> personal GCash account, are recorded by hand, and are checked against the uploaded GCash
+> statement ([D9](../../../../../docs/decisions.md), [payments.md](../../../../../docs/payments.md)).
+> HitPay (built) and the GCash for Business design ([the parked design](../../../../../docs/archive/gcash-business/gcash-payment-flow.md))
+> wait until the client confirms GCash's actual process. Don't write a GCash adapter here from memory.
 
 Everything provider-specific lives in this folder. Nothing outside it knows
 which gateway is collecting money — not the billing engine, not settlement, not

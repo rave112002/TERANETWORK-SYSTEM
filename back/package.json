@@ -24,6 +24,7 @@
     "db:check": "node scripts/check-database.js",
     "db:seed:dev": "node scripts/seed-dev-data.js",
     "keys": "node scripts/generate-keys.js",
+    "gcash:inspect": "node scripts/inspect-gcash-statement.js",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -50,6 +51,7 @@
     "nodemailer": "^9.0.3",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
+    "pdfjs-dist": "^6.3.289",
     "qrcode": "^1.5.4",
     "rate-limiter-flexible": "^9.0.1",
     "sanitize-html": "^2.15.0",

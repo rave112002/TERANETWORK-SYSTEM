@@ -1,6 +1,7 @@
 import { createAxiosInstanceWithInterceptor, userTypeAuth } from "../axios";
 
 const api = createAxiosInstanceWithInterceptor("data", userTypeAuth.admin);
+const apiMultipart = createAxiosInstanceWithInterceptor("multipart", userTypeAuth.admin);
 
 /**
  * Billing — invoices, payments, adjustments and the cycle runs.
@@ -81,6 +82,49 @@ export const getPaymentsApi = async (filters = {}) => {
  */
 export const recordPaymentApi = async (data) => {
   const response = await api.post("/api/v1/admin/payments", data);
+  return response.data;
+};
+
+/* ── GCash Check (statement reconciliation) ─────────────────────────────── */
+
+export const getPaymentStatementsApi = async () => {
+  const response = await api.get("/api/v1/admin/payment-statements");
+  return response.data;
+};
+
+/**
+ * @param {FormData} formData `file` (the PDF) and `password`. The password is
+ *   used once by the server to open the file and is never stored.
+ */
+export const uploadPaymentStatementApi = async (formData) => {
+  const response = await apiMultipart.post("/api/v1/admin/payment-statements", formData);
+  return response.data;
+};
+
+export const getStatementReconciliationApi = async (statementId) => {
+  const response = await api.get(
+    `/api/v1/admin/payment-statements/${statementId}/reconciliation`
+  );
+  return response.data;
+};
+
+export const deletePaymentStatementApi = async (statementId) => {
+  const response = await api.delete(`/api/v1/admin/payment-statements/${statementId}`);
+  return response.data;
+};
+
+/** @param {{transactionId: string, reviewStatus: 'open'|'not_customer'}} args */
+export const reviewStatementTransactionApi = async ({ transactionId, reviewStatus }) => {
+  const response = await api.post(
+    `/api/v1/admin/payment-statements/transactions/${transactionId}/review`,
+    { reviewStatus }
+  );
+  return response.data;
+};
+
+/** @param {{paymentId: string, transactionId: string}} data */
+export const fixPaymentReferenceApi = async (data) => {
+  const response = await api.post("/api/v1/admin/payment-statements/fix-reference", data);
   return response.data;
 };
 

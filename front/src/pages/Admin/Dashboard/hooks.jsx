@@ -53,6 +53,54 @@ const buildAttention = (attention) => {
     });
   }
 
+  // The latest GCash statement check. Money that arrived unrecorded comes
+  // first: that customer paid and may still be disconnected.
+  const gcash = attention.gcash;
+  const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+  if (gcash?.inFileNotRecorded > 0) {
+    items.push({
+      key: "gcash-unrecorded",
+      severity: "error",
+      title: `${plural(gcash.inFileNotRecorded, "GCash payment")} not recorded`,
+      detail: "Money arrived in the GCash account but no invoice was marked paid.",
+      to: "/admin/billing/gcash-check",
+      cta: "Open GCash Check",
+    });
+  }
+
+  if (gcash?.possibleTypos > 0) {
+    items.push({
+      key: "gcash-typos",
+      severity: "warning",
+      title: plural(gcash.possibleTypos, "possible reference typo"),
+      detail: "A typed reference is one or two characters off from one in the GCash statement.",
+      to: "/admin/billing/gcash-check",
+      cta: "Review the pairs",
+    });
+  }
+
+  if (gcash?.recordedNotInFile > 0) {
+    items.push({
+      key: "gcash-missing",
+      severity: "warning",
+      title: `${plural(gcash.recordedNotInFile, "recorded payment")} not in the GCash statement`,
+      detail: "A mistyped reference, or proof of payment that was not real.",
+      to: "/admin/billing/gcash-check",
+      cta: "Open GCash Check",
+    });
+  }
+
+  if (gcash?.amountDiffers > 0) {
+    items.push({
+      key: "gcash-amount",
+      severity: "info",
+      title: `${plural(gcash.amountDiffers, "GCash amount")} ${gcash.amountDiffers === 1 ? "differs" : "differ"} from the statement`,
+      detail: "Same reference, different amount: a typo, or a fee taken off.",
+      to: "/admin/billing/gcash-check",
+      cta: "Open GCash Check",
+    });
+  }
+
   if (attention.atRisk > 0) {
     items.push({
       key: "at-risk",

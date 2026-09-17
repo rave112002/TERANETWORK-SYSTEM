@@ -46,11 +46,15 @@ in every session. **Load the relevant skill before writing code** — the rules 
   one branch row, so `companyId`/`branchId` scoping from `req.user` is sufficient. Existing
   multi-branch code (`branchScope()`, `user_branches`) is kept because it is harmless — **do not
   extend it or build multi-branch features.** See decision D7 in
-  [docs/migration/00-decisions.md](docs/migration/00-decisions.md).
-- **Payments: GCash Business merchant QR on the invoice** (one reusable QR, transactions matched
-  to invoices afterwards) is the acting method; HitPay is parked, not removed. **Do not build the
-  GCash integration or add a public endpoint for it** until the client's GCash Business
-  documentation arrives. See D8 and [docs/gcash-payment-flow.md](docs/gcash-payment-flow.md).
+  [docs/decisions.md](docs/decisions.md).
+- **Payments: TERANETWORK's personal GCash account.** Customers send money to it and send proof
+  to the Facebook page; staff record each payment with its reference number; the downloaded
+  GCash transaction-history PDF is uploaded to **Billing → GCash Check** to catch typos, fakes and
+  unrecorded payments. The PDF and its password are **never stored**. **HitPay and GCash for
+  Business are both parked, not removed** — don't build on either, and don't add a public
+  payment endpoint. See D9 in [docs/decisions.md](docs/decisions.md) and
+  [docs/payments.md](docs/payments.md).
+- **Where the project stands:** [docs/STATUS.md](docs/STATUS.md) — one page, kept current.
 
 - **Backend response envelope:** every endpoint replies via `res.sendSuccess()` →
   `{ success, message, data: { ... } }`. The frontend unwraps `apiData?.data?.<entity>`.
