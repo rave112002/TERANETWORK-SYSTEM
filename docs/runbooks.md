@@ -267,9 +267,11 @@ happened to the modem.
 > ⏸️ **HitPay is parked (2026-09-16).** The acting method is a GCash Business merchant QR on the
 > invoice, and its integration is not built yet — see
 > [gcash-payment-flow.md](gcash-payment-flow.md). Until then, record GCash payments by hand from
-> the invoice (Billing → Invoices → Record payment), putting the GCash reference number in the
-> notes, and **check the reference has not already been recorded** — nothing enforces that yet.
-> The rest of this section describes the parked gateway set-up.
+> the invoice (Billing → Invoices → Record payment) and enter the transaction's **Reference no.**
+> It is required for GCash and QR Ph, and the system refuses a reference it has already seen,
+> saying which invoice it went to. To check whether a payment is already in, search
+> Billing → Payments by the reference, in any spacing. The rest of this section describes the
+> parked gateway set-up.
 
 There are two levels, and they answer different questions.
 

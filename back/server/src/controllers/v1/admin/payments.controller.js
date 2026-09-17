@@ -8,6 +8,7 @@ import { getCurrentTimestampLocal } from "../../../utils/dateUtils.js";
 import { enqueue } from "../../../lib/jobs/jobs.queue.js";
 import { settleInvoice } from "../../../lib/billing/settlement.service.js";
 import { formatAmount } from "../../../lib/money/money.js";
+import { normalizePaymentReference } from "../../../lib/payments/reference.js";
 import {
   listPaymentsQuerySchema,
   recordPaymentSchema,
@@ -101,8 +102,14 @@ router.get(
       params.push(`${paidTo} 23:59:59`);
     }
     if (search) {
-      whereClause += " AND (i.invoiceNo LIKE ? OR c.name LIKE ? OR c.accountNo LIKE ?)";
+      // References are stored normalised, so the search term is too — a clerk
+      // pasting "1234 567 890123" from the GCash app must find "1234567890123".
+      const reference = normalizePaymentReference(search);
+      whereClause += reference
+        ? " AND (i.invoiceNo LIKE ? OR c.name LIKE ? OR c.accountNo LIKE ? OR p.providerPaymentId LIKE ?)"
+        : " AND (i.invoiceNo LIKE ? OR c.name LIKE ? OR c.accountNo LIKE ?)";
       params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+      if (reference) params.push(`%${reference}%`);
     }
 
     const [countRows, payments, totalRows] = await Promise.all([
@@ -143,7 +150,7 @@ router.post(
   checkPermission("billing", "payments", "write"),
   validateBody(recordPaymentSchema),
   catchAsync(async (req, res) => {
-    const { invoiceId, amount, channel, paidAt, notes } = req.body;
+    const { invoiceId, amount, channel, paidAt, referenceNo, notes } = req.body;
     const { companyId, accountId } = req.user;
 
     const scope = branchScope("branchId", getScopedBranchIds(req.user));
@@ -159,6 +166,10 @@ router.post(
       invoiceId: invoice.invoiceId,
       amount,
       channel,
+      // The duplicate guard: the column is UNIQUE and settleInvoice() checks it
+      // first. `provider` stays NULL — no gateway was involved; `recordedBy`
+      // is what marks this as a manual entry.
+      providerPaymentId: referenceNo ?? null,
       recordedBy: accountId,
       paidAt: paidAt || null,
       context: getAuditContext(req),
@@ -179,6 +190,30 @@ router.post(
       return res.sendError("A voided invoice cannot be paid", 409);
     }
     if (result.status === "not_found") return res.sendError("Invoice not found", 404);
+    if (result.status === "duplicate") {
+      // Say where it already went. The clerk is usually holding a screenshot a
+      // customer sent, and "already recorded" alone does not tell them whether
+      // this customer is paid or somebody else was credited with their money.
+      const [existing] = await req.db.query(
+        `SELECT p.paidAt, i.invoiceNo, c.name AS customerName,
+                CONCAT(u.firstName, ' ', u.lastName) AS recordedByName
+           FROM payments p
+           LEFT JOIN invoices i ON i.invoiceId = p.invoiceId
+           LEFT JOIN customers c ON c.customerId = p.customerId
+           LEFT JOIN users u ON u.accountId = p.recordedBy
+          WHERE p.providerPaymentId = ? LIMIT 1`,
+        [referenceNo]
+      );
+      const where = existing
+        ? ` on ${existing.invoiceNo} (${existing.customerName}), paid ${String(existing.paidAt).slice(0, 10)}${
+            existing.recordedByName ? `, recorded by ${existing.recordedByName}` : ""
+          }`
+        : "";
+      return res.sendError(
+        `Reference ${referenceNo} has already been recorded${where}. The same transaction cannot be recorded twice.`,
+        409
+      );
+    }
 
     // The note is not part of settlement — it is bookkeeping colour on the row,
     // and settleInvoice is shared with the webhook, which never has one.

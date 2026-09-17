@@ -27,6 +27,7 @@
 | **S13** | Revocation and modem recovery | ✅ complete — the lifecycle now has an end, and the modem comes back |
 | **S14** | HitPay + per-branch gateways | ✅ built and tested — ⏸️ **PARKED** 2026-09-16: GCash Business is the acting payment method ([D8](00-decisions.md#d8--gcash-business-merchant-qr-on-the-invoice-option-a-hitpay-parked)) |
 | **S15** | Single-branch installation, roles, dev seed data | ✅ complete — see [S15](#s15--single-branch-installation-roles-and-dev-seed-data) |
+| **S16** | Payment reference numbers — duplicate guard for manual GCash / QR Ph entries | ✅ complete — see [S16](#s16--payment-reference-numbers) |
 
 > ### ⚠️ Production architecture: ONE BRANCH PER INSTALLATION
 >
@@ -1753,6 +1754,55 @@ exemption; emails are `@example.com`, and phones use the unassigned `0900` prefi
 
 ---
 
+## S16 — Payment reference numbers ✅
+
+**2026-09-17.** Resolves A8. Until the GCash integration exists, every GCash payment is recorded by
+hand, and the reference could only go in free-text notes, so nothing stopped the same transaction
+being entered twice. A double entry marks a second customer's invoice paid with the first
+customer's money.
+
+### Built
+
+| # | Item | File |
+| --- | --- | --- |
+| 1 | Reference normaliser: separators out, upper-cased, 6–64 letters and digits | `back/server/src/lib/payments/reference.js` |
+| 2 | `referenceNo` on `POST /admin/payments`: **required** for GCASH and QRPH, **refused** for CASH, optional otherwise | `back/server/src/validators/billing.validator.js` |
+| 3 | Stored as `payments.providerPaymentId` (already UNIQUE, already checked first by `settleInvoice()`); a duplicate returns **409 naming the invoice, customer, date and clerk** it went to; payment search matches references in any spacing | `back/server/src/controllers/v1/admin/payments.controller.js` |
+| 4 | **Reference no.** field in the Record payment drawer, hidden for cash | `front/.../Invoices/components/RecordPaymentDrawer.jsx` |
+| 5 | Reference column and search on Payments; reference shown on the invoice's payment list | `front/.../Payments/hooks.jsx`, `index.jsx`, `InvoiceDetailDrawer.jsx` |
+| 6 | Seeded GCash payments carry references in the new column | `back/scripts/seed-dev-data.js` |
+
+**No schema change.** The column and its unique key already existed for gateway webhooks.
+`provider` stays NULL for manual entries, and `recordedBy` is what marks them as manual.
+
+### Found on the way
+
+`POST /admin/payments` did not handle a **`duplicate`** result from `settleInvoice()` at all. It
+fell through to the success path and answered *"Payment recorded"* for a payment that had not been
+recorded. That was unreachable while manual entries never carried a `providerPaymentId`, and would
+have become reachable with this change.
+
+### Verified
+
+| Check | Result |
+| --- | --- |
+| Unit tests: normaliser and validator rules | ✅ 11 new; suite **420 passed** |
+| Integration, against a throwaway database with the real router, `settleInvoice()` and unique key | ✅ 12 of 12 checks, database dropped afterwards |
+| — GCash without a reference / cash with one | ✅ 400 / 400 |
+| — `1234 567 890123` recorded, stored as `1234567890123`, provider NULL, recordedBy set | ✅ |
+| — Same reference typed differently on **another** invoice | ✅ 409 naming the first invoice and customer; the second invoice stays unpaid |
+| — Reference already in seeded history | ✅ 409 |
+| — Search with the spaced form | ✅ finds it |
+| — QR Ph payment on a suspended account | ✅ 201, reconnection still queued |
+| — **Two clerks, same reference, two invoices, same instant** | ✅ exactly one 201 and one 409, one payment row |
+| — Bank transfer without a reference | ✅ 201 (optional) |
+| Frontend lint / build | ✅ clean / built |
+| Dev database | 76 seeded GCash payments had their reference moved from `notes` to the new column |
+
+**Not verified:** the drawer in a browser.
+
+---
+
 ## ⚠️ Needs attention
 
 | # | Item | Detail |
@@ -1763,7 +1813,7 @@ exemption; emails are `@example.com`, and phones use the unassigned `0900` prefi
 | ~~A5~~ | ~~No frontend screen has ever been rendered~~ | ✅ **Resolved 2026-09-09.** `playwright-core` drives the machine's installed Chrome; `cd front && npm run shoot` captures every admin screen, every form drawer, a mobile viewport and dark mode, and reports console errors, page errors and failed requests. Two real defects were found this way — see below. Re-run it after any UI change. |
 | ~~A6~~ | ~~The screenshot pass needs data to be useful~~ | ✅ **Resolved 2026-09-16 (S15).** `npm run db:seed:dev` seeds one branch with a realistic dataset. |
 | **A7** | **Business numbers collide across installations** | Counters are per company, so every branch issues `ACC-000001` and `INV-2026-000001`. Harmless while branches never combine data; a branch prefix is needed before any consolidation (accounting, BIR, merged export). See D7. |
-| **A8** | **Manual GCash payments have no duplicate guard** | The Record payment drawer has no reference-number field, so a GCash reference can only go in `notes` and the same transaction can be entered twice. Store it as `providerPaymentId`. See [gcash-payment-flow.md §5](../gcash-payment-flow.md). |
+| ~~A8~~ | ~~Manual GCash payments have no duplicate guard~~ ✅ **Resolved 2026-09-17 (S16).** | The Record payment drawer has no reference-number field, so a GCash reference can only go in `notes` and the same transaction can be entered twice. Store it as `providerPaymentId`. See [gcash-payment-flow.md §5](../gcash-payment-flow.md). |
 | ~~A4~~ | ~~`sharp` carries a high-severity advisory~~ | ✅ **Resolved 2026-09-13** in the M14 security pass. `sharp@0.35.4` on libvips 8.18.6; `npm audit --omit=dev` reports zero. The `image-compress.js` API surface was exercised against the new version before the bump was accepted. |
 
 ---

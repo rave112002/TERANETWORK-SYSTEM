@@ -271,6 +271,7 @@ const InvoiceDetailDrawer = ({ open, invoice, onClose, onRecordPayment }) => {
                               style={{ fontSize: 12, color: "var(--color-text-muted)" }}
                             >
                               {dayjs(p.paidAt).format("MMM D, YYYY HH:mm")}
+                              {p.providerPaymentId ? ` · Ref ${p.providerPaymentId}` : ""}
                               {p.notes ? ` · ${decodeHTML(p.notes)}` : ""}
                             </div>
                           </div>

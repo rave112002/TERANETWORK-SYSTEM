@@ -695,10 +695,13 @@ async function main() {
             amount: comp.total,
             channel: cash ? "CASH" : "GCASH",
             provider: null,
-            providerPaymentId: null,
+            // Manual GCash entries carry the transaction reference in the
+            // duplicate-guard column, normalised, as the Record payment drawer
+            // stores it (lib/payments/reference.js).
+            providerPaymentId: cash ? null : `${randInt(1, 9)}${digits(12)}`,
             recordedBy: staffId,
             paidAt: paidAt.format(DT),
-            notes: cash ? "Paid at the branch office" : `GCash ref ${digits(4)} ${digits(3)} ${digits(6)}`,
+            notes: cash ? "Paid at the branch office" : rng() < 0.3 ? "Customer sent a screenshot of the receipt" : null,
             dateCreated: paidAt.clone().add(randInt(5, 90), "minutes").format(DT),
           });
           await emailEvent({

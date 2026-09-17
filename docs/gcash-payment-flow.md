@@ -130,11 +130,13 @@ matcher and `settleInvoice()`:
 | **Route 3. Manual entry:** Billing staff record a payment from the GCash notification, with the reference number | Nothing from GCash | None | Immediate, human-driven |
 | **Route 4. Inbound callback:** GCash calls a URL on our server | GCash documenting callbacks for this product | **Public HTTPS endpoint required** | Seconds |
 
-**Route 3 is partly possible today:** the **Record payment** drawer on the Invoices screen
-(`POST /admin/payments`) settles an invoice through `settleInvoice()` with channel `GCASH`.
-**Gap:** it has no GCash reference-number field. The reference can only go in free-text `notes`,
-so nothing stops the same GCash transaction being entered twice. Adding the reference as
-`providerPaymentId` is a small change and worth making first. Route 3 is the fallback whatever else is built. **Route 4 is the only route that brings
+**Route 3 works today** (2026-09-17). The **Record payment** drawer on the Invoices screen
+(`POST /admin/payments`) takes a **Reference no.**, required for GCash and QR Ph. It is
+normalised (`1234 567 890123` → `1234567890123`, `lib/payments/reference.js`) and stored in
+`payments.providerPaymentId`, whose unique key makes a second entry of the same transaction
+impossible. The 409 names the invoice and customer it already went to. **Any future importer must
+settle through the same normaliser**, so a payment entered by hand and later imported collides
+instead of counting twice. Route 3 is the fallback whatever else is built. **Route 4 is the only route that brings
 public-endpoint infrastructure**, and it is chosen only if the product requires it.
 
 ---
@@ -171,7 +173,35 @@ MikroTik, or both.
 
 ---
 
-## 8. What not to do until the documentation arrives
+## 8. What the GCash for Business overview answers
+
+**Read 2026-09-17:** [GCash_for_Business_Overview.md](GCash_for_Business_Overview.md). It is a general
+product overview with no source or date, not the client's product documentation or contract, so
+treat its figures as indicative.
+
+| # | Answer | What it changes |
+| --- | --- | --- |
+| **Q4** Fees | **Partly.** A Merchant Discount Rate applies: about **1.5–2% for QR payments**, 2–3.5% online. It does not say whether the fee comes off each transaction or at settlement. | Plan for fees. Exact-amount matching is safe **only if** the transaction record shows the **gross** amount the customer paid. The report sample below settles it. |
+| **Q3** Report export | **Yes.** The Merchant Portal generates **PDF/CSV transaction logs**. | **Route 2 (report import) is viable** with no API and no public endpoint. The columns are still unknown (Q5). |
+| **Q2** API access | **Not for this model.** The APIs described are for **online checkout** (GCash Web Pay, Shopify/WooCommerce plugins, custom API): a session per payment, like HitPay. Nothing mentions an API to *list payments made to a static merchant QR*. | **Route 1 (polling) is unconfirmed**, and Route 4 belongs to the checkout products rather than Option A. Don't plan around either until the client's own documentation says otherwise. |
+| — Portal access | The portal shows **transactions in real time**, with **multi-user roles** (restricted cashier/manager access without withdrawal rights). | Billing staff can get their own restricted portal login to look up references for **Route 3**, which works today. |
+| **Q9** One QR or one per branch | **Unclear.** The portal tracks "branch sales", so one merchant account can cover several branches. | **Matters under D7.** If both branches share one QR and account, each installation's export contains the other branch's payments. An importer then has to leave those unmatched rather than flag them, or each branch needs its own QR. |
+| **New** QR Ph | The merchant QR is **QR Ph compatible**: customers can pay it from **Maya, BDO, BPI** and other banks, not only GCash. | Not every payer is a GCash user, so **payer mobile or name cannot be relied on** for matching, and some references will be QR Ph ones. The Record payment drawer already requires a reference for both **GCash and QR Ph**. |
+| **New** Dynamic QR | Static **and dynamic** QR Ph codes exist. | A dynamic QR can carry the amount per invoice, which would make matching much easier. D8 chose a static QR, so this is **not** being built. It is a fallback if static-QR matching proves unreliable in practice. |
+
+**Still unanswered:** Q1 (which product was approved), Q5 (the fields a transaction carries), Q6
+(a message field), Q7, Q8 (MikroTik restore step), Q10 (SMS).
+
+### The most useful next request
+
+**One sample transaction report (CSV) exported from their GCash Business portal**, with names and
+numbers redacted if they prefer. That single file answers **Q4** (is there a fee column, and is
+the amount gross or net), **Q5** (which columns exist), **Q6** (is there a message column) and most
+of **Q9** (does it hold both branches), and it is what an importer would be written against.
+
+---
+
+## 9. What not to do until the documentation arrives
 
 - Do **not** write a GCash API client, endpoint URLs, auth scheme, or signature check from memory.
 - Do **not** add a public webhook route, tunnel, or port-forward for GCash.

@@ -1,6 +1,12 @@
 import { z } from "zod";
 
 import { money, optionalString, queryEnum, queryInt } from "./_helpers.js";
+import {
+  normalizePaymentReference,
+  REFERENCE_FORBIDDEN_CHANNELS,
+  REFERENCE_PATTERN,
+  REFERENCE_REQUIRED_CHANNELS,
+} from "../lib/payments/reference.js";
 
 /**
  * Billing — invoices, payments, adjustments, and the cycle runs.
@@ -122,16 +128,53 @@ export const listPaymentsQuerySchema = z.object({
  * Making the clerk type it is the check: if what they were handed does not
  * match what is owed, the request is rejected rather than silently marking a
  * short payment as settled.
+ *
+ * `referenceNo` arrives normalised (see lib/payments/reference.js) and is the
+ * duplicate guard: required for GCash and QR Ph, refused for cash, optional
+ * otherwise.
  */
-export const recordPaymentSchema = z.object({
-  invoiceId: z.string().min(1, "Invoice is required").max(50),
-  amount: money({ min: 0.01 }),
-  channel: z.enum(PAYMENT_CHANNELS, { error: "Select a payment channel" }),
-  // 'YYYY-MM-DD HH:mm:ss' or 'YYYY-MM-DD'. Absent means now — a payment banked
-  // yesterday should be recorded with yesterday's date.
-  paidAt: optionalString(19),
-  notes: optionalString(255),
-});
+export const recordPaymentSchema = z
+  .object({
+    invoiceId: z.string().min(1, "Invoice is required").max(50),
+    amount: money({ min: 0.01 }),
+    channel: z.enum(PAYMENT_CHANNELS, { error: "Select a payment channel" }),
+    // 'YYYY-MM-DD HH:mm:ss' or 'YYYY-MM-DD'. Absent means now — a payment banked
+    // yesterday should be recorded with yesterday's date.
+    paidAt: optionalString(19),
+    // Normalised before the checks below, so "1234 567 890123" and
+    // "1234567890123" are validated — and later deduplicated — as one value.
+    referenceNo: optionalString(80).transform((v) =>
+      v === undefined ? undefined : normalizePaymentReference(v) || undefined
+    ),
+    notes: optionalString(255),
+  })
+  .superRefine((body, ctx) => {
+    const { channel, referenceNo } = body;
+
+    if (REFERENCE_FORBIDDEN_CHANNELS.includes(channel) && referenceNo) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["referenceNo"],
+        message: "A cash payment has no reference number",
+      });
+      return;
+    }
+    if (REFERENCE_REQUIRED_CHANNELS.includes(channel) && !referenceNo) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["referenceNo"],
+        message: "Enter the transaction reference number",
+      });
+      return;
+    }
+    if (referenceNo && !REFERENCE_PATTERN.test(referenceNo)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["referenceNo"],
+        message: "A reference number is 6–64 letters and digits",
+      });
+    }
+  });
 
 // ── Adjustments (pending charges) ───────────────────────────────────────────
 

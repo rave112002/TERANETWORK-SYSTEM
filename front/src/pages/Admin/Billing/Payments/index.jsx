@@ -99,7 +99,7 @@ const PaymentsPage = () => {
           <SearchInput
             value={filters.search}
             onChange={handleSearch}
-            placeholder="Search invoice no, customer…"
+            placeholder="Search invoice no, customer, reference…"
           />
           <div className="flex items-center gap-2">
             <RefreshButton onRefresh={refetch} isFetching={isFetching} />

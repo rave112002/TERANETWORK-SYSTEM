@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { CalendarDays, HandCoins, Loader2, X } from "lucide-react";
 
@@ -40,6 +40,13 @@ import { formatPeso } from "../../../../../utils/currency";
  * prefilling turns that check into a formality that always passes, and the one
  * case it exists for — the clerk was handed less than the bill — sails through
  * as a settled invoice. Typing what was actually received is the check.
+ *
+ * ── The reference number is the duplicate guard ─────────────────────────────
+ *
+ * For GCash and QR Ph it is required, and the backend refuses a reference it
+ * has already seen, naming the invoice it went to. Without it, the same GCash
+ * screenshot recorded twice marks a second customer paid with the first one's
+ * money. The rules mirror recordPaymentSchema in billing.validator.js.
  */
 
 /**
@@ -56,18 +63,44 @@ const CHANNELS = [
   { value: "OTHER", label: "Other" },
 ];
 
-const paymentSchema = z.object({
-  amount: z.coerce
-    .number({ invalid_type_error: "Enter the amount received" })
-    .positive("The amount must be greater than zero")
-    .max(9999999999.99, "That amount is too large"),
-  channel: z.string().min(1, "Choose how it was paid"),
-  // Blank means now. A payment banked yesterday should be dated yesterday.
-  paidAt: z.string(),
-  notes: z.string().max(255, "Keep the note under 255 characters"),
-});
+/** Channels whose payments always carry a transaction reference. */
+const REFERENCE_REQUIRED = ["GCASH", "QRPH"];
 
-const EMPTY = { amount: "", channel: "CASH", paidAt: "", notes: "" };
+/** Same normalisation as the backend: separators out, upper-cased. */
+const normalizeReference = (value) => value.replace(/[\s\-_.]/g, "").toUpperCase();
+
+const paymentSchema = z
+  .object({
+    amount: z.coerce
+      .number({ invalid_type_error: "Enter the amount received" })
+      .positive("The amount must be greater than zero")
+      .max(9999999999.99, "That amount is too large"),
+    channel: z.string().min(1, "Choose how it was paid"),
+    // Blank means now. A payment banked yesterday should be dated yesterday.
+    paidAt: z.string(),
+    referenceNo: z.string().max(80, "That reference is too long"),
+    notes: z.string().max(255, "Keep the note under 255 characters"),
+  })
+  .superRefine(({ channel, referenceNo }, ctx) => {
+    const reference = normalizeReference(referenceNo);
+    if (REFERENCE_REQUIRED.includes(channel) && !reference) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["referenceNo"],
+        message: "Enter the reference number from the transaction",
+      });
+      return;
+    }
+    if (reference && !/^[A-Z0-9]{6,64}$/.test(reference)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["referenceNo"],
+        message: "A reference number is 6–64 letters and digits",
+      });
+    }
+  });
+
+const EMPTY = { amount: "", channel: "CASH", paidAt: "", referenceNo: "", notes: "" };
 
 const req = <span style={{ color: "var(--color-error)" }}>*</span>;
 
@@ -75,6 +108,9 @@ const RecordPaymentDrawer = ({ open, invoice, onClose }) => {
   const recordMutation = useRecordPayment();
 
   const form = useForm({ resolver: zodResolver(paymentSchema), defaultValues: EMPTY });
+  const channel = useWatch({ control: form.control, name: "channel" });
+  const isCash = channel === "CASH";
+  const referenceRequired = REFERENCE_REQUIRED.includes(channel);
 
   useEffect(() => {
     if (open) form.reset(EMPTY);
@@ -94,12 +130,16 @@ const RecordPaymentDrawer = ({ open, invoice, onClose }) => {
         // Sent as a full timestamp so a back-dated payment lands at the start
         // of that day rather than at whatever hour the form was submitted.
         paidAt: values.paidAt ? `${values.paidAt} 00:00:00` : undefined,
+        // Cash never carries one; the backend refuses it rather than store a
+        // value that could later block a real transaction's reference.
+        referenceNo: isCash ? undefined : values.referenceNo || undefined,
         notes: values.notes || undefined,
       });
       handleClose();
     } catch {
-      // The mutation's onError names the mismatch precisely — how much is owed
-      // and how much was entered — so the drawer stays open to be corrected.
+      // The mutation's onError names the problem precisely — the amount owed
+      // versus entered, or which invoice a reference was already recorded on —
+      // so the drawer stays open to be corrected.
     }
   };
 
@@ -228,7 +268,16 @@ const RecordPaymentDrawer = ({ open, invoice, onClose }) => {
                 render={({ field }) => (
                   <FormItem className="mb-5">
                     <FormLabel>Paid by {req}</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
+                    <Select
+                      value={field.value}
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        // A reference typed for GCash must not ride along
+                        // invisibly once the clerk switches to cash.
+                        if (value === "CASH") form.setValue("referenceNo", "");
+                        form.clearErrors("referenceNo");
+                      }}
+                    >
                       <FormControl>
                         <SelectTrigger className="h-10 w-full">
                           <SelectValue placeholder="How was it paid?" />
@@ -246,6 +295,36 @@ const RecordPaymentDrawer = ({ open, invoice, onClose }) => {
                   </FormItem>
                 )}
               />
+
+              {!isCash && (
+                <FormField
+                  control={form.control}
+                  name="referenceNo"
+                  render={({ field }) => (
+                    <FormItem className="mb-5">
+                      <FormLabel>Reference no. {referenceRequired && req}</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="e.g., 1234 567 890123"
+                          className="h-10 font-mono"
+                          autoCapitalize="characters"
+                          spellCheck={false}
+                          {...field}
+                        />
+                      </FormControl>
+                      <p
+                        className="m-0 mt-1.5"
+                        style={{ fontSize: 12, color: "var(--color-text-muted)" }}
+                      >
+                        {referenceRequired
+                          ? "From the GCash Business portal or the payment confirmation. A reference can only be recorded once."
+                          : "Optional. If entered, it can only be recorded once."}
+                      </p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <FormField
                 control={form.control}
@@ -278,10 +357,10 @@ const RecordPaymentDrawer = ({ open, invoice, onClose }) => {
                 name="notes"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Reference or note</FormLabel>
+                    <FormLabel>Note</FormLabel>
                     <FormControl>
                       <Textarea
-                        placeholder="e.g., GCash ref 0012345678, received by the Bicutan counter"
+                        placeholder="e.g., received at the counter, customer sent a screenshot"
                         rows={3}
                         {...field}
                       />

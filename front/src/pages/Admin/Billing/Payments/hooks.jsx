@@ -115,6 +115,22 @@ export const usePaymentsData = () => {
         ),
       },
       {
+        // The GCash / QR Ph transaction id for manual entries, or the gateway's
+        // payment id. Stored normalised, so it is shown exactly as searched.
+        title: "Reference",
+        dataIndex: "providerPaymentId",
+        key: "providerPaymentId",
+        width: 160,
+        render: (reference) => (
+          <span
+            className="truncate font-mono"
+            style={{ fontSize: 12.5, color: "var(--color-text-secondary)" }}
+          >
+            {reference || "—"}
+          </span>
+        ),
+      },
+      {
         title: "Amount",
         dataIndex: "amount",
         key: "amount",
