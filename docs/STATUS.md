@@ -46,14 +46,13 @@ Customer signs up → subscription → ONU provisioned on the OLT
 
 ## ▶️ Next, in order (before go-live)
 
-1. **Commit** SuperAdmin steps 4–5 (System Settings; old portal removed) — still uncommitted.
-2. **Customer import** from the client's subscriber spreadsheet — the biggest go-live gap.
-3. **Automatic backups** (mysqldump + Task Scheduler, per the deployment doc).
-4. **Express serves the React build on :8787** (today they run as two servers).
-5. **One full dry run** on dev data: bill → pay → record → check → sweep → reconnect.
-6. **Per installation:** set `MANAGE_API_KEY`, add the branch in SuperAdmin, create the Owner login,
+1. **Customer import** from the client's subscriber spreadsheet — the biggest go-live gap.
+2. **Automatic backups** (mysqldump + Task Scheduler, per the deployment doc).
+3. **Express serves the React build on :8787** (today they run as two servers).
+4. **One full dry run** on dev data: bill → pay → record → check → sweep → reconnect.
+5. **Per installation:** set `MANAGE_API_KEY`, add the branch in SuperAdmin, create the Owner login,
    fill in Settings → How customers pay (incl. Terms), upload the logo.
-7. `npm run gcash:inspect` on a multi-page statement when one is available.
+6. `npm run gcash:inspect` on a multi-page statement when one is available.
 
 ## ⏸️ Parked (code kept, don't build on it)
 
