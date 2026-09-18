@@ -356,9 +356,17 @@ SuperAdmin web  →  superadmin-server  ──────▶  Express :8787  /a
 | **One repo, two builds** | `front` builds twice (`build` for branches, `build:superadmin` for your PC). `superadmin-server/` is its own small app. The management API's version and shapes live in `shared/manage-contract/`, imported by both sides. |
 | **Versions** | Each branch reports `manageApiVersion`. SuperAdmin supports the current and previous version and flags anything else. |
 
-### Transitional
+### The in-branch SuperAdmin portal — removed 2026-09-18
 
-The old in-branch SuperAdmin portal (`/superadmin` on each branch) stays until its Company
-Profile, Users and Settings pages exist in the central app. Then it is removed from the branch
-build. Its Companies and Branches pages are not carried over: each branch holds one of each.
+Once the central app had Company Profile, Users and System Settings, the old in-branch portal
+(`/superadmin`, `/api/v1/superadmin/*`) was removed from the branch app. Its Companies and Branches
+pages were not carried over: each branch holds one of each.
+
+- **`db:setup` creates no login any more.** It used to seed a SuperAdmin account with a default
+  password (`superadmin@template.com`). A branch's first Owner login is now made from the central
+  SuperAdmin: set `MANAGE_API_KEY`, add the branch, then Users → Add login → Owner.
+- **Migration 016** switches off (`Inactive`) any SuperAdmin login an older setup created. Nothing
+  could log in with it after the removal; a known password should not stay switched on anyway.
+- **`front/scripts/check-build.mjs`** fails the branch build if it contains the central SuperAdmin
+  app or any call to `/api/v1/superadmin`.
 

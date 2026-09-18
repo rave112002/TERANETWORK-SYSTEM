@@ -10,15 +10,8 @@ const router = express.Router();
 
 // ─── Upload configurations ──────────────────────────────────────────────────
 
-// SuperAdmin — company logo: uploads/superadmin/logos/{companyId}/
-const superadminLogoUpload = upload({
-  filePath: (req) => {
-    const companyId = req.body.companyId || req.params.companyId || "unknown";
-    return `uploads/superadmin/logos/${companyId}`;
-  },
-  fileTypes: ["images"],
-  maxFileSize: 1024 * 1024 * 2, // 2MB
-});
+// The company logo is uploaded through the management API from the central
+// SuperAdmin (controllers/v1/manage/company.controller.js, D10), not here.
 
 // Admin — user avatar: uploads/admin/avatars/{companyId}/{branchId}/{accountId}/
 const adminAvatarUpload = upload({
@@ -41,31 +34,6 @@ const adminImageUpload = upload({
 });
 
 // ─── Routes ─────────────────────────────────────────────────────────────────
-
-/**
- * POST /logo
- * Upload company logo (SuperAdmin context)
- * Requires companyId in request body or params
- */
-router.post(
-  "/logo",
-  superadminLogoUpload.single("logo"),
-  compressImage,
-  catchAsync(async (req, res) => {
-    if (!req.file) {
-      throw new APIError("No file uploaded", 400);
-    }
-
-    const filePath = `/${req.file.path.replace(/\\/g, "/")}`;
-
-    return res.sendSuccess("Logo uploaded successfully", {
-      path: filePath,
-      filename: req.file.filename,
-      size: req.file.size,
-      mimetype: req.file.mimetype,
-    });
-  })
-);
 
 /**
  * POST /avatar

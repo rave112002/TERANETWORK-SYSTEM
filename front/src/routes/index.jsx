@@ -2,7 +2,6 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router";
 import { Suspense, lazy } from "react";
 import { ComponentLoader } from "../components/LoadingFallback";
 import AdminRoute from "./pageRoutes/AdminRoute";
-import SuperAdminRoute from "./pageRoutes/SuperAdminRoute";
 
 const LandingPage = lazy(() => import("../pages/LandingPage"));
 const PayInvoice = lazy(() => import("../pages/Public/PayInvoice"));
@@ -31,7 +30,6 @@ const RootRoutes = () => {
           }
         />
         <Route path="/admin/*" element={<AdminRoute />} />
-        <Route path="/superadmin/*" element={<SuperAdminRoute />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

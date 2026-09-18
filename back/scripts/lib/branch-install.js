@@ -151,6 +151,18 @@ const uuid = async (connection) => {
 // ── Steps ───────────────────────────────────────────────────────────────────
 
 /**
+ * What to do after setup. No login is created here: the branch's first Owner
+ * login comes from the central SuperAdmin (docs/decisions.md D10), which is why
+ * setup no longer seeds a SuperAdmin account with a default password.
+ */
+export function printNextSteps(branchName) {
+  console.log(`\n   Next, to create ${branchName}'s first Owner login:`);
+  console.log("   1. Put a random key of 32+ characters in .env as MANAGE_API_KEY and restart the server.");
+  console.log("   2. Central SuperAdmin → Branches → Add branch (this server's Tailscale address + that key).");
+  console.log("   3. Central SuperAdmin → Users → Add login → Owner.");
+}
+
+/**
  * Insert every catalogue permission that is missing, one row at a time.
  *
  * Per row rather than all-or-nothing, because migrations insert permissions of
@@ -185,37 +197,6 @@ export async function seedPermissions(connection) {
       ? `   ✅ ${inserted} permission(s) seeded (${PERMISSIONS.length - inserted} already present)`
       : "   ⏭️  All permissions already present"
   );
-}
-
-/** The SuperAdmin login. Skipped when the account already exists. */
-export async function seedSuperadmin(connection) {
-  const [existing] = await connection.query(
-    `SELECT accountId FROM credentials WHERE email = 'superadmin@template.com' LIMIT 1`
-  );
-  if (existing.length > 0) {
-    console.log("   ⏭️  SuperAdmin account already exists — skipping");
-    return;
-  }
-
-  const timestamp = now();
-  const accountId = await uuid(connection);
-
-  await connection.query(
-    `INSERT INTO superadmins (accountId, firstName, lastName, status, dateCreated, dateUpdated)
-     VALUES (?, 'Super', 'Admin', 'Active', ?, ?)`,
-    [accountId, timestamp, timestamp]
-  );
-  await connection.query(
-    `INSERT INTO credentials (accountId, email, password, type, status, dateCreated, dateUpdated)
-     VALUES (?, 'superadmin@template.com', ?, 'SUPERADMIN', 'Active', ?, ?)`,
-    [accountId, await hashPassword("superadmin123"), timestamp, timestamp]
-  );
-
-  console.log("\n   📋 SuperAdmin Credentials:");
-  console.log("   ┌──────────────────────────────────────────────────┐");
-  console.log("   │ Email:    superadmin@template.com                │");
-  console.log("   │ Password: superadmin123                          │");
-  console.log("   └──────────────────────────────────────────────────┘");
 }
 
 /**

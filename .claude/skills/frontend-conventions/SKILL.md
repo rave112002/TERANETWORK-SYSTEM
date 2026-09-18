@@ -5,6 +5,14 @@ description: The non-negotiable conventions for this repo's React 19 + Vite clie
 
 # Frontend conventions (`front/`)
 
+> **SuperAdmin is no longer part of the branch app** ([D10](../../../docs/decisions.md#d10--one-central-superadmin-over-tailscale)).
+> The branch app has one portal: **Admin**. The central SuperAdmin is a separate app: `front` built with
+> `--mode superadmin` (pages in `src/pages/SuperAdminConsole/`, routes in `src/routes/superadmin.jsx`) plus
+> `superadmin-server/`. It reaches a branch only through the key-protected `/api/v1/manage/*`
+> (`server/src/controllers/v1/manage/`, contract in `shared/manage-contract/`). Anything in these docs about
+> `/api/v1/superadmin/*`, `SuperAdminRoute.jsx`, `pages/SuperAdmin/` or `useSuperAdminAuthStore` describes
+> the removed template portal: **do not build on it.**
+
 React 19 (hooks only) · JavaScript, no TypeScript · Vite · **shadcn/ui** (`@/components/ui/*`) ·
 Tailwind v4 · Zustand · TanStack React Query · react-hook-form + zod · sonner · TanStack Table via
 the shared `DataTable` · axios · react-router v7 · lucide-react · dayjs.

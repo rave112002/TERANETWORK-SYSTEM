@@ -1,9 +1,9 @@
-# Full-Stack Multi-Tenant Template
+# TERANETWORK System
 
-A multi-tenant admin platform with two portals: **SuperAdmin** (manages companies across the whole
-platform) and **Admin** (manages users, roles, and resources scoped to a single company + branch).
-Tenancy is enforced by scoping every Admin query to the authenticated user's `companyId` /
-`branchId`; SuperAdmin operates across all companies.
+Billing and network administration for TERANETWORK, an internet provider, built on an internal
+multi-tenant template. **Each branch runs its own copy** (the Admin portal + API + MySQL); **one
+central SuperAdmin** on the developer's PC manages every branch through a key-protected management
+API. Every Admin query is scoped to the authenticated user's `companyId` / `branchId`.
 
 ## Repository layout
 
@@ -41,8 +41,9 @@ in every session. **Load the relevant skill before writing code** — the rules 
 ## Cross-cutting facts
 
 - **Production is ONE BRANCH PER INSTALLATION.** Each TERANETWORK branch runs its own locally
-  deployed server + MySQL database; there is no central server, no cross-branch dashboard or
-  report, and no Superadmin spanning branches. A production database holds one company row and
+  deployed server + MySQL database; there is no central business server and no cross-branch
+  dashboard or report (the central SuperAdmin below manages branches but holds no business
+  data). A production database holds one company row and
   one branch row, so `companyId`/`branchId` scoping from `req.user` is sufficient. Existing
   multi-branch code (`branchScope()`, `user_branches`) is kept because it is harmless — **do not
   extend it or build multi-branch features.** See decision D7 in
@@ -52,7 +53,9 @@ in every session. **Load the relevant skill before writing code** — the rules 
   reaches each branch only through that branch's key-protected `/api/v1/manage/*` over
   Tailscale — never its database — and shows health and management, not business numbers. The
   management API's version and shapes live in `shared/manage-contract/`; change both sides in
-  the same commit. The old in-branch `/superadmin` portal is transitional.
+  the same commit. The old in-branch `/superadmin` portal and `/api/v1/superadmin/*` were
+  **removed** (2026-09-18); don't reintroduce them. `db:setup` creates no login: a branch's first
+  Owner login is made from the central SuperAdmin (Users).
 - **Payments: TERANETWORK's personal GCash account.** Customers send money to it and send proof
   to the Facebook page; staff record each payment with its reference number; the downloaded
   GCash transaction-history PDF is uploaded to **Billing → GCash Check** to catch typos, fakes and

@@ -14,7 +14,7 @@
 import "dotenv/config";
 import mysql from "mysql2/promise";
 import { runMigrations } from "./migrate.js";
-import { seedBranchInstallation, seedPermissions, seedSuperadmin } from "./lib/branch-install.js";
+import { printNextSteps, seedBranchInstallation, seedPermissions } from "./lib/branch-install.js";
 
 const DB_CONFIG = {
   host: process.env.DB_HOST,
@@ -62,14 +62,12 @@ async function main() {
     console.log("\n🔐 Seeding permissions...");
     await seedPermissions(connection);
 
-    console.log("\n👤 Creating default superadmin...");
-    await seedSuperadmin(connection);
-
     console.log("\n🏢 Setting up this installation's branch...");
     const install = await seedBranchInstallation(connection);
 
     console.log(`\n🎉 Clean database setup complete — installation for branch "${install.branchName}".`);
-    console.log("   Optional development data: npm run db:seed:dev");
+    printNextSteps(install.branchName);
+    console.log("\n   Optional development data: npm run db:seed:dev");
   } catch (error) {
     console.error("\n❌ Database setup failed:", error.message);
     process.exit(1);

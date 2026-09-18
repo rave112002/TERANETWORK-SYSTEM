@@ -20,7 +20,7 @@ Two separate stores, one per portal. Never mix them.
 | Store                    | localStorage key  | Fields                                             |
 | ------------------------ | ----------------- | -------------------------------------------------- |
 | `useAdminAuthStore`      | `admin-auth`      | `userData`, `token`, `refreshToken`, `permissions` |
-| `useSuperAdminAuthStore` | `superadmin-auth` | `userData`, `token`, `refreshToken`                |
+| ~~`useSuperAdminAuthStore`~~ | — | Removed with the in-branch SuperAdmin portal (D10). The central SuperAdmin app uses `useSuperAdminConsoleStore` (`store/superAdminConsoleStore.js`, cookie session). |
 
 ### Store shape (Admin)
 
@@ -214,7 +214,7 @@ Props:
 
 **Do:**
 
-- Use `useAdminAuthStore` for Admin portal, `useSuperAdminAuthStore` for SuperAdmin
+- Use `useAdminAuthStore` for the Admin portal (the only portal in the branch app)
 - Call `reset()` for logout — never manually clear individual fields
 - Check `hasPermission("module", "submodule", "write")` before showing create/edit/delete buttons
 - Let `<ProtectedRoute>` handle the loading and 403 states — don't duplicate that logic

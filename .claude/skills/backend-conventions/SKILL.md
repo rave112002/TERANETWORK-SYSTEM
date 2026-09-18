@@ -5,6 +5,14 @@ description: The non-negotiable conventions for this repo's Node + Express + MyS
 
 # Backend conventions (`back/`)
 
+> **SuperAdmin is no longer part of the branch app** ([D10](../../../docs/decisions.md#d10--one-central-superadmin-over-tailscale)).
+> The branch app has one portal: **Admin**. The central SuperAdmin is a separate app: `front` built with
+> `--mode superadmin` (pages in `src/pages/SuperAdminConsole/`, routes in `src/routes/superadmin.jsx`) plus
+> `superadmin-server/`. It reaches a branch only through the key-protected `/api/v1/manage/*`
+> (`server/src/controllers/v1/manage/`, contract in `shared/manage-contract/`). Anything in these docs about
+> `/api/v1/superadmin/*`, `SuperAdminRoute.jsx`, `pages/SuperAdmin/` or `useSuperAdminAuthStore` describes
+> the removed template portal: **do not build on it.**
+
 Node + Express · MySQL via a custom `Database` class wrapping `mysql2/promise`
 (`server/config/database.js`, injected as `req.db`) · Passport JWT · Zod validators ·
 multi-tenant scoping by `companyId`/`branchId`.
@@ -46,7 +54,7 @@ Load the relevant doc for the detail; these are the ones worth knowing cold.
 - **Check-then-insert needs one transaction with `FOR UPDATE`**, or two concurrent requests both
   pass the check before either inserts.
 - **Never trust client-sent `companyId` / `branchId` / `accountId`.** Scope from `req.user`.
-  SuperAdmin has neither — don't assume they're present.
+  Management-API requests (`/api/v1/manage/*`) have no `req.user` at all — use `req.installation`.
 - **IDs come from MySQL** — `SELECT UUID()`, never `crypto.randomUUID()`, `uuidv4()`, or
   `role_${Date.now()}`. Generate inside the transaction with `conn.execute`.
 - **Timestamps come from `getCurrentTimestampLocal()`** (Asia/Manila) — never `NOW()`,
@@ -64,8 +72,8 @@ Load the relevant doc for the detail; these are the ones worth knowing cold.
   list. Every phone uses `optionalPhone()`, which also normalises to `09XX XXXX XXX` before the
   controller sees it — controllers never format a phone.
 - **One permission per route group.** Sub-actions reuse the parent's. GET = `read`, mutations =
-  `write`. Middleware order is `checkPermission` → `validate*` → `catchAsync`. SuperAdmin routes
-  get no permission middleware.
+  `write`. Middleware order is `checkPermission` → `validate*` → `catchAsync`. Management-API routes
+  use `requireManageKey` instead of permission middleware.
 - **Never invent a permission** that isn't in the `permissions` table.
 - **Whitelist any interpolated sort column** — it isn't a bound parameter.
 - **Every response goes through `res.sendSuccess(message, data, status)` / `res.sendError`.** Both

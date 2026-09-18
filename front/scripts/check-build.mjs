@@ -27,7 +27,16 @@ if (!fs.existsSync(dir)) {
   process.exit(1);
 }
 
-const found = jsFiles(dir).some((file) => fs.readFileSync(file, "utf8").includes(MARKER));
+const sources = jsFiles(dir).map((file) => fs.readFileSync(file, "utf8"));
+const found = sources.some((code) => code.includes(MARKER));
+
+// The old in-branch SuperAdmin portal was removed (D10). Its API is gone from the
+// branch server, so any code still calling it is dead weight or a regression.
+const OLD_PORTAL_API = "/api/v1/superadmin";
+if (target !== "superadmin" && sources.some((code) => code.includes(OLD_PORTAL_API))) {
+  console.error(`check-build: the BRANCH build still calls ${OLD_PORTAL_API}, which no longer exists.`);
+  process.exit(1);
+}
 
 if (target === "superadmin" && !found) {
   console.error("check-build: the SuperAdmin build does not contain the SuperAdmin app");

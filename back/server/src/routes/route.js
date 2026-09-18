@@ -5,7 +5,6 @@ const router = Router();
 
 // Importing route modules
 import adminRoute from "./v1/admin/index.js";
-import superAdminRoute from "./v1/superadmin/index.js";
 import payController from "../controllers/v1/public/pay.controller.js";
 import webhooksController from "../controllers/v1/public/webhooks.controller.js";
 import uploadRoute from "../controllers/v1/upload/upload.controller.js";
@@ -19,7 +18,6 @@ router.use(idempotencyMiddleware());
 
 // Mount portal-based routes
 router.use("/v1/admin", adminRoute);
-router.use("/v1/superadmin", superAdminRoute);
 
 // The customer-facing payment surface. No auth by design — the emailed
 // /pay/<token> link is the credential. See controllers/v1/public/pay.controller.js

@@ -1,9 +1,17 @@
 ---
 name: new-module
-description: Scaffold a complete CRUD module across this multi-tenant template — MySQL table + migration, permission row, Zod validator, Express controller with permission gating, route wiring, axios + React Query services, the Modern list page (hooks.jsx + index.jsx), the Sheet form drawer, and sidebar/route registration. Use whenever the user asks to add, create, or scaffold a new module, page, entity, resource, or CRUD feature in the Admin or SuperAdmin portal (e.g. "add a Products module", "new Suppliers page", "scaffold Inventory CRUD"). Also use to add just the backend or just the frontend half of such a module.
+description: Scaffold a complete CRUD module across this multi-tenant template — MySQL table + migration, permission row, Zod validator, Express controller with permission gating, route wiring, axios + React Query services, the Modern list page (hooks.jsx + index.jsx), the Sheet form drawer, and sidebar/route registration. Use whenever the user asks to add, create, or scaffold a new module, page, entity, resource, or CRUD feature in the Admin portal (e.g. "add a Products module", "new Suppliers page", "scaffold Inventory CRUD"). Also use to add just the backend or just the frontend half of such a module.
 ---
 
 # New module scaffold
+
+> **SuperAdmin is no longer part of the branch app** ([D10](../../../docs/decisions.md#d10--one-central-superadmin-over-tailscale)).
+> The branch app has one portal: **Admin**. The central SuperAdmin is a separate app: `front` built with
+> `--mode superadmin` (pages in `src/pages/SuperAdminConsole/`, routes in `src/routes/superadmin.jsx`) plus
+> `superadmin-server/`. It reaches a branch only through the key-protected `/api/v1/manage/*`
+> (`server/src/controllers/v1/manage/`, contract in `shared/manage-contract/`). Anything in these docs about
+> `/api/v1/superadmin/*`, `SuperAdminRoute.jsx`, `pages/SuperAdmin/` or `useSuperAdminAuthStore` describes
+> the removed template portal: **do not build on it.**
 
 Builds one entity's full vertical slice — backend to sidebar — exactly to this repo's
 non-negotiable conventions. `Roles` (`back/.../admin/roles.controller.js` +
@@ -36,7 +44,7 @@ if the user gave only a module name, ask for the fields.
 | `{{entityId}}` | business ID column — **never** the auto-increment `id` | `productId` |
 | `{{table}}` | MySQL table, lowercase plural | `products` |
 | `{{module}}` / `{{submodule}}` | permission slug, snake_case; submodule is `null` for top-level | `products` / `null` |
-| `{{portal}}` | `Admin` or `SuperAdmin` | `Admin` |
+| `{{portal}}` | `Admin` — the only portal in the branch app (D10) | `Admin` |
 | `{{route}}` | sidebar path segment | `/products` |
 | `{{apiBase}}` | `/api/v1/{{portal-lower}}/{{entities}}` | `/api/v1/admin/products` |
 | `{{Icon}}` | one lucide-react icon, reused on header chip + stat card | `Package` |
@@ -121,7 +129,8 @@ Then walk the checklist in `references/checklist.md`. Report anything you skippe
 - **Timestamps come from `getCurrentTimestampLocal()`** — never `NOW()`, `new Date()`, or `moment()`
   in application code.
 - **Tenant scope from `req.user`** — `companyId`/`branchId` are read off `req.user`, never off
-  `req.body`/`req.query`. SuperAdmin routes have neither.
+  `req.body`/`req.query`. Management-API routes (`/api/v1/manage/*`) have no `req.user`; they
+  scope to the installation with `lib/manage/installation.js`.
 - **Soft delete** — `UPDATE … SET status = 'Deleted'`. No `DELETE FROM`. List queries filter
   `status != 'Deleted'` unless an explicit `?status=` was passed.
 - **Transactions** — `let conn;` before `try`, `conn.execute` (destructure `[rows]`) inside,
@@ -131,8 +140,8 @@ Then walk the checklist in `references/checklist.md`. Report anything you skippe
   it. Query filters use `queryEnum` / `queryEnumDefault` / `queryInt` from `_helpers.js` so a
   cleared filter (`?status=`) doesn't 400. Every phone uses `optionalPhone()`.
 - **One permission per route group** — GET = `read`, POST/PUT/DELETE = `write`, same
-  module/submodule the frontend's `<ProtectedRoute>` uses. SuperAdmin routes get no
-  `checkPermission`.
+  module/submodule the frontend's `<ProtectedRoute>` uses. Management-API routes use
+  `requireManageKey` instead of `checkPermission`.
 - **shadcn/ui + lucide-react only** — `@/components/ui/*`. No other component or icon library.
 - **Never hardcode a hex** — use the `--color-*` tokens. No `bg-white`/`bg-gray-*`/`text-slate-*`,
   no `shadow-*` on static surfaces, no inline `background` on the primary `<Button>`.

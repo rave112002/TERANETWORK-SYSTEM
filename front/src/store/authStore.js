@@ -28,23 +28,3 @@ export const useAdminAuthStore = create(
     },
   ),
 );
-
-// SuperAdmin Auth Store
-export const useSuperAdminAuthStore = create(
-  persist(
-    (set) => ({
-      userData: null,
-      token: null,
-      refreshToken: null,
-      setToken: (token) => set({ token }),
-      setRefreshToken: (refreshToken) => set({ refreshToken }),
-      setUserData: (userData) => set({ userData }),
-      setUser: (userData) => set({ userData }), // Alias for compatibility
-      reset: () => set({ userData: null, token: null, refreshToken: null }),
-    }),
-    {
-      name: "superadmin-auth",
-      storage: createJSONStorage(() => localStorage),
-    },
-  ),
-);

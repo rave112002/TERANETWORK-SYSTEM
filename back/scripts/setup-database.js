@@ -2,7 +2,7 @@
  * Database Setup Script (ESM)
  *
  * Applies all pending migrations (database/migrations/), then seeds a complete
- * SINGLE-BRANCH installation: permissions, the SuperAdmin login, the company,
+ * SINGLE-BRANCH installation: permissions, the company,
  * this installation's one branch, and its Owner / Admin / Billing / Technician
  * roles. Additive and re-runnable — existing tables and data are left
  * untouched; each seed step is skipped when already present.
@@ -18,7 +18,7 @@
 import "dotenv/config";
 import mysql from "mysql2/promise";
 import { runMigrations } from "./migrate.js";
-import { seedBranchInstallation, seedPermissions, seedSuperadmin } from "./lib/branch-install.js";
+import { printNextSteps, seedBranchInstallation, seedPermissions } from "./lib/branch-install.js";
 
 const DB_CONFIG = {
   host: process.env.DB_HOST,
@@ -49,14 +49,11 @@ async function main() {
     console.log("\n🔐 Seeding permissions...");
     await seedPermissions(connection);
 
-    console.log("\n👤 Creating superadmin account...");
-    await seedSuperadmin(connection);
-
     console.log("\n🏢 Setting up this installation's branch...");
     const install = await seedBranchInstallation(connection);
 
     console.log(`\n🎉 Database setup complete — installation for branch "${install.branchName}".`);
-    console.log("   The branch Owner login is created from the SuperAdmin portal (Users).");
+    printNextSteps(install.branchName);
   } catch (error) {
     console.error("\n❌ Database setup failed:", error.message);
     process.exit(1);

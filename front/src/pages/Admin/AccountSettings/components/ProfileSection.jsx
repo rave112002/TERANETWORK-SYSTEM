@@ -22,10 +22,7 @@ import {
 } from "@/components/ui/tooltip";
 
 import SectionLabel from "../../../../components/SectionLabel";
-import {
-  useAdminAuthStore,
-  useSuperAdminAuthStore,
-} from "../../../../store/authStore";
+import { useAdminAuthStore } from "../../../../store/authStore";
 import { useUpdateProfile } from "../../../../services/requests/account";
 import {
   PHONE_MAX_LENGTH,
@@ -44,13 +41,9 @@ const schema = z.object({
 const req = <span style={{ color: "var(--color-error)" }}>*</span>;
 
 const ProfileSection = ({ portal = "admin" }) => {
-  const adminUser = useAdminAuthStore((s) => s.userData);
-  const superUser = useSuperAdminAuthStore((s) => s.userData);
-  const userData = portal === "superadmin" ? superUser : adminUser;
-  const setUserData =
-    portal === "superadmin"
-      ? useSuperAdminAuthStore.getState().setUserData
-      : useAdminAuthStore.getState().setUserData;
+  // Admin portal only: the in-branch SuperAdmin portal was removed (D10).
+  const userData = useAdminAuthStore((s) => s.userData);
+  const setUserData = useAdminAuthStore.getState().setUserData;
 
   const { mutate, isPending } = useUpdateProfile(portal);
 

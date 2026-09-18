@@ -1,11 +1,13 @@
 # Project status
 
-**Updated:** 2026-09-17 · Keep this page to one screen. Update it whenever something moves.
+**Updated:** 2026-09-18 · Keep this page to one screen. Update it whenever something moves.
 
 ## What the system is
 
 A billing and network admin system for **TERANETWORK**, an internet provider. **Each branch runs
 its own copy** (own server, own database) — [D7](decisions.md#d7--one-branch-per-installation).
+**One central SuperAdmin** on the developer's PC manages every branch over Tailscale —
+[D10](decisions.md#d10--one-central-superadmin-over-tailscale).
 
 ```
 Customer signs up → subscription → ONU provisioned on the OLT
@@ -25,6 +27,7 @@ Customer signs up → subscription → ONU provisioned on the OLT
 | How to pay | GCash number, account name, Facebook page and **Terms and conditions** set in **Settings → How customers pay**, printed on every invoice PDF (and the payment steps on every billing email) |
 | Collections | Dunning sweep after the due date, exemptions, automatic reconnection on payment |
 | Admin | Dashboard with "needs attention", reports, users & roles, audit trail, runbooks |
+| **Central SuperAdmin** | **Branches** (health, version, warnings), **Company Profile** (logo, TIN), **Users** (Owner/Admin logins, password reset), **System Settings** (dry-run, billing schedule). Changes audited on the branch as `system:superadmin:<user>`. Old in-branch `/superadmin` removed. See [superadmin-server/README.md](../superadmin-server/README.md) |
 
 ## ⚠️ Built but not proven on the real thing
 
@@ -41,27 +44,16 @@ Customer signs up → subscription → ONU provisioned on the OLT
 | **MikroTik** router IP, RouterOS version, login — and what the old Sheets→MikroTik step changed | Reconnecting on the router, if it's needed beyond the OLT |
 | Do they send invoices by **SMS**? Through which provider? | SMS (only email exists) |
 
-## ▶️ Now: central SuperAdmin ([D10](decisions.md#d10--one-central-superadmin-over-tailscale))
+## ▶️ Next, in order (before go-live)
 
-Admin portal work is **paused**. One SuperAdmin app on the developer's PC manages every branch
-over Tailscale.
-
-| Step | What | State |
-| --- | --- | --- |
-| 1 | Branch `/api/v1/manage/health` + `superadmin-server` (login, branch list) + **Branches** page with online/offline and version — see [superadmin-server/README.md](../superadmin-server/README.md) | ✅ 2026-09-17 |
-| 2 | **Company Profile** per branch (name, logo, address, TIN), changes audited on the branch as `system:superadmin:<user>` | ✅ 2026-09-18 |
-| 3 | **Users** per branch: create Owner/Admin logins (one Owner), reset passwords (signs out everywhere), deactivate/reactivate (never the only Owner) | ✅ 2026-09-18 |
-| 4 | System settings per branch | ⬜ |
-| 5 | Remove the old in-branch `/superadmin` from the branch build | ⬜ |
-
-## ⏳ Later (Admin portal, paused)
-
-1. **Customer import** from the client's subscriber spreadsheet — the biggest go-live gap.
-2. **Automatic backups** (mysqldump + Task Scheduler, per the deployment doc).
-3. **Express serves the React build on :8787** (today they run as two servers).
-4. **One full dry run** on dev data: bill → pay → record → check → sweep → reconnect.
-5. **Per installation, before go-live:** fill in Settings → How customers pay (incl. Terms), upload the logo.
-6. `npm run gcash:inspect` on a multi-page statement when one is available.
+1. **Commit** SuperAdmin steps 4–5 (System Settings; old portal removed) — still uncommitted.
+2. **Customer import** from the client's subscriber spreadsheet — the biggest go-live gap.
+3. **Automatic backups** (mysqldump + Task Scheduler, per the deployment doc).
+4. **Express serves the React build on :8787** (today they run as two servers).
+5. **One full dry run** on dev data: bill → pay → record → check → sweep → reconnect.
+6. **Per installation:** set `MANAGE_API_KEY`, add the branch in SuperAdmin, create the Owner login,
+   fill in Settings → How customers pay (incl. Terms), upload the logo.
+7. `npm run gcash:inspect` on a multi-page statement when one is available.
 
 ## ⏸️ Parked (code kept, don't build on it)
 

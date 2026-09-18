@@ -39,9 +39,9 @@ const appUrl = () =>
     .trim()
     .replace(/\/$/, "");
 
-// The auth controller is mounted under both /admin/auth and /superadmin/auth.
-// Derive which portal a request targets from its mount path so reset links and
-// portal/type checks resolve correctly.
+// Mounted under /admin/auth only. The in-branch SuperAdmin portal (and its
+// /superadmin/auth mount) was removed in favour of the central SuperAdmin (D10);
+// the portal/type helpers stay so a SUPERADMIN credential can never log in here.
 const portalOf = (req) => (req.baseUrl.includes("/superadmin/") ? "superadmin" : "admin");
 const typesForPortal = (portal) =>
   portal === "superadmin" ? ["SUPERADMIN"] : ["ADMIN", "USER"];

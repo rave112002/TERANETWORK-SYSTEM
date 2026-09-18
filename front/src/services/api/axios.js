@@ -1,9 +1,6 @@
 import axios from "axios";
 import { toast } from "sonner";
-import {
-  useAdminAuthStore,
-  useSuperAdminAuthStore,
-} from "../../store/authStore";
+import { useAdminAuthStore } from "../../store/authStore";
 import { useCsrfStore } from "../../store/csrfStore";
 
 export const axiosInstance = axios.create({
@@ -13,14 +10,14 @@ export const axiosInstance = axios.create({
   withCredentials: true,
 });
 
+// Only the Admin portal talks to the branch API. The central SuperAdmin app has
+// its own client (services/api/superadmin-console/client.js) and server (D10).
 export const userTypeAuth = {
   admin: "admin",
-  superadmin: "superadmin",
 };
 
 export const tokens = {
   [userTypeAuth.admin]: useAdminAuthStore,
-  [userTypeAuth.superadmin]: useSuperAdminAuthStore,
 };
 
 export const getUserToken = (userType = userTypeAuth.admin) => {
@@ -130,7 +127,6 @@ axiosInstance.interceptors.response.use(
 // other under rotation).
 const refreshPromises = {
   [userTypeAuth.admin]: null,
-  [userTypeAuth.superadmin]: null,
 };
 
 const performTokenRefresh = async (user) => {

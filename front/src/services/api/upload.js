@@ -6,22 +6,6 @@ const getUploadApi = (userType = "admin") =>
   createAxiosInstanceWithInterceptor("multipart", userType);
 
 /**
- * Upload company logo.
- *
- * `companyId` is appended BEFORE the file on purpose: multer parses multipart
- * parts in order, so the backend's path resolver only sees `req.body.companyId`
- * if it arrived first. Without it the logo lands in an "unknown" folder.
- */
-export const uploadLogoApi = async (file, userType = "admin", companyId) => {
-  const api = getUploadApi(userType);
-  const formData = new FormData();
-  if (companyId) formData.append("companyId", companyId);
-  formData.append("logo", file);
-  const response = await api.post("/api/v1/upload/logo", formData);
-  return response.data;
-};
-
-/**
  * Upload user avatar
  */
 export const uploadAvatarApi = async (file, userType = "admin") => {

@@ -1,5 +1,9 @@
 # File Upload Path Convention
 
+> The company logo is now uploaded from the central SuperAdmin through the management API
+> (`PUT /api/v1/manage/company-profile/logo`, D10). It still lands in `uploads/superadmin/logos/{companyId}/`.
+> The old `POST /api/v1/upload/logo` route and the SuperAdmin-portal upload examples below are gone.
+
 All uploaded files are stored in `public/uploads/{portal}/` with a hierarchical folder structure based on the portal and entity context.
 
 ---

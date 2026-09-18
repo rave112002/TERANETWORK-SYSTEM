@@ -380,7 +380,13 @@ export default router;
 Mixing them silently returns a `FieldPacket` where you expected a row. Never call `req.db.query`
 inside a transaction — it takes a different connection and isn't part of it.
 
-### SuperAdmin variant
+### SuperAdmin variant — obsolete (D10)
+
+The in-branch SuperAdmin portal and `routes/v1/superadmin/` were removed. Something the central
+SuperAdmin needs from a branch is a management-API endpoint under `controllers/v1/manage/`
+(behind `requireManageKey`, audited with `manageAuditContext`), plus a pass-through route in
+`superadmin-server/`. The text below is kept for reference only.
+
 
 Drop every `checkPermission` (SuperAdmin has unrestricted access by design) and drop the
 `companyId`/`branchId` scoping — `req.user` carries neither. When SuperAdmin acts on a specific

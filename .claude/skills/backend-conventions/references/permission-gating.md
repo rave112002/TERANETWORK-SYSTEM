@@ -235,9 +235,11 @@ All endpoints under `/admin/roles` use `users.roles`. Don't create a separate `u
 
 Only check permissions that exist in the `permissions` table. If a permission isn't seeded, don't reference it.
 
-### 4. SuperAdmin skips permission checks
+### 4. The management API uses a key, not permissions
 
-SuperAdmin routes (`/api/v1/superadmin/*`) don't need permission middleware — SuperAdmin has unrestricted access by design.
+`/api/v1/manage/*` is called by the central SuperAdmin server, not a person (D10). It is gated by
+`requireManageKey` (the branch's `MANAGE_API_KEY`), mounted in `routes/route.js`; add no
+`checkPermission` there. The old `/api/v1/superadmin/*` routes no longer exist.
 
 ### 5. Middleware order in route definition
 
@@ -279,7 +281,7 @@ req.userPermission = {
 
 - Don't invent permission names not in the database
 - Don't check different permissions for sub-actions (e.g., "manage permissions" within roles)
-- Don't apply permission middleware to SuperAdmin routes
+- Don't apply permission middleware to management-API routes (they use `requireManageKey`)
 - Don't hardcode permission checks inline — always use the middleware
 - Don't use `next(new APIError(...))` in the middleware — return `res.status().json()` directly for cleaner error responses
 
@@ -287,7 +289,7 @@ req.userPermission = {
 
 ## Owner Role Convention
 
-The "Owner" role is system-managed, created when a branch is created from SuperAdmin. It must never be visible from the Admin portal.
+The "Owner" role is system-managed: `npm run db:setup` creates it with the branch's other roles. It must never be visible from the Admin portal.
 
 ### Rules
 
@@ -295,5 +297,5 @@ The "Owner" role is system-managed, created when a branch is created from SuperA
 2. **Hide Owner users from Admin user list** — all user list queries: `AND r.roleName != 'Owner'` (JOIN roles)
 3. **Cannot assign Owner from Admin** — reject if roleId resolves to Owner
 4. **Cannot modify/delete Owner from Admin** — reject PUT/DELETE on Owner role
-5. **Owner is only visible in SuperAdmin** portal
-6. **Owner is created automatically** during `POST /superadmin/branches` (with all permissions at `write` level)
+5. **Owner logins are managed from the central SuperAdmin** (Users page → `/api/v1/manage/users`), one per branch
+6. **The Owner role is created by `db:setup`** (`scripts/lib/branch-install.js`), with every permission at `write`

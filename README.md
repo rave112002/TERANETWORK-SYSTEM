@@ -1,21 +1,17 @@
-# Full-Stack Multi-Tenant Template
+# TERANETWORK System
 
-A production-style starter for multi-tenant admin platforms. It ships two portals out of the box —
-a **SuperAdmin** portal that manages companies across the whole platform, and an **Admin**
-portal scoped to a single company + branch — with role-based access control, an audit trail,
-file uploads, and a hardened Express API.
+Billing and network administration for **TERANETWORK**, an internet provider: subscribers and
+subscriptions, the fibre plant (OLTs, NAPs, ONUs), monthly invoicing, GCash payments with a
+statement check, and automatic disconnection and reconnection.
 
-The repository is a **monorepo of two independent apps**:
+> **Where the project stands:** [docs/STATUS.md](docs/STATUS.md) (one page, kept current).
+> **Why things are the way they are:** [docs/decisions.md](docs/decisions.md).
+> **How it is deployed:** [docs/isp-invoice-generator-deployment-multibranch.md](docs/isp-invoice-generator-deployment-multibranch.md).
 
-| Path               | App                         | Stack                                                                                          |
-| ------------------ | --------------------------- | ---------------------------------------------------------------------------------------------- |
-| [`front/`](front/) | React SPA (the two portals) | React 19 · Vite · shadcn/ui (Radix + Tailwind) · Tailwind CSS v4 · Zustand · TanStack Query · react-hook-form + zod · React Router v7 |
-| [`back/`](back/)   | REST API server             | Node · Express · MySQL (`mysql2`) · Passport JWT · Zod                                         |
-
-> Coding conventions live in the [`frontend-conventions`](.claude/skills/frontend-conventions/SKILL.md)
-> and [`backend-conventions`](.claude/skills/backend-conventions/SKILL.md) skills — 14 topic docs
-> that are the source of truth for the project's patterns. This README is the high-level map. See
-> [Working with Claude Code](#working-with-claude-code).
+Built on an internal multi-tenant template; the coding conventions live in the
+[`frontend-conventions`](.claude/skills/frontend-conventions/SKILL.md) and
+[`backend-conventions`](.claude/skills/backend-conventions/SKILL.md) skills. This README is the
+high-level map. See [Working with Claude Code](#working-with-claude-code).
 
 ---
 
@@ -37,35 +33,32 @@ The repository is a **monorepo of two independent apps**:
 
 ## Architecture at a glance
 
+**Every branch is its own installation**: its own Windows PC, Express server and MySQL database
+([D7](docs/decisions.md#d7--one-branch-per-installation)). **One central SuperAdmin**, on the
+developer's PC, manages every branch over Tailscale through each branch's key-protected
+management API ([D10](docs/decisions.md#d10--one-central-superadmin-over-tailscale)).
+
 ```
-                         ┌─────────────────────────────┐
-   Browser               │  front/  (Vite SPA)         │
-   ┌───────────────┐     │  /admin/*     Admin portal  │
-   │ SuperAdmin UI │◀───▶│  /superadmin/* SuperAdmin   │
-   │ Admin UI      │     │  Zustand · Query · shadcn/ui│
-   └───────────────┘     └──────────────┬──────────────┘
-                                         │  HTTPS + JWT (Bearer) + CSRF
-                                         ▼
-                         ┌─────────────────────────────┐
-                         │  back/  (Express API)        │
-                         │  /api/v1/admin/*             │
-                         │  /api/v1/superadmin/*        │
-                         │  /api/v1/upload/*            │
-                         │  Passport JWT · RBAC · Zod   │
-                         │  audit trail · rate limiting │
-                         └──────────────┬──────────────┘
-                                         │  mysql2 pool (req.db)
-                                         ▼
-                                ┌─────────────────┐
-                                │   MySQL 8        │
-                                │  14 tables       │
-                                └─────────────────┘
+DEVELOPER PC                                     BRANCH PC (one per branch)
+┌─────────────────────────────┐                  ┌──────────────────────────────┐
+│ SuperAdmin web app          │                  │ Admin portal (front, /admin) │
+│  (front: build:superadmin)  │                  │        │ JWT + CSRF          │
+│        │                    │    Tailscale     │        ▼                     │
+│ superadmin-server/          │ ───────────────▶ │ back/  /api/v1/admin/*       │
+│  Express + SQLite           │  x-manage-key    │        /api/v1/manage/*      │
+│  (logins, branch list)      │                  │        │                     │
+└─────────────────────────────┘                  │        ▼                     │
+                                                 │     MySQL (branch data)      │
+                                                 └──────────────────────────────┘
 ```
 
-- **Tenancy:** every Admin-portal query is scoped to the authenticated user's `companyId` / `branchId`.
-  SuperAdmin operates across all companies.
-- **Auth:** stateless JWT (RS256). The token carries a `userId`; the Passport strategy loads the full
-  user (including `roleId`) onto `req.user` per request.
+- **Branch app:** staff (Owner, Admin, Billing, Technician) use the Admin portal. Every query is
+  scoped to the user's `companyId` / `branchId`; an installation holds exactly one of each.
+- **Central SuperAdmin:** branch health, company profile, Owner/Admin logins and system settings,
+  one branch at a time. It never touches a branch database and holds no business data. See
+  [superadmin-server/README.md](superadmin-server/README.md).
+- **Auth:** stateless JWT (RS256) for the Admin portal; a per-branch `MANAGE_API_KEY` for the
+  management API; the SuperAdmin app has its own login.
 - **Authorization:** a `module / submodule / accessLevel` permission model, enforced on the backend by
   `checkPermission` middleware and mirrored on the frontend by `ProtectedRoute` + `usePermissions`.
 
@@ -73,15 +66,16 @@ The repository is a **monorepo of two independent apps**:
 
 ## Core concepts
 
-| Concept               | What it means                                                                                                                                                                                               |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Two portals**       | `SuperAdmin` (platform owner — manages companies/branches/owners) and `Admin` (a company's own users, roles, settings).                                                                                  |
-| **Multi-tenancy**     | Data isolation by `companyId` (company) + `branchId` (location). Admin endpoints filter by the values on `req.user`; never trust client-sent scope.                                                      |
-| **RBAC**              | Permissions are `module` + optional `submodule` + `accessLevel` (`none < read < write`). Per-user overrides take precedence over role permissions.                                                          |
-| **Business IDs**      | Every row has an internal `id BIGINT` (never exposed) and a `varchar(50)` business ID (`accountId`, `companyId`, `roleId`, …) used in all APIs, URLs, and foreign keys. Generated with MySQL `SELECT UUID()`. |
-| **Soft deletes**      | Rows are never physically deleted — `status` is set to `'Deleted'` and queries filter `status != 'Deleted'`.                                                                                                |
-| **Response envelope** | Every endpoint replies via `res.sendSuccess(message, data, status?)` → `{ success, message, data }`. The frontend unwraps `apiData.data.<entity>`.                                                          |
-| **Audit trail**       | Middleware auto-logs successful `CREATE/UPDATE/DELETE`s (with sanitized metadata) on the audited admin routes; viewable in the Admin → Audit Trail page.                                                    |
+| Concept | What it means |
+| --- | --- |
+| **Branch = installation** | One server + one database per branch. No central business database; branches never share data. |
+| **Central SuperAdmin** | One app on the developer's PC (`front` SuperAdmin build + `superadmin-server/`). Talks to branches only through `/api/v1/manage/*`; the contract is in `shared/manage-contract/`. |
+| **Scoping** | Admin endpoints filter by `companyId` + `branchId` from `req.user`; never trust client-sent scope. |
+| **RBAC** | Permissions are `module` + optional `submodule` + `accessLevel` (`none < read < write`). Per-user overrides take precedence over role permissions. |
+| **Business IDs** | Every row has an internal `id BIGINT` (never exposed) and a `varchar(50)` business ID (`accountId`, `companyId`, `roleId`, …) used in all APIs, URLs and foreign keys. Generated with MySQL `SELECT UUID()`. |
+| **Soft deletes** | Rows are never physically deleted: `status` is set to `'Deleted'` and queries filter `status != 'Deleted'`. |
+| **Response envelope** | Every endpoint replies via `res.sendSuccess(message, data, status?)` → `{ success, message, data }`. The frontend unwraps `apiData.data.<entity>`. |
+| **Audit trail** | Every change is audited. Changes made from SuperAdmin are recorded on the branch as `system:superadmin:<username>`. |
 
 ---
 
@@ -91,39 +85,27 @@ The repository is a **monorepo of two independent apps**:
 .
 ├── README.md                  ← you are here
 ├── CLAUDE.md                  ← project map for AI agents
+├── docs/                      ← STATUS.md, decisions.md, payments.md, runbooks.md, archive/
 ├── .claude/skills/            ← Claude Code skills (checked in)
-│   ├── frontend-conventions/  ← 8 frontend topic docs, loaded on demand
-│   ├── backend-conventions/   ← 6 backend topic docs, loaded on demand
-│   └── new-module/            ← scaffolds a CRUD module end to end
-├── front/                     ← React SPA
-│   ├── CLAUDE.md              ← stack + pointer to frontend-conventions
+├── shared/manage-contract/    ← the management API's version and shapes (back/ and superadmin-server/)
+├── superadmin-server/         ← central SuperAdmin server (Express + built-in SQLite), developer PC only
+├── front/                     ← React SPA, two builds
 │   └── src/
-│       ├── pages/             ← Admin/ and SuperAdmin/ portal modules
-│       │   └── <Module>/      ← index.jsx (view) · hooks.jsx (logic) · components/
-│       ├── components/        ← shared UI (PageHeader, StatCard, PaginationFooter,
-│       │                        SectionLabel, StatusToggle, ProtectedRoute, layout, …)
-│       ├── hooks/             ← usePermissions, useDebounce, …
-│       ├── routes/            ← portal route trees + auth guards
-│       ├── services/
-│       │   ├── api/           ← raw axios calls (per portal/module)
-│       │   └── requests/      ← TanStack Query hooks (mirror api/)
-│       ├── store/             ← Zustand (authStore, themeStore)
-│       └── index.css          ← Tailwind v4 + Modern design tokens (shadcn token bridge)
-└── back/                      ← Express API
-    ├── CLAUDE.md              ← stack + pointer to backend-conventions
-    ├── .env.example
-    ├── database/              ← schema.sql (the baseline) + migrations/ (empty until needed)
-    ├── scripts/               ← keys / db:setup / db:reset / db:check
-    ├── auth-keys/             ← RS256 JWT keypair (generate with `npm run keys`; gitignored)
-    └── server/
-        ├── bin/www.js         ← entrypoint (boot, health check, listen)
-        ├── config/            ← express.js (middleware chain) · database.js (pool)
-        └── src/
-            ├── routes/        ← /api/v1/{admin,superadmin,upload} mounts
-            ├── controllers/   ← v1/{admin,superadmin,auth,upload}/*.controller.js
-            ├── middlewares/   ← passport JWT, checkPermission, auditTrail, csrf, rateLimiter, …
-            ├── validators/    ← Zod schemas
-            └── utils/         ← catchAsync, responses, dateUtils, hashing, file, …
+│       ├── pages/Admin/              ← the branch app's Admin portal
+│       ├── pages/SuperAdminConsole/  ← the central SuperAdmin app (SuperAdmin build only)
+│       ├── routes/                   ← index.jsx (branch) · superadmin.jsx (SuperAdmin build)
+│       ├── services/api/, requests/  ← axios calls + TanStack Query hooks (admin/, superadmin-console/)
+│       └── components/, hooks/, store/, index.css
+└── back/                      ← branch API server
+    ├── database/              ← schema.sql (baseline) + numbered migrations/
+    ├── scripts/               ← keys / db:setup / db:migrate / gcash:inspect / …
+    └── server/src/
+        ├── routes/            ← /api/v1/{admin,manage,public,upload} mounts
+        ├── controllers/       ← v1/{admin,manage,auth,public,upload}/*.controller.js
+        ├── lib/               ← billing, payments, dunning, jobs, OLT drivers, manage/, settings/, …
+        ├── middlewares/       ← passport JWT, checkPermission, requireManageKey, auditTrail, csrf, …
+        ├── validators/        ← Zod schemas
+        └── utils/
 ```
 
 ---
@@ -132,82 +114,44 @@ The repository is a **monorepo of two independent apps**:
 
 ### Prerequisites
 
-- **Node.js** 18+ and **npm**
-- **MySQL** 8 (a reachable database/schema)
+- **Node.js** 22.13+ and **npm**
+- **MySQL** 8
 
-### 1. Backend
+### 1. A branch (backend + Admin portal)
 
 ```bash
 cd back
 npm install
+cp .env.example .env          # DB_*, ISSUER, AUDIENCE, CSRF_SECRET, LOG_SALT, COMPANY_EMAIL, BRANCH_NAME, …
+npm run keys                  # RS256 JWT keypair (refuses to overwrite; --force to regenerate)
+npm run db:setup              # migrations + permissions + the company, this branch and its roles
+npm run dev                   # http://localhost:3000  (API under /api/v1)
 
-# Configure environment
-cp .env.example .env          # then edit DB_*, ISSUER, AUDIENCE, CSRF_SECRET, LOG_SALT, …
-
-# Generate the RS256 JWT keypair referenced by .env (jwtAuthPrivatePath / jwtAuthPublicPath).
-# Refuses to overwrite existing keys; pass --force to regenerate.
-npm run keys
-
-# Build the schema: applies the baseline + any pending migrations, then seeds the
-# permission set and a default SuperAdmin. Additive and re-runnable — existing
-# tables and data are left untouched, and seeds are skipped when already present.
-npm run db:setup
-
-npm run dev                   # nodemon on http://localhost:3000  (API under /api/v1)
+cd ../front
+npm install
+cp .env.example .env          # VITE_API_URL → the backend
+npm run dev                   # http://localhost:5173/admin
 ```
 
-**Required env vars** (see [`back/.env.example`](back/.env.example) for the full annotated list):
+`db:setup` creates **no login**. The branch's first Owner login comes from the central SuperAdmin
+(the setup output repeats these steps):
 
-| Group    | Keys                                                                                            |
-| -------- | ----------------------------------------------------------------------------------------------- |
-| App      | `NODE_ENV`, `PORT`                                                                              |
-| Database | `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASS`, `DB_DATABASE` (+ optional `DB_POOL_SIZE`, timeouts) |
-| JWT      | `jwtAuthPrivatePath`, `jwtAuthPublicPath`, `ISSUER`, `AUDIENCE`, `EXPIRY`                       |
-| Security | `CSRF_SECRET`, `LOG_SALT`                                                                       |
-| CORS     | `FRONTEND_URL`, `ALLOWED_ORIGINS` (comma-separated)                                             |
+1. Put a random key (32+ characters) in `back/.env` as `MANAGE_API_KEY` and restart the server.
+2. In the central SuperAdmin: **Branches → Add branch** with this server's address and that key.
+3. **Users → Add login → Owner.** That Owner then signs in to the Admin portal at `/admin`.
 
-Rate-limiting, Redis, SendGrid, SSL, and file-validation knobs are all optional and documented in the
-example file.
-
-### 2. Frontend
+### 2. The central SuperAdmin (developer PC only)
 
 ```bash
-cd front
+cd superadmin-server
 npm install
-
-cp .env.example .env          # set VITE_API_URL to the backend (default http://localhost:3000)
-
-npm run dev                   # Vite dev server (http://localhost:5173)
+cp .env.example .env          # SUPERADMIN_SECRET
+npm run user -- --username <you>
+cd ../front && npm run build:superadmin
+cd ../superadmin-server && npm start     # http://127.0.0.1:8788
 ```
 
-Frontend env (`front/.env`): `VITE_API_URL`, `VITE_SOCKET_URL`, `VITE_APP_NAME`, `VITE_APP_ENV`,
-`VITE_APP_VERSION`, `VITE_SENTRY_DSN`. Make sure the backend's `FRONTEND_URL` / `ALLOWED_ORIGINS`
-include the Vite origin so CORS + CSRF allow it.
-
-The Admin portal lives at `/admin/*` and the SuperAdmin portal at `/superadmin/*`.
-
-### 3. Where to start
-
-`npm run db:setup` seeds the permission set and a default SuperAdmin (the script prints the
-login). Sign in to the **SuperAdmin portal** at `/superadmin` with:
-
-- **Email:** `superadmin@template.com`
-- **Password:** `superadmin123` _(change this before any real use)_
-
-That SuperAdmin is the **only** account seeded — there is no sample company or Admin user. Follow
-the chain below to create your first Admin login; each step unlocks the next:
-
-1. **Create a company** — SuperAdmin → **Companies** → _New_. This creates the company (tenant).
-   `POST /api/v1/superadmin/companies`
-2. **Create a branch** under that company — SuperAdmin → **Branches**. This also auto-provisions
-   an **Owner** role with full permissions for that company + branch.
-   `POST /api/v1/superadmin/branches`
-3. **Create a user** (the branch Owner) — SuperAdmin → **Users**. One Owner per branch; they receive
-   the Owner role and login credentials.
-   `POST /api/v1/superadmin/users`
-
-That Owner can now sign in to the **Admin portal** at `/admin` and manage their own company's
-users, roles, permissions, and settings.
+Details: [superadmin-server/README.md](superadmin-server/README.md).
 
 ---
 
@@ -221,8 +165,8 @@ users, roles, permissions, and settings.
 | `npm start`                                                  | Start the server (`server/bin/www.js`)                                       |
 | `npm run keys`                                               | Generate the RS256 JWT keypair into `auth-keys/` (`-- --force` to overwrite) |
 | `npm run db:migrate`                                         | Apply the baseline + any pending migrations. Additive, safe                   |
-| `npm run db:setup`                                           | Migrate, **then** seed permissions + SuperAdmin. Additive, re-runnable, safe  |
-| `npm run db:setup:clean`                                     | ⚠️ **Drops all tables**, re-migrates from scratch, seeds permissions + SuperAdmin |
+| `npm run db:setup`                                           | Migrate, **then** seed permissions, the company, this branch and its roles. Additive, re-runnable, safe |
+| `npm run db:setup:clean`                                     | ⚠️ **Drops all tables**, re-migrates from scratch, then seeds as `db:setup`   |
 | `npm run db:reset`                                           | ⚠️ Nuclear: drops the whole **database** and recreates it empty (no tables)  |
 | `npm run db:check`                                           | Verify DB connectivity / list tables + row counts (read-only, safe)          |
 | `npm run lint` · `lint:fix`                                  | ESLint                                                                       |
@@ -234,7 +178,9 @@ users, roles, permissions, and settings.
 | Script                      | Action                       |
 | --------------------------- | ---------------------------- |
 | `npm run dev`               | Vite dev server              |
-| `npm run build`             | Production build (`dist/`)   |
+| `npm run build`             | Branch app build (`dist/`), checked to contain no SuperAdmin code |
+| `npm run build:superadmin`  | Central SuperAdmin build (`dist-superadmin/`) |
+| `npm run dev:superadmin`    | SuperAdmin dev server (proxies `/api` to superadmin-server) |
 | `npm run build:analyze`     | Build with bundle analysis   |
 | `npm run preview`           | Preview the production build |
 | `npm run lint` · `lint:fix` | ESLint                       |
@@ -268,11 +214,12 @@ keep-alive, slow-query logging) and is injected as `req.db`:
 ### Auth & RBAC
 
 - **Authentication** — [`passport.jwt.config.js`](back/server/src/middlewares/passport.jwt.config.js) verifies RS256
-  tokens and loads the user (admin/staff _or_ superadmin) onto `req.user` (`accountId`, `companyId`,
+  tokens and loads the admin/staff user onto `req.user` (`accountId`, `companyId`,
   `branchId`, `roleId`, `type`, …).
 - **Authorization** — `checkPermission(module, submodule?, accessLevel?)` resolves the user's effective
   level (user override → role permission), enforcing `GET = read`, `POST/PUT/DELETE = write`.
-  SuperAdmin routes skip permission checks by design. See [`permission-gating.md`](.claude/skills/backend-conventions/references/permission-gating.md).
+- **Management API** — `/api/v1/manage/*`, for the central SuperAdmin only, gated by
+  `requireManageKey` (the branch's `MANAGE_API_KEY`) instead of a user session. See [`permission-gating.md`](.claude/skills/backend-conventions/references/permission-gating.md).
 
 ### Validation, uploads, audit
 
@@ -287,11 +234,13 @@ keep-alive, slow-query logging) and is injected as `req.db`:
 
 ## Frontend
 
-- **Routing & portals** — [`routes/pageRoutes/AdminRoute.jsx`](front/src/routes/pageRoutes/AdminRoute.jsx) and
-  `SuperAdminRoute.jsx` define each portal's routes + sidebar navigation. `<Auth>` / `<UnAuth>` guards
-  gate access; `<ProtectedRoute module … accessLevel>` gates individual pages.
-- **State** — Zustand for auth (`useAdminAuthStore`, `useSuperAdminAuthStore`, persisted to
-  `localStorage`) and theme; **TanStack Query** for all server state. Tokens attach via an axios
+- **Two builds** — `vite.config.js` points `@app-routes` at `routes/index.jsx` (the branch app's
+  Admin portal, [`AdminRoute.jsx`](front/src/routes/pageRoutes/AdminRoute.jsx)) or, with
+  `--mode superadmin`, at `routes/superadmin.jsx` (the central SuperAdmin app).
+  `scripts/check-build.mjs` fails the branch build if SuperAdmin code gets into it. `<Auth>` /
+  `<UnAuth>` guards gate access; `<ProtectedRoute module … accessLevel>` gates Admin pages.
+- **State** — Zustand for auth (`useAdminAuthStore` for the Admin portal, `useSuperAdminConsoleStore`
+  for the SuperAdmin app, persisted to `localStorage`) and theme; **TanStack Query** for all server state. Tokens attach via an axios
   interceptor. See [`auth-state.md`](.claude/skills/frontend-conventions/references/auth-state.md).
 - **Page module pattern** — each page is a folder: `index.jsx` (presentational), `hooks.jsx` (a single
   hook owning data, columns, filters, pagination, and actions), and `components/`. See
@@ -316,16 +265,14 @@ resource routes additionally require the matching permission.
 
 | Group                      | Base path                                       | Endpoints                                                                                             |
 | -------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| Auth (per portal)          | `/api/v1/admin/auth`, `/api/v1/superadmin/auth` | `GET /csrf-token` · `POST /login` · `POST /refresh` · `POST /logout` · `GET /me`                      |
+| Auth                       | `/api/v1/admin/auth`                            | `GET /csrf-token` · `POST /login` · `POST /refresh` · `POST /logout` · `GET /me`                      |
 | Admin · Users              | `/api/v1/admin/users`                           | `GET /` · `GET /:userId` · `POST /` · `PUT /:userId` · `DELETE /:userId`                              |
 | Admin · Roles              | `/api/v1/admin/roles`                           | CRUD + `GET/POST /:roleId/permissions`                                                                |
 | Admin · Permissions        | `/api/v1/admin/permissions`                     | `GET /` · `GET /modules` · `GET /user` · `POST /check`                                                |
 | Admin · User permissions   | `/api/v1/admin/user-permissions`                | `GET /:accountId` · `POST /:accountId` · `POST /:accountId/bulk` · `DELETE /:accountId/:permissionId` |
 | Admin · Audit trail        | `/api/v1/admin/audit-trail`                     | `GET /` (paginated + filterable)                                                                      |
-| SuperAdmin · Companies | `/api/v1/superadmin/companies`              | CRUD (companies)                                                                                         |
-| SuperAdmin · Branches      | `/api/v1/superadmin/branches`                   | CRUD (+ auto-creates an Owner role)                                                                   |
-| SuperAdmin · Users         | `/api/v1/superadmin/users`                      | `GET /` · `POST /` (branch Owner)                                                                     |
-| Uploads                    | `/api/v1/upload`                                | `POST /logo` · `POST /avatar` · `POST /image` · `DELETE /file`                                        |
+| Management (SuperAdmin)    | `/api/v1/manage` (`x-manage-key`)               | `GET /health` · `/company-profile` (+ `/logo`) · `/users` · `/system-settings`                        |
+| Uploads                    | `/api/v1/upload`                                | `POST /avatar` · `POST /image` · `DELETE /file`                                                       |
 
 List endpoints accept `page`, `pageSize`, `search`, `status`, and `sortBy` / `sortOrder` (where
 applicable) and return `{ items, pagination }` inside the response envelope.
@@ -342,7 +289,7 @@ need an incremental change on top of it. Fourteen tables:
 | ----------------------- | ------------------ | --------------------------------------------------- |
 | `companies`             | `companyId`        | Company (the tenant)                                |
 | `branches`              | `branchId`         | Physical location under a company                   |
-| `superadmins`           | `accountId`        | Platform-level admins                               |
+| `superadmins`           | `accountId`        | Retired in-branch SuperAdmin logins (all Inactive, migration 016) |
 | `credentials`           | `accountId`        | Auth credentials (shared across portals via `type`) |
 | `users`                 | `accountId`        | Admin/staff users (belong to a company + branch)    |
 | `roles`                 | `roleId`           | Permission roles (scoped to company + branch)       |
