@@ -1,6 +1,6 @@
 node_modules
 auth-keys
-public
+/public
 !public/uploads/
 !public/uploads/**/.gitkeep
 logs
