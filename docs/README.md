@@ -12,6 +12,7 @@ clean) or inside `front/` / `back/` (those hold code conventions only).
 | [decisions.md](decisions.md) | Why things are the way they are (D1–D9). Newest at the bottom. |
 | [payments.md](payments.md) | How payments work: personal GCash, recording references, GCash Check. |
 | [runbooks.md](runbooks.md) | What to do when something goes wrong. |
+| [test-branch-guide.md](test-branch-guide.md) | Fresh test branch: wipe dev data, connect SuperAdmin, test the real OLT, customers. |
 | [vendor-transcripts/](vendor-transcripts/) | Real OLT command output the drivers were written against. |
 | [archive/](archive/) | Finished migration docs and parked designs. History only. |
 

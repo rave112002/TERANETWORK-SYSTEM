@@ -33,14 +33,13 @@ Customer signs up → subscription → ONU provisioned on the OLT
 
 | What | Why it matters |
 | --- | --- |
-| **Cut-off / reconnect on the real HSGQ OLT** | Only ever run against a fake OLT. Needs bench access. |
+| **Cut-off / reconnect on the real HSGQ OLT** | Commands bench-validated by hand; the system itself has not driven the OLT yet. Test on the bench (XE04I, ONU 1/27): [test-branch-guide.md](test-branch-guide.md) part 6. |
 | **GCash Check on longer statements** | Checked on one real 1-page statement (7 rows, 2026-09-17): all rows, references, directions and the credit total read correctly. Not yet seen: a multi-page statement. Run `npm run gcash:inspect` on one when available. |
 
 ## ⏳ Waiting on the client
 
 | Need | Unblocks |
 | --- | --- |
-| **Access to the OLT** | Proving disconnect/reconnect works |
 | **MikroTik** router IP, RouterOS version, login — and what the old Sheets→MikroTik step changed | Reconnecting on the router, if it's needed beyond the OLT |
 | Do they send invoices by **SMS**? Through which provider? | SMS (only email exists) |
 
