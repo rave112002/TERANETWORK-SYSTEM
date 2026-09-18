@@ -34,37 +34,70 @@ import APIError from "../../utils/APIError.js";
 /**
  * Read every ONU the OLT can see.
  *
- * No `ponPortIndex`, so the driver sweeps everything it can. On the HSGQ that
- * is one CLI command per PON; the driver owns that detail.
+ * Sweeps each PON port registered in the DB for this OLT so that drivers
+ * (like HSGQ) that require a `ponPortIndex` per call get one. Results from
+ * all ports are merged into a single ONU list. The `command` and
+ * `rawResponse` fields aggregate all port sweeps for the run log.
  *
+ * @param {Object} db
  * @param {Object} olt an `olts` row including `credentialsEnc`.
  * @returns {Promise<{onus: Array, command: string|null, rawResponse: string|null}>}
  */
-const readOltOnus = async (olt) => {
+const readOltOnus = async (db, olt) => {
   const driver = resolveDriver({ vendor: olt.vendor });
+  const credentials = olt.credentialsEnc ? decryptCredentials(olt.credentialsEnc) : undefined;
 
-  const result = await driver.listOnus({
-    host: olt.host,
-    port: olt.port,
-    protocol: olt.protocol,
-    credentials: olt.credentialsEnc ? decryptCredentials(olt.credentialsEnc) : undefined,
-  });
+  // Fetch every PON port registered for this OLT. The portIndex value
+  // ("1", "2", "0/1/3", etc.) is what the driver passes to the device.
+  const ponPorts = await db.query(
+    `SELECT portIndex FROM pon_ports
+      WHERE oltId = ? AND status != 'Deleted'
+      ORDER BY portIndex`,
+    [olt.oltId]
+  );
 
-  if (!result.success) {
-    // Surfaced rather than swallowed. A sweep that could not reach the device
-    // and a sweep that found nothing produce the same empty list and mean
-    // opposite things.
+  if (ponPorts.length === 0) {
     throw new APIError(
-      result.error || "The OLT did not answer the discovery command",
-      502,
-      "DEVICE_ERROR"
+      "This OLT has no PON ports registered — add at least one under Network → PON Ports before running discovery",
+      422,
+      "NO_PON_PORTS"
     );
   }
 
+  const allOnus = [];
+  const allCommands = [];
+  const allResponses = [];
+
+  for (const { portIndex } of ponPorts) {
+    // eslint-disable-next-line no-await-in-loop
+    const result = await driver.listOnus({
+      host: olt.host,
+      port: olt.port,
+      protocol: olt.protocol,
+      credentials,
+      ponPortIndex: portIndex,
+    });
+
+    if (!result.success) {
+      // Surfaced rather than swallowed. A sweep that could not reach the device
+      // and a sweep that found nothing produce the same empty list and mean
+      // opposite things.
+      throw new APIError(
+        result.error || `The OLT did not answer the discovery command for PON ${portIndex}`,
+        502,
+        "DEVICE_ERROR"
+      );
+    }
+
+    if (Array.isArray(result.parsed)) allOnus.push(...result.parsed);
+    if (result.command) allCommands.push(result.command);
+    if (result.rawResponse) allResponses.push(result.rawResponse);
+  }
+
   return {
-    onus: Array.isArray(result.parsed) ? result.parsed : [],
-    command: result.command ?? null,
-    rawResponse: result.rawResponse ?? null,
+    onus: allOnus,
+    command: allCommands.join("\n---\n") || null,
+    rawResponse: allResponses.join("\n---\n") || null,
   };
 };
 
@@ -107,7 +140,7 @@ export const runDiscovery = async (db, { olt, context, triggeredBy = "user" }) =
   );
 
   try {
-    const device = await readOltOnus(olt);
+    const device = await readOltOnus(db, olt);
 
     // Our side. Scoped to this OLT's branch: a sweep of the Bicutan OLT must
     // not report Bagumbayan's modems as orphaned just because this device
