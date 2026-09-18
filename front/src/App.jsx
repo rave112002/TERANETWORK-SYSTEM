@@ -2,7 +2,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import ConfirmDialog from "./components/ConfirmDialog";
-import RootRoutes from "./routes";
+// The branch app or the central SuperAdmin app, chosen at build time (vite.config.js).
+import RootRoutes from "@app-routes";
 import { useThemeStore } from "./store/themeStore";
 
 // Create a query client

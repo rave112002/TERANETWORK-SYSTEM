@@ -1,0 +1,6 @@
+{
+  "name": "@teranetwork/manage-contract",
+  "private": true,
+  "type": "module",
+  "main": "index.js"
+}

@@ -189,6 +189,11 @@ this controller. That is the intended path, not a workaround.
 
 **Decided:** 2026-09-16, by the client. **Supersedes** the cross-branch parts of [D1](#d1--tenancy--authorization-model).
 
+> ⚠️ **Amended 2026-09-17 by [D10](#d10--one-central-superadmin-over-tailscale).** Everything
+> below about each branch being its own installation still stands. What changed: there IS now one
+> SuperAdmin, on the developer's PC, that manages every branch — through each branch's
+> management API over Tailscale, never through its database.
+
 **Every TERANETWORK branch runs its own, locally deployed instance of this system** — its own
 server, its own MySQL database, its own worker. There is **no central server**, no combined
 dashboard or report across branches, and no Superadmin that manages more than one branch's
@@ -318,4 +323,42 @@ the due date, paid customers stay online.
 | 🔎 Possible typo | A ❌ reference and a ➕ reference differ by one or two characters | Most likely the same payment typed wrong. Staff confirm and fix it in one click. |
 
 Design and details: **[payments.md](payments.md)**.
+
+---
+
+## D10 — One central SuperAdmin over Tailscale
+
+**Decided:** 2026-09-17, by the owner. **Amends** [D7](#d7--one-branch-per-installation).
+Deployment design: [isp-invoice-generator-deployment-multibranch.md](isp-invoice-generator-deployment-multibranch.md).
+
+Branches stay standalone (their own Windows PC, Express, MySQL, backups). **SuperAdmin moves off
+the branches** into one separate app on the developer's PC, which reaches each branch over
+Tailscale.
+
+```
+YOUR PC                                         BRANCH PC (one per branch)
+SuperAdmin web  →  superadmin-server  ──────▶  Express :8787  /api/v1/manage/*
+                   (SQLite: your login,         (key-protected)
+                    branch list + keys)              ↓
+                                                 MySQL (branch data)
+```
+
+### Rules
+
+| | |
+| --- | --- |
+| **Management and health only** | SuperAdmin shows each branch's health (online, version, migrations, failing jobs, last backup) and manages its company profile, Owner/Admin logins and system settings. It does **not** pull business numbers (collections, subscribers) across branches — not yet; the client has not asked. |
+| **API, never the database** | SuperAdmin talks only to a branch's `/api/v1/manage/*`. It never connects to a branch's MySQL. |
+| **Per-branch key** | Each branch has its own `MANAGE_API_KEY` in its `.env`. SuperAdmin stores it encrypted. The branch refuses the management API entirely when no key is set. |
+| **The browser never holds a branch key** | The SuperAdmin web app talks to `superadmin-server` on the same PC; that server calls the branches. |
+| **SuperAdmin's own data** | A small SQLite file on the developer's PC (Node's built-in `node:sqlite`): SuperAdmin logins, sessions, branch list. No branch business data. |
+| **Branches don't depend on it** | A branch works normally with the SuperAdmin PC off. SuperAdmin shows an unreachable branch as offline and keeps working with the rest. |
+| **One repo, two builds** | `front` builds twice (`build` for branches, `build:superadmin` for your PC). `superadmin-server/` is its own small app. The management API's version and shapes live in `shared/manage-contract/`, imported by both sides. |
+| **Versions** | Each branch reports `manageApiVersion`. SuperAdmin supports the current and previous version and flags anything else. |
+
+### Transitional
+
+The old in-branch SuperAdmin portal (`/superadmin` on each branch) stays until its Company
+Profile, Users and Settings pages exist in the central app. Then it is removed from the branch
+build. Its Companies and Branches pages are not carried over: each branch holds one of each.
 

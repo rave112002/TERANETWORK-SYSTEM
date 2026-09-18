@@ -6,7 +6,9 @@
   "author": "Raven Bayatan",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "dev:superadmin": "vite --mode superadmin",
+    "build": "vite build && node scripts/check-build.mjs branch",
+    "build:superadmin": "vite build --mode superadmin && node scripts/check-build.mjs superadmin",
     "build:analyze": "vite build --mode analyze",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

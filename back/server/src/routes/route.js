@@ -10,6 +10,8 @@ import payController from "../controllers/v1/public/pay.controller.js";
 import webhooksController from "../controllers/v1/public/webhooks.controller.js";
 import uploadRoute from "../controllers/v1/upload/upload.controller.js";
 import { idempotencyMiddleware } from "../middlewares/idempotency.middleware.js";
+import { requireManageKey } from "../middlewares/requireManageKey.middleware.js";
+import manageController from "../controllers/v1/manage/manage.controller.js";
 
 // Idempotent mutations: requests carrying an Idempotency-Key header get their
 // successful response cached and replayed on retry (opt-in, Stripe-style)
@@ -28,6 +30,11 @@ router.use("/v1/public", payController);
 // server, holds no cookie, and cannot fetch a token. The signature is the
 // authentication; see controllers/v1/public/webhooks.controller.js.
 router.use("/v1/public/webhooks", webhooksController);
+
+// The management API for the central SuperAdmin (docs/decisions.md D10). No user
+// session: the per-branch MANAGE_API_KEY is the credential, and the whole API
+// answers 503 until one is configured.
+router.use("/v1/manage", requireManageKey(), manageController);
 
 // Shared routes (accessible by all authenticated users)
 import passport from "passport";

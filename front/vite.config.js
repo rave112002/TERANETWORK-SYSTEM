@@ -9,6 +9,12 @@ import { defineConfig, loadEnv } from "vite";
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd());
   const isAnalyze = mode === "analyze";
+  // Two apps from one codebase (docs/decisions.md D10):
+  //   default          the branch app (Admin portal) — deployed on every branch PC
+  //   --mode superadmin the central SuperAdmin app — deployed on the developer's PC only
+  // The route tree is swapped at the module level, so the other app's pages are
+  // never imported and never end up in the bundle.
+  const isSuperAdminApp = mode === "superadmin";
 
   return {
     plugins: [
@@ -27,12 +33,27 @@ export default defineConfig(({ mode }) => {
       alias: {
         // shadcn/ui components import via `@/…`; also usable in app code.
         "@": fileURLToPath(new URL("./src", import.meta.url)),
+        "@app-routes": fileURLToPath(
+          new URL(
+            isSuperAdminApp ? "./src/routes/superadmin.jsx" : "./src/routes/index.jsx",
+            import.meta.url
+          )
+        ),
       },
     },
     server: {
       host: true,
-      port: 5173,
-      proxy: {
+      port: isSuperAdminApp ? 5175 : 5173,
+      proxy: isSuperAdminApp
+        ? {
+            // superadmin-server; its API lives under /api (no /v1).
+            "/api": {
+              target: env.VITE_SUPERADMIN_API_URL || "http://localhost:8788",
+              changeOrigin: true,
+              secure: false,
+            },
+          }
+        : {
         "/api/v1": {
           target: env.VITE_API_URL,
           changeOrigin: true,
@@ -46,6 +67,7 @@ export default defineConfig(({ mode }) => {
       },
     },
     build: {
+      outDir: isSuperAdminApp ? "dist-superadmin" : "dist",
       // Enable code splitting
       rollupOptions: {
         output: {

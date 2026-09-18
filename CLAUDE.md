@@ -47,6 +47,12 @@ in every session. **Load the relevant skill before writing code** — the rules 
   multi-branch code (`branchScope()`, `user_branches`) is kept because it is harmless — **do not
   extend it or build multi-branch features.** See decision D7 in
   [docs/decisions.md](docs/decisions.md).
+- **SuperAdmin is ONE central app on the developer's PC** (D10), not part of a branch: `front`
+  built with `npm run build:superadmin` + `superadmin-server/` (Express + built-in SQLite). It
+  reaches each branch only through that branch's key-protected `/api/v1/manage/*` over
+  Tailscale — never its database — and shows health and management, not business numbers. The
+  management API's version and shapes live in `shared/manage-contract/`; change both sides in
+  the same commit. The old in-branch `/superadmin` portal is transitional.
 - **Payments: TERANETWORK's personal GCash account.** Customers send money to it and send proof
   to the Facebook page; staff record each payment with its reference number; the downloaded
   GCash transaction-history PDF is uploaded to **Billing → GCash Check** to catch typos, fakes and

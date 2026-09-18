@@ -41,21 +41,32 @@ Customer signs up → subscription → ONU provisioned on the OLT
 | **MikroTik** router IP, RouterOS version, login — and what the old Sheets→MikroTik step changed | Reconnecting on the router, if it's needed beyond the OLT |
 | Do they send invoices by **SMS**? Through which provider? | SMS (only email exists) |
 
-## ▶️ Next, in order
+## ▶️ Now: central SuperAdmin ([D10](decisions.md#d10--one-central-superadmin-over-tailscale))
 
-1. **Commit the 2026-09-17 work.** Doc cleanup, GCash Check, payment settings, invoice layout and
-   PDF preview are all still uncommitted.
-2. **Run `npm run gcash:inspect` on a multi-page statement** when one is available (the 1-page
-   real statement is fully confirmed, including two-line descriptions).
-3. **One full dry run** on dev data: bill → pay → record → check → sweep → reconnect.
-4. **Automatic backups** (the runbook describes them, but nothing runs them yet).
-5. **Per installation, before go-live:** fill in Settings → How customers pay, including Terms
-   (done on the dev New Lower Bicutan branch except Terms), and upload the company logo.
+Admin portal work is **paused**. One SuperAdmin app on the developer's PC manages every branch
+over Tailscale.
+
+| Step | What | State |
+| --- | --- | --- |
+| 1 | Branch `/api/v1/manage/health` + `superadmin-server` (login, branch list) + **Branches** page with online/offline and version — see [superadmin-server/README.md](../superadmin-server/README.md) | ✅ 2026-09-17 |
+| 2 | **Company Profile** per branch (name, logo, address, TIN), changes audited on the branch as `system:superadmin:<user>` | ✅ 2026-09-18 |
+| 3 | **Users** per branch: create Owner/Admin logins (one Owner), reset passwords (signs out everywhere), deactivate/reactivate (never the only Owner) | ✅ 2026-09-18 |
+| 4 | System settings per branch | ⬜ |
+| 5 | Remove the old in-branch `/superadmin` from the branch build | ⬜ |
+
+## ⏳ Later (Admin portal, paused)
+
+1. **Customer import** from the client's subscriber spreadsheet — the biggest go-live gap.
+2. **Automatic backups** (mysqldump + Task Scheduler, per the deployment doc).
+3. **Express serves the React build on :8787** (today they run as two servers).
+4. **One full dry run** on dev data: bill → pay → record → check → sweep → reconnect.
+5. **Per installation, before go-live:** fill in Settings → How customers pay (incl. Terms), upload the logo.
+6. `npm run gcash:inspect` on a multi-page statement when one is available.
 
 ## ⏸️ Parked (code kept, don't build on it)
 
 - **HitPay** online checkout, and **GCash for Business** merchant QR — [D8](decisions.md#d8--gcash-business-merchant-qr-on-the-invoice-option-a-hitpay-parked)
-- **Multi-branch features**. Each installation is one branch ([D7](decisions.md#d7--one-branch-per-installation)).
+- **Multi-branch business features** (cross-branch reports, shared data). Each branch is standalone; only SuperAdmin spans them ([D7](decisions.md#d7--one-branch-per-installation), [D10](decisions.md#d10--one-central-superadmin-over-tailscale)).
 - Outage credits, alert emails, data export/anonymise — not started, not needed yet.
 
 ## Where things are
@@ -63,6 +74,7 @@ Customer signs up → subscription → ONU provisioned on the OLT
 | | |
 | --- | --- |
 | Decisions (why things are the way they are) | [decisions.md](decisions.md) |
+| How it is deployed (branches, SuperAdmin, Tailscale) | [isp-invoice-generator-deployment-multibranch.md](isp-invoice-generator-deployment-multibranch.md) |
 | Payments, day to day | [payments.md](payments.md) |
 | What to do when something breaks | [runbooks.md](runbooks.md) |
 | The old migration plan and 1,800-line checklist | [archive/](archive/) (history only) |
