@@ -1,6 +1,6 @@
 import { Suspense, lazy } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router";
-import { Building2, Server, Users } from "lucide-react";
+import { Building2, Server, Settings2, Users } from "lucide-react";
 
 import BasicLayout from "../components/layout/BasicLayout";
 import { ComponentLoader } from "../components/LoadingFallback";
@@ -27,6 +27,7 @@ const Login = lazy(() => import("../pages/SuperAdminConsole/Login"));
 const Branches = lazy(() => import("../pages/SuperAdminConsole/Branches"));
 const CompanyProfile = lazy(() => import("../pages/SuperAdminConsole/CompanyProfile"));
 const BranchUsers = lazy(() => import("../pages/SuperAdminConsole/Users"));
+const SystemSettings = lazy(() => import("../pages/SuperAdminConsole/SystemSettings"));
 
 const page = (Component) => (
   <Suspense fallback={<ComponentLoader />}>
@@ -60,6 +61,15 @@ const navigations = [
     label: "Users",
     icon: <Users className="h-5 w-5" />,
     component: page(BranchUsers),
+    isFilter: true,
+    isShow: true,
+  },
+  {
+    route: "/superadmin/system-settings",
+    name: "System Settings",
+    label: "System Settings",
+    icon: <Settings2 className="h-5 w-5" />,
+    component: page(SystemSettings),
     isFilter: true,
     isShow: true,
   },

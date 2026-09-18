@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { Building2, Pencil, RefreshCw, Trash2, Users } from "lucide-react";
+import { Building2, Pencil, RefreshCw, Settings2, Trash2, Users } from "lucide-react";
 import { useNavigate } from "react-router";
 
 import RowActions from "../../../components/RowActions";
@@ -158,6 +158,12 @@ export const useBranchesData = () => {
                 label: "Users",
                 icon: <Users className="w-4 h-4" />,
                 onClick: () => navigate(`/superadmin/users?branch=${record.branchId}`),
+              },
+              {
+                key: "system",
+                label: "System settings",
+                icon: <Settings2 className="w-4 h-4" />,
+                onClick: () => navigate(`/superadmin/system-settings?branch=${record.branchId}`),
               },
               {
                 key: "edit",

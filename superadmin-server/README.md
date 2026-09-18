@@ -57,6 +57,7 @@ The branch shows **Online** when the address and key are right.
 | Branches | `GET /manage/health` | Status, version, warnings; checked every 30 s |
 | Company Profile | `GET/PUT /manage/company-profile`, `GET/PUT/DELETE /manage/company-profile/logo` | Logo: PNG or JPG, 2 MB, passed through untouched. Each change is audited on the branch as `system:superadmin:<username>`. |
 | Users | `GET/POST /manage/users`, `PUT /manage/users/:id/password`, `PUT /manage/users/:id/status` | Owner and Admin logins only (staff logins stay on the branch). One Owner per branch; the only active Owner can't be deactivated. Passwords go straight to the branch and are never stored here or written to the audit trail. |
+| System Settings | `GET/PUT /manage/system-settings` | Dry-run, billing schedule and rules. The branch runs the same checks and audit as its own System page (`lib/settings/systemSettings.service.js`); the form is the shared `SystemSettingsPanel`. |
 
 ## Development
 

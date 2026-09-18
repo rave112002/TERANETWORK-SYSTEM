@@ -4,6 +4,7 @@ import { catchAsync } from "../../../utils/catchAsync.js";
 import { collectBranchHealth } from "../../../lib/manage/health.service.js";
 import companyController from "./company.controller.js";
 import usersController from "./users.controller.js";
+import systemController from "./system.controller.js";
 
 const router = express.Router();
 
@@ -33,5 +34,6 @@ router.get(
 
 router.use("/company-profile", companyController);
 router.use("/users", usersController);
+router.use("/system-settings", systemController);
 
 export default router;

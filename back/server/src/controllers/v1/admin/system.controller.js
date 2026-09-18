@@ -4,16 +4,11 @@ import { catchAsync, validateBody, validateQuery } from "../../../utils/catchAsy
 import { checkPermission } from "../../../middlewares/checkPermission.middleware.js";
 import { gatewayStatus } from "../../../lib/payment-gateways/index.js";
 import { branchScope, getScopedBranchIds } from "../../../utils/branchScope.js";
-import { getAuditContext, writeAudit } from "../../../utils/audit.js";
+import { getAuditContext } from "../../../utils/audit.js";
 import {
-  SETTING_KEYS,
-  getAllSettings,
-  getBillingSchedule,
-  getRecoveryAfterDays,
-  parseIntSetting,
-  setSetting,
-  validateBillingSchedule,
-} from "../../../lib/settings/settings.service.js";
+  readSystemSettings,
+  updateSystemSettings,
+} from "../../../lib/settings/systemSettings.service.js";
 import { getQueueStats } from "../../../lib/jobs/jobs.queue.js";
 import {
   updateSettingsSchema,
@@ -40,39 +35,8 @@ router.get(
   "/settings",
   checkPermission("system", null, "read"),
   catchAsync(async (req, res) => {
-    const { companyId } = req.user;
-    const raw = await getAllSettings(req.db, companyId);
-
-    const rows = await req.db.query(
-      `SELECT settingKey, description, updatedBy, dateUpdated
-       FROM system_settings WHERE companyId = ?`,
-      [companyId]
-    );
-    const meta = Object.fromEntries(rows.map((r) => [r.settingKey, r]));
-
-    // The schedule comes back through the same parser the billing jobs use, so
-    // the screen can never show a number the worker would reject as junk.
-    const schedule = await getBillingSchedule(req.db, companyId);
-    const recoveryAfterDays = await getRecoveryAfterDays(req.db, companyId);
-
-    return res.sendSuccess("Settings retrieved successfully", {
-      settings: {
-        DRY_RUN: raw.DRY_RUN === "true",
-        GRACE_DAYS: schedule.graceDays,
-        VAT_RATE: Number.parseFloat(raw.VAT_RATE),
-        RECONNECTION_FEE_ENABLED: raw.RECONNECTION_FEE_ENABLED === "true",
-
-        STATEMENT_DAY: schedule.statementDay,
-        DUE_DAY: schedule.dueDay,
-        REMINDER_DAYS_BEFORE: schedule.reminderDaysBefore,
-        CYCLE_HOUR: schedule.cycleHour,
-        DAILY_HOUR: schedule.dailyHour,
-        DUNNING_HOUR: schedule.dunningHour,
-
-        RECOVERY_AFTER_DAYS: recoveryAfterDays,
-      },
-      meta,
-    });
+    const result = await readSystemSettings(req.db, req.user.companyId);
+    return res.sendSuccess("Settings retrieved successfully", result);
   })
 );
 
@@ -88,82 +52,14 @@ router.put(
   checkPermission("system", null, "write"),
   validateBody(updateSettingsSchema),
   catchAsync(async (req, res) => {
-    const { companyId, accountId } = req.user;
-    const updates = req.body;
-
-    // ── Check the schedule as a whole before writing any of it ──────────────
-    //
-    // The validator has already checked each value on its own. What it cannot
-    // check is the combination, because an update is partial: "due day 20" is
-    // fine or catastrophic depending on the statement day already stored. So
-    // the stored schedule is merged with the incoming changes and the result is
-    // judged as one thing.
-    //
-    // Refused before the transaction opens, so a rejected schedule leaves no
-    // half-applied settings behind and the message says which two values
-    // disagree rather than "invalid".
-    const SCHEDULE_FIELDS = {
-      [SETTING_KEYS.STATEMENT_DAY]: "statementDay",
-      [SETTING_KEYS.DUE_DAY]: "dueDay",
-      [SETTING_KEYS.GRACE_DAYS]: "graceDays",
-      [SETTING_KEYS.DAILY_HOUR]: "dailyHour",
-      [SETTING_KEYS.DUNNING_HOUR]: "dunningHour",
-    };
-
-    if (Object.keys(SCHEDULE_FIELDS).some((key) => key in updates)) {
-      const merged = await getBillingSchedule(req.db, companyId);
-      for (const [key, field] of Object.entries(SCHEDULE_FIELDS)) {
-        if (key in updates) merged[field] = parseIntSetting(updates[key], key);
-      }
-
-      const problem = validateBillingSchedule(merged);
-      if (problem) return res.sendError(problem, 400);
-    }
-
-    let conn;
-    try {
-      conn = await req.db.beginTransaction();
-
-      const [currentRows] = await conn.execute(
-        `SELECT settingKey, settingValue FROM system_settings WHERE companyId = ?`,
-        [companyId]
-      );
-      const before = Object.fromEntries(
-        currentRows.map((r) => [r.settingKey, r.settingValue])
-      );
-
-      const after = { ...before };
-
-      for (const [key, value] of Object.entries(updates)) {
-        // Stored as strings, so booleans and numbers are normalised on the way
-        // in — never `String(value)` on a boolean somewhere else and "TRUE"
-        // here.
-        const stored = typeof value === "boolean" ? String(value) : String(value);
-        await setSetting(conn, { companyId, key, value: stored, updatedBy: accountId });
-        after[key] = stored;
-      }
-
-      const changed = Object.keys(updates).filter((k) => before[k] !== after[k]);
-
-      await writeAudit(conn, {
-        context: getAuditContext(req),
-        module: "system",
-        action: "settings.update",
-        description:
-          // Called out by name: this is the one that stops device commands.
-          "DRY_RUN" in updates
-            ? `Dry-run mode turned ${updates.DRY_RUN ? "ON — device commands will be logged, not executed" : "OFF — device commands will execute"}`
-            : `Updated ${changed.join(", ") || "settings"}`,
-        before,
-        after,
-      });
-
-      await req.db.commit(conn);
-      return res.sendSuccess("Settings updated successfully", { changed });
-    } catch (err) {
-      await req.db.rollback(conn);
-      throw err;
-    }
+    const result = await updateSystemSettings(req.db, {
+      companyId: req.user.companyId,
+      updates: req.body,
+      updatedBy: req.user.accountId,
+      context: getAuditContext(req),
+    });
+    if (result.error) return res.sendError(result.error, 400);
+    return res.sendSuccess("Settings updated successfully", { changed: result.changed });
   })
 );
 

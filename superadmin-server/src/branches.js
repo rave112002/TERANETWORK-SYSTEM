@@ -5,6 +5,7 @@ import express from "express";
 import { MIN_MANAGE_KEY_LENGTH } from "../../shared/manage-contract/index.js";
 import { checkBranchHealth } from "./branchClient.js";
 import { createBranchCompanyRouter } from "./branchCompany.js";
+import { createBranchSystemRouter } from "./branchSystem.js";
 import { createBranchUsersRouter } from "./branchUsers.js";
 import { decryptSecret, encryptSecret } from "./crypto.js";
 import { nowIso } from "./db.js";
@@ -170,6 +171,7 @@ export const createBranchesRouter = ({ db, config, fetchImpl }) => {
 
   router.use("/:branchId/company-profile", loadBranch, createBranchCompanyRouter({ fetchImpl }));
   router.use("/:branchId/users", loadBranch, createBranchUsersRouter({ fetchImpl }));
+  router.use("/:branchId/system-settings", loadBranch, createBranchSystemRouter({ fetchImpl }));
 
   return router;
 };
