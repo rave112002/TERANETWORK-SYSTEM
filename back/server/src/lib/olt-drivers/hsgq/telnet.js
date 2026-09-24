@@ -4,21 +4,21 @@
  *
  * A tiny telnet client over Node's built-in `net` socket (no extra dependency).
  * Its whole job: connect, log in, walk the CLI prompt state machine, run a
- * command plan (from commands.js), and hand back the raw text the device
- * printed. The driver then feeds that raw text to the parsers (parsers.js).
+ * command plan (from commands.js), and hand back what the device printed for
+ * each command. The driver judges success from that (parsers.js).
  *
- * CLI navigation (from HSGQ_DOCUMENTATION.md §12):
+ * CLI navigation (v2 §3):
  *   login  ->  Tera-Network>            (user/exec mode)
- *   enable ->  Tera-Network#            (privileged mode)
+ *   enable ->  Tera-Network#            (privileged mode, no password)
  *   configure -> Tera-Network(config)#  (global config)
  *   interface epon 1 -> Tera-Network(config-epon-1)#
- * Quirk: most `show` commands only work inside config/interface mode.
+ *   end    ->  Tera-Network#            (the only mode the save is verified in)
  *
  * ┌─────────────────────────────────────────────────────────────────────────┐
- * │ ✅ LOGIN BANNER + ENABLE BEHAVIOUR VERIFIED (July 2026): the device       │
- * │ prompts "Username:" then "Password:" (no "login:"), lands on             │
- * │ "Tera-Network>", and `enable` needs NO password. See                     │
- * │ docs/vendor-transcripts/hsgq-xe04i/HSGQ-XE04I-CLI-Validation.md.          │
+ * │ ✅ VERIFIED (September 2026 re-test, v2 §2/§5): prompts are lowercase     │
+ * │ "username:" / "password:"; `enable` needs no password; output pages at   │
+ * │ "--More--" unless `terminal length 0` is sent first (sent every session). │
+ * │ See docs/vendor-transcripts/hsgq-xe04i/HSGQ-XE04I-CLI-Validation-v2.md.   │
  * └─────────────────────────────────────────────────────────────────────────┘
  *
  * SAFETY: every path (success, timeout, socket error) ends by destroying the
@@ -28,10 +28,40 @@
 
 import net from "node:net";
 
-// A CLI prompt: ends with '>' (user) or '#' (enable/config), optional trailing space.
-const PROMPT_RE = /[>#]\s*$/;
-const LOGIN_RE = /(?:login|username)\s*:/i;
-const PASSWORD_RE = /password\s*:/i;
+import { SAVE_COMMAND } from "./commands.js";
+
+// A CLI prompt on its own line: hostname, optional "(mode)", then '>' or '#'.
+// Anchored to the start of a line so a '#' inside an ONU description ("NAP#3")
+// that happens to end a TCP chunk is never mistaken for the prompt.
+const PROMPT_RE = /(?:^|\n)[^\s>#()]+(?:\([^()\s]*\))?[>#][ \t]*$/;
+const MORE_RE = /-+\s*More\s*-+[ \t]*$/i;
+const LOGIN_RE = /(?:login|username)\s*:\s*$/i;
+const PASSWORD_RE = /password\s*:\s*$/i;
+// "The length of the user name is invalid!" / "Bad username , too many failures!" (v2 §2)
+const LOGIN_FAIL_RE = /invalid|bad (?:user|pass)|failure|incorrect|denied/i;
+
+// Output decoration to drop: ANSI escapes and backspaces (used to erase "--More--").
+const ANSI_RE = /\x1b\[[0-9;?]*[A-Za-z]/g;
+
+// Event lines ("[2000/01/01 01:12:51]  Info: ...") printed AFTER a prompt. The
+// OLT prints them whenever something happens on a PON (v2 §5), so a prompt can
+// be followed by one; patterns are tested with these removed from the end.
+const TRAILING_EVENTS_RE = /(?:\r?\n[ \t]*\[\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2}\][^\n]*)+\r?\n?$/;
+
+// Telnet protocol bytes (RFC 854). We answer option negotiation instead of
+// ignoring it: some devices wait for a reply before printing the login prompt.
+const IAC = 255;
+const DONT = 254;
+const DO = 253;
+const WONT = 252;
+const WILL = 251;
+const SB = 250;
+const SE = 240;
+const OPT_ECHO = 1;
+const OPT_SGA = 3; // suppress go-ahead
+
+// Guard against a device that pages forever.
+const MAX_PAGES = 1000;
 
 export class HsgqTelnetTransport {
   /**
@@ -52,7 +82,10 @@ export class HsgqTelnetTransport {
     this.timeoutMs = timeoutMs;
 
     this.socket = null;
-    this.buffer = ""; // accumulates bytes until a prompt/pattern is seen
+    this.buffer = ""; // accumulates text until a prompt/pattern is seen
+    this._pending = Buffer.alloc(0); // an IAC sequence split across TCP chunks
+    this._answered = new Set(); // negotiation already replied to (avoid loops)
+    this._closedError = null; // set once the device hangs up
     this._waiter = null; // the single in-flight { patterns, resolve, reject, timer }
   }
 
@@ -63,48 +96,128 @@ export class HsgqTelnetTransport {
   connect() {
     return new Promise((resolve, reject) => {
       this.socket = net.createConnection({ host: this.host, port: this.port });
-      this.socket.setEncoding("utf8");
 
-      const onConnectError = (err) => reject(err);
+      // Without this an unreachable host hangs for the OS's own SYN timeout (~21 s on Windows).
+      const timer = setTimeout(() => {
+        this.socket.destroy();
+        reject(new Error(`Could not connect to ${this.host}:${this.port} within ${this.timeoutMs} ms`));
+      }, this.timeoutMs);
+
+      const onConnectError = (err) => {
+        clearTimeout(timer);
+        reject(err);
+      };
       this.socket.once("error", onConnectError);
 
       this.socket.once("connect", () => {
+        clearTimeout(timer);
         this.socket.removeListener("error", onConnectError);
-        // Feed incoming bytes into the buffer + notify any waiter.
-        this.socket.on("data", (chunk) => {
-          this.buffer += chunk;
-          this._checkWaiter();
-        });
-        // If the socket dies mid-operation, fail the pending waiter.
-        this.socket.on("error", (err) => this._failWaiter(err));
-        this.socket.on("close", () => this._failWaiter(new Error("Connection closed by device")));
+        this.socket.on("data", (chunk) => this._onData(chunk));
+        // If the socket dies mid-operation, fail the pending waiter (and any later one).
+        this.socket.on("error", (err) => this._onClosed(err));
+        this.socket.on("close", () => this._onClosed(new Error("Connection closed by device")));
         resolve();
       });
     });
   }
 
   /**
+   * Strip telnet negotiation out of a raw chunk, answer it, and append the
+   * remaining text to the buffer.
+   *
+   * Text is decoded as latin1 (one byte = one char) so a stray non-UTF-8 byte,
+   * like the "°" in `show optical-info`, can't corrupt the characters around it.
+   *
+   * @param {Buffer} chunk
+   */
+  _onData(chunk) {
+    const data = this._pending.length ? Buffer.concat([this._pending, chunk]) : chunk;
+    this._pending = Buffer.alloc(0);
+
+    const text = [];
+    const replies = [];
+    let i = 0;
+    while (i < data.length) {
+      if (data[i] !== IAC) {
+        text.push(data[i]);
+        i += 1;
+        continue;
+      }
+      if (i + 1 >= data.length) {
+        this._pending = data.subarray(i);
+        break;
+      }
+      const cmd = data[i + 1];
+      if (cmd === IAC) {
+        // Escaped 0xFF data byte.
+        text.push(IAC);
+        i += 2;
+      } else if (cmd === SB) {
+        // Sub-negotiation: skip to IAC SE.
+        const end = data.indexOf(Buffer.from([IAC, SE]), i + 2);
+        if (end === -1) {
+          this._pending = data.subarray(i);
+          break;
+        }
+        i = end + 2;
+      } else if (cmd >= WILL && cmd <= DONT) {
+        if (i + 2 >= data.length) {
+          this._pending = data.subarray(i);
+          break;
+        }
+        const opt = data[i + 2];
+        const key = `${cmd}:${opt}`;
+        if (!this._answered.has(key)) {
+          this._answered.add(key);
+          // Let the device echo and suppress go-ahead; refuse everything else.
+          if (cmd === WILL) replies.push(IAC, opt === OPT_ECHO || opt === OPT_SGA ? DO : DONT, opt);
+          if (cmd === DO) replies.push(IAC, opt === OPT_SGA ? WILL : WONT, opt);
+        }
+        i += 3;
+      } else {
+        // Any other two-byte command (NOP, GA, ...).
+        i += 2;
+      }
+    }
+
+    if (replies.length && this.socket && !this.socket.destroyed) {
+      this.socket.write(Buffer.from(replies));
+    }
+    if (text.length) {
+      this.buffer += Buffer.from(text)
+        .toString("latin1")
+        .replace(ANSI_RE, "")
+        .replace(/\x08/g, "");
+      this._checkWaiter();
+    }
+  }
+
+  /**
    * Wait until the accumulated buffer matches one of `patterns`.
    * @param {Array<{name: string, re: RegExp}>} patterns
+   * @param {number} [timeoutMs]
    * @returns {Promise<{ name: string, text: string }>} the matched name + text so far.
    */
-  _expect(patterns) {
+  _expect(patterns, timeoutMs = this.timeoutMs) {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this._waiter = null;
         reject(new Error(`Timed out waiting for ${patterns.map((p) => p.name).join("/")} (got: ${JSON.stringify(this.buffer.slice(-80))})`));
-      }, this.timeoutMs);
+      }, timeoutMs);
 
       this._waiter = { patterns, resolve, reject, timer };
       this._checkWaiter(); // maybe it's already in the buffer
+      // The device may already have hung up (e.g. after a failed login).
+      if (this._waiter && this._closedError) this._failWaiter(this._closedError);
     });
   }
 
   /** Test the buffer against the current waiter's patterns; resolve on a hit. */
   _checkWaiter() {
     if (!this._waiter) return;
+    const settled = this.buffer.replace(TRAILING_EVENTS_RE, "");
     for (const { name, re } of this._waiter.patterns) {
-      if (re.test(this.buffer)) {
+      if (re.test(settled)) {
         const text = this.buffer;
         this.buffer = "";
         clearTimeout(this._waiter.timer);
@@ -114,6 +227,12 @@ export class HsgqTelnetTransport {
         return;
       }
     }
+  }
+
+  /** Remember that the device is gone, then fail the pending waiter. */
+  _onClosed(err) {
+    this._closedError ??= err;
+    this._failWaiter(err);
   }
 
   /** Fail the pending waiter (socket error/close). */
@@ -131,34 +250,85 @@ export class HsgqTelnetTransport {
   }
 
   /**
-   * Log in: answer the Username/Password banner, land on the user prompt.
+   * Log in: answer the username/password banner, land on the user prompt.
+   *
+   * A rejected login is reported as such. Without this it surfaced as a
+   * timeout, which reads like a network problem and sends you to the cabling.
+   *
    * @returns {Promise<void>}
    */
   async login() {
+    if (!this.username || !this.password) {
+      throw new Error("This OLT has no username/password saved — re-enter its credentials");
+    }
+    const refused = (text) =>
+      new Error(
+        `The OLT refused the login (${JSON.stringify(text.trim().slice(-100))}). ` +
+          "Check the username and password saved on this OLT."
+      );
+
     await this._expect([{ name: "login", re: LOGIN_RE }]);
     this._writeLine(this.username);
-    await this._expect([{ name: "password", re: PASSWORD_RE }]);
+
+    let reply = await this._expect([
+      { name: "password", re: PASSWORD_RE },
+      { name: "rejected", re: LOGIN_FAIL_RE },
+    ]);
+    if (reply.name !== "password") throw refused(reply.text);
     this._writeLine(this.password);
-    await this._expect([{ name: "prompt", re: PROMPT_RE }]);
+
+    reply = await this._expect([
+      { name: "prompt", re: PROMPT_RE },
+      { name: "rejected", re: LOGIN_FAIL_RE },
+      { name: "retry", re: LOGIN_RE },
+    ]);
+    if (reply.name !== "prompt") throw refused(reply.text);
   }
 
   /**
    * Send one command and return everything printed up to the next prompt —
-   * with that trailing prompt stripped off.
+   * with the command's echo and the trailing prompt stripped off, and any
+   * "--More--" pages continued and joined.
    *
-   * WHY strip it: prompts have no trailing newline (e.g. "...(config-epon-1)# ").
-   * If we kept it, concatenating several commands' output would GLUE the next
-   * command's first line onto a prompt fragment, and a line-based parser would
-   * mis-read (or skip) it. Stripping the trailing prompt keeps each chunk clean.
+   * WHY strip the prompt: prompts have no trailing newline (e.g.
+   * "...(config-epon-1)# "). Keeping it would glue a prompt fragment onto the
+   * next command's first line and a line-based parser would mis-read it.
    *
    * @param {string} line
-   * @returns {Promise<string>} raw device output for this command (prompt removed).
+   * @param {number} [timeoutMs]
+   * @returns {Promise<string>} device output for this command.
    */
-  async exec(line) {
+  async exec(line, timeoutMs = this.timeoutMs) {
     this._writeLine(line);
-    const { text } = await this._expect([{ name: "prompt", re: PROMPT_RE }]);
-    // Remove the final prompt line (e.g. "\nTera-Network(config-epon-1)# ").
-    return text.replace(/\r?\n?[^\r\n]*[>#][ \t]*$/, "");
+    let out = "";
+    for (let page = 0; ; page += 1) {
+      const { name, text } = await this._expect(
+        [
+          { name: "prompt", re: PROMPT_RE },
+          { name: "more", re: MORE_RE },
+        ],
+        timeoutMs
+      );
+      if (name === "prompt") {
+        out += text;
+        break;
+      }
+      // Paging should be off (`terminal length 0`); this is the safety net.
+      if (page >= MAX_PAGES) throw new Error(`'${line}' paged more than ${MAX_PAGES} times`);
+      out += text.replace(MORE_RE, "");
+      this.socket.write(" ");
+    }
+
+    return (
+      out
+        .replace(TRAILING_EVENTS_RE, "")
+        // Remove the final prompt line (e.g. "\nTera-Network(config-epon-1)# ").
+        .replace(/\r?\n?[^\r\n]*[>#][ \t]*$/, "")
+        // Carriage returns used to overwrite a line ("--More--" erasure).
+        .replace(/\r(?!\n)/g, "")
+        // The device's echo of what we typed.
+        .replace(/^[ \t]*(.*)\r?\n?/, (first, echoed) => (echoed.trim() === line.trim() ? "" : first))
+    );
   }
 
   /**
@@ -178,28 +348,43 @@ export class HsgqTelnetTransport {
   }
 
   /**
-   * Run a command plan from commands.js: enable -> configure -> interface ->
-   * commands -> (save) -> collect all raw output.
+   * Run a command plan from commands.js:
+   *   enable -> terminal length 0 -> configure -> interface -> commands ->
+   *   end -> (save)
    *
    * @param {{ interface: string, commands: string[], save: boolean }} plan
-   * @returns {Promise<{ command: string, rawResponse: string }>}
+   * @returns {Promise<{
+   *   command: string,
+   *   rawResponse: string,
+   *   outputs: Array<{ command: string, output: string }>
+   * }>} `outputs` is per command, so the driver can judge each reply on its
+   *   own; `rawResponse` is the whole session as a readable transcript.
    */
   async execPlan(plan) {
-    const parts = [];
+    const outputs = [];
+    const run = async (command, timeoutMs) => {
+      outputs.push({ command, output: await this.exec(command, timeoutMs) });
+    };
+
     await this.enable();
-    parts.push(await this.exec("configure"));
-    parts.push(await this.exec(`interface ${plan.interface}`));
+    // Without this, a 60-ONU `show onu-info all` stops at "--More--" (v2 §5).
+    await run("terminal length 0");
+    await run("configure");
+    await run(`interface ${plan.interface}`);
     for (const cmd of plan.commands) {
-      parts.push(await this.exec(cmd));
+      await run(cmd);
     }
-    parts.push(await this.exec("exit")); // leave the interface
+    // `end`, not `exit`: the save is only verified at `Tera-Network#` (v2 §14).
+    await run("end");
     if (plan.save) {
-      // Bench-verified save command (Cisco-style `write memory` equivalent).
-      parts.push(await this.exec("copy running-config startup-config"));
+      // Writing flash can be slower than a `show`.
+      await run(SAVE_COMMAND, Math.max(this.timeoutMs, 30000));
     }
+
     return {
       command: plan.commands.join("\n"),
-      rawResponse: parts.join(""),
+      rawResponse: outputs.map(({ command, output }) => `> ${command}\n${output}`).join("\n"),
+      outputs,
     };
   }
 

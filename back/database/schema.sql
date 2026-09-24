@@ -533,12 +533,19 @@ CREATE TABLE IF NOT EXISTS onus (
   -- Separate from provisioningState: one is where the device sits in its service
   -- lifecycle, the other is whether the inventory record exists at all.
   recordStatus ENUM('Active','Inactive','Deleted') NOT NULL DEFAULT 'Active',
+  -- The unique keys below must ignore deleted rows, or deleting an ONU would
+  -- block its MAC, serial and NAP port for good. MySQL has no partial index, so
+  -- they key on these copies, which are NULL once the row is Deleted. Never
+  -- written directly.
+  liveSerialNo VARCHAR(64) AS (IF(recordStatus = 'Deleted', NULL, serialNo)) STORED,
+  liveMac VARCHAR(17) AS (IF(recordStatus = 'Deleted', NULL, mac)) STORED,
+  liveNapId VARCHAR(50) AS (IF(recordStatus = 'Deleted', NULL, napId)) STORED,
   dateCreated DATETIME NOT NULL,
   dateUpdated DATETIME NOT NULL,
-  UNIQUE KEY uq_onus_serial (companyId, serialNo),
-  UNIQUE KEY uq_onus_mac (companyId, mac),
+  UNIQUE KEY uq_onus_serial (companyId, liveSerialNo),
+  UNIQUE KEY uq_onus_mac (companyId, liveMac),
   -- One ONU per NAP port — a second unit on the same port is a data-entry error.
-  UNIQUE KEY uq_onus_nap_port (napId, napPort),
+  UNIQUE KEY uq_onus_nap_port (liveNapId, napPort),
   INDEX idx_onus_oltId (oltId),
   INDEX idx_onus_napId (napId),
   INDEX idx_onus_state (provisioningState),

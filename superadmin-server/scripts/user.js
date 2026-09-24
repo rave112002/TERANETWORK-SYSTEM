@@ -4,6 +4,10 @@
  *   npm run user -- --username raven --first Raven --last Bayatan
  *   npm run user -- --username raven            (existing: resets the password)
  *
+ * In PowerShell, npm's wrapper drops the `--` and keeps the flags for itself, so
+ * the script receives only "raven Raven Bayatan". Those positionals are read as
+ * username, first name, last name, so the documented command works in any shell.
+ *
  * The password is asked for and not shown as you type. Run on the SuperAdmin PC.
  */
 import crypto from "node:crypto";
@@ -15,7 +19,8 @@ import { loadConfig } from "../src/config.js";
 import { nowIso, openDatabase } from "../src/db.js";
 import { hashPassword } from "../src/crypto.js";
 
-const { values } = parseArgs({
+const { values, positionals } = parseArgs({
+  allowPositionals: true,
   options: {
     username: { type: "string" },
     first: { type: "string" },
@@ -35,6 +40,10 @@ const askHidden = (question) =>
       resolve(answer);
     });
   });
+
+values.username ??= positionals[0];
+values.first ??= positionals[1];
+values.last ??= positionals[2];
 
 const username = values.username?.trim();
 if (!username) {
