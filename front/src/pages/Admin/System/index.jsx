@@ -9,6 +9,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+import EmailUsageCard from "./components/EmailUsageCard";
 import { useSystemData } from "./hooks";
 import DataTable from "../../../components/DataTable";
 import PageHeader from "../../../components/PageHeader";
@@ -25,6 +26,8 @@ const SystemPage = () => {
     settingsError,
     isSaving,
     canWrite,
+    emailUsage,
+    emailUsageLoading,
     jobs,
     jobsLoading,
     jobsFetching,
@@ -59,7 +62,7 @@ const SystemPage = () => {
     <div className="p-8 space-y-5">
       <PageHeader
         title="System"
-        subtitle="Runtime settings and the background job queue."
+        subtitle="Runtime settings, email sending and the background job queue."
       />
 
       {/* Two banners, in order of urgency. A dead job means a customer is in a
@@ -87,6 +90,8 @@ const SystemPage = () => {
           </AlertDescription>
         </Alert>
       )}
+
+      <EmailUsageCard usage={emailUsage} isLoading={emailUsageLoading} />
 
       {settingsLoading ? (
         <div className="flex items-center justify-center py-20">

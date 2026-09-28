@@ -9,7 +9,7 @@ import {
   useGetBranches,
 } from "../../../services/requests/superadmin-console/branches";
 import { confirm } from "../../../store/confirmStore";
-import { StatusCell, WarningsCell } from "./components/cells";
+import { EmailCell, StatusCell, WarningsCell } from "./components/cells";
 
 /**
  * Every branch this SuperAdmin manages, with its live health (D10).
@@ -126,6 +126,12 @@ export const useBranchesData = () => {
             </div>
           );
         },
+      },
+      {
+        title: "Emails (24h)",
+        key: "email",
+        width: 120,
+        render: (_, record) => <EmailCell check={checks[record.branchId]} />,
       },
       {
         title: "Needs attention",

@@ -61,6 +61,28 @@ billed for the month is passed over.
 
 ---
 
+## "The customer says they never got the invoice email"
+
+**Look at System → Email sending.** It shows how many emails went out in the
+last 24 hours against the Gmail account's limit (`EMAIL_DAILY_LIMIT`, 500 for a
+regular Gmail account), and the latest ones that were not sent, with the reason.
+
+- **"Gmail refused … daily limit reached"** — the account hit its limit. Gmail
+  counts a rolling 24 hours, so it frees up gradually. The refused emails stop
+  retrying after about half an hour and show as dead jobs; once the count has
+  come down, open each invoice and press **Resend**. If anyone also sends mail
+  from that Gmail by hand, it uses up the same 500.
+- **"the invoice PDF could not be built"** — the email is deliberately not sent
+  without its PDF. Fix the cause (usually the logo file), then **Resend**.
+- **"no email address on file"** — add it to the customer, then **Resend**.
+- **"Email is not set up"** — `SMTP_HOST` is empty in `back/.env`; nothing is
+  being emailed at all.
+
+The same count shows on the Dashboard (only when high) and in SuperAdmin →
+Branches (Emails 24h).
+
+---
+
 ## "The customer paid but they're still disconnected"
 
 This should not happen, and if it does the cause is almost always one of three

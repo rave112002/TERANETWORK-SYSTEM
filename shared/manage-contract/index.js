@@ -99,7 +99,39 @@ export const versionCompatibility = (version) => {
  * @property {{queued: number, failed: number, dead: number}} jobs
  * @property {boolean} dryRun               device actions are simulated, not sent to the OLT
  * @property {{lastBackupAt: string|null}} backup  null until backups report in
+ * @property {EmailUsage} [email]           absent on branches built before 2026-09-28
  */
+
+/**
+ * Outgoing email over the last 24 hours, against the sending account's daily
+ * limit (a regular Gmail account: ~500 recipients per rolling 24 hours).
+ *
+ * @typedef {Object} EmailUsage
+ * @property {number} sentLast24h
+ * @property {number} failedLast24h
+ * @property {number} quotaRefusedLast24h  failures where the mail server said the limit was hit
+ * @property {number} limit                 EMAIL_DAILY_LIMIT on the branch
+ * @property {boolean} configured           false: no SMTP, emails are only logged
+ */
+
+/** A regular Gmail account's limit. Branches override it with EMAIL_DAILY_LIMIT. */
+export const DEFAULT_EMAIL_DAILY_LIMIT = 500;
+
+/** From this share of the limit on, the count is shown as a warning. */
+export const EMAIL_USAGE_WARN_AT = 0.8;
+
+/**
+ * How close a branch is to its sending limit. The same answer in the Admin
+ * portal and in SuperAdmin, so the two never disagree about one branch.
+ *
+ * @param {{sentLast24h: number, quotaRefusedLast24h?: number, limit: number}} usage
+ * @returns {"ok"|"high"|"full"}  full: at the limit, or the server has refused mail for it
+ */
+export const emailUsageLevel = ({ sentLast24h, quotaRefusedLast24h = 0, limit }) => {
+  if (quotaRefusedLast24h > 0 || (limit > 0 && sentLast24h >= limit)) return "full";
+  if (limit > 0 && sentLast24h >= limit * EMAIL_USAGE_WARN_AT) return "high";
+  return "ok";
+};
 
 const isObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 const isCount = (v) => Number.isInteger(v) && v >= 0;
@@ -147,6 +179,17 @@ export const readBranchHealth = (data) => {
     ],
     ["dryRun", typeof d.dryRun === "boolean"],
     ["backup", isObject(d.backup) && stringOrNull(d.backup.lastBackupAt)],
+    // Optional: older branches do not report it (an added field, so no version bump).
+    [
+      "email",
+      d.email === undefined ||
+        (isObject(d.email) &&
+          isCount(d.email.sentLast24h) &&
+          isCount(d.email.failedLast24h) &&
+          isCount(d.email.quotaRefusedLast24h) &&
+          isCount(d.email.limit) &&
+          typeof d.email.configured === "boolean"),
+    ],
   ];
 
   const bad = checks.find(([, valid]) => !valid);
@@ -184,4 +227,7 @@ export default {
   MIN_MANAGE_KEY_LENGTH,
   versionCompatibility,
   readBranchHealth,
+  DEFAULT_EMAIL_DAILY_LIMIT,
+  EMAIL_USAGE_WARN_AT,
+  emailUsageLevel,
 };

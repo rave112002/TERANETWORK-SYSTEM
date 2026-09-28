@@ -3,6 +3,7 @@ import {
   MANAGE_KEY_HEADER,
   MIN_SUPPORTED_MANAGE_API_VERSION,
   MANAGE_API_VERSION,
+  emailUsageLevel,
   readBranchHealth,
   versionCompatibility,
 } from "../../shared/manage-contract/index.js";
@@ -44,6 +45,19 @@ export const healthWarnings = (health) => {
     );
   }
   if (health.dryRun) warnings.push("Dry-run is on: disconnections are simulated, not sent to the OLT");
+  // Absent on branches built before the email count existed.
+  if (health.email) {
+    const { sentLast24h, limit, quotaRefusedLast24h, configured } = health.email;
+    const level = emailUsageLevel(health.email);
+    if (!configured) warnings.push("Email is not set up: invoices are not being emailed");
+    if (quotaRefusedLast24h > 0) {
+      warnings.push(`Gmail refused ${quotaRefusedLast24h} email(s): daily sending limit reached`);
+    } else if (level === "full") {
+      warnings.push(`Email limit reached: ${sentLast24h} of ${limit} in the last 24 hours`);
+    } else if (level === "high") {
+      warnings.push(`Email use is high: ${sentLast24h} of ${limit} in the last 24 hours`);
+    }
+  }
   if (!health.backup.lastBackupAt) warnings.push("No backup reported");
   return warnings;
 };
@@ -119,9 +133,15 @@ export const checkBranchHealth = async ({ baseUrl, apiKey }, { timeoutMs = 5000,
     );
   }
 
+  // The level rides along so the page colours the count exactly as the
+  // warnings above judge it, without its own copy of the thresholds.
+  const withLevel = health.email
+    ? { ...health, email: { ...health.email, level: emailUsageLevel(health.email) } }
+    : health;
+
   return result(health.database.ok ? "online" : "degraded", health.database.ok ? "Online" : "Online, but its database is down", {
     latencyMs,
-    health,
+    health: withLevel,
     warnings: healthWarnings(health),
   });
 };

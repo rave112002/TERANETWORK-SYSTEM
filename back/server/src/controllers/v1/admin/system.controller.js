@@ -10,6 +10,7 @@ import {
   updateSystemSettings,
 } from "../../../lib/settings/systemSettings.service.js";
 import { getQueueStats } from "../../../lib/jobs/jobs.queue.js";
+import { getEmailUsage } from "../../../lib/email/usage.service.js";
 import {
   updateSettingsSchema,
   listJobsQuerySchema,
@@ -82,6 +83,22 @@ router.get(
   catchAsync(async (req, res) =>
     res.sendSuccess("Payment gateway status", { gateway: gatewayStatus() })
   )
+);
+
+/**
+ * GET /email-usage
+ *
+ * Emails sent in the last 24 hours against the sending account's daily limit
+ * (Gmail: ~500), the size of the next statement-day run, and the latest
+ * failures with their reasons. See lib/email/usage.service.js.
+ */
+router.get(
+  "/email-usage",
+  checkPermission("system", null, "read"),
+  catchAsync(async (req, res) => {
+    const usage = await getEmailUsage(req.db, req.user.companyId);
+    return res.sendSuccess("Email usage", { usage });
+  })
 );
 
 /**

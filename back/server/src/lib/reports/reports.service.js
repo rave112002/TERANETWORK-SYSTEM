@@ -2,6 +2,8 @@ import moment from "moment-timezone";
 
 import { branchScope } from "../../utils/branchScope.js";
 import { getCurrentTimestampLocal } from "../../utils/dateUtils.js";
+import { getEmailUsageCounts } from "../email/usage.service.js";
+import { emailUsageLevel } from "../../../../../shared/manage-contract/index.js";
 import {
   findLatestStatement,
   loadReconciliation,
@@ -396,6 +398,10 @@ export const operationsSummary = async (db, { user, branchIds }) => {
     [user.companyId, ...branchScope("de.branchId", branchIds).params, nowStamp]
   );
 
+  // Against the Gmail account's daily limit. Company-wide: one branch, one
+  // sending account (D7).
+  const email = await getEmailUsageCounts(db, user.companyId);
+
   // The latest GCash check, recomputed — so the alert clears the moment a
   // reference is fixed or a payment recorded, not at the next upload.
   const latestStatement = await findLatestStatement(db, { companyId: user.companyId, branchIds });
@@ -414,6 +420,7 @@ export const operationsSummary = async (db, { user, branchIds }) => {
       atRisk: Number(dunning[0]?.atRisk ?? 0),
       unappliedAdjustments: Number(unappliedAdjustments?.n ?? 0),
       liveExemptions: Number(liveExemptions?.n ?? 0),
+      email: { ...email, level: emailUsageLevel(email) },
       gcash: gcash && {
         statementId: latestStatement.statementId,
         periodEnd: latestStatement.periodEnd,
@@ -440,6 +447,7 @@ const emptySummary = (monthStart, monthEnd) => ({
     atRisk: 0,
     unappliedAdjustments: 0,
     liveExemptions: 0,
+    email: null,
     gcash: null,
   },
   series: [],

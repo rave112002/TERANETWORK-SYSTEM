@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { getCurrentTimestampLocal } from "../../utils/dateUtils.js";
 import { getAllSettings } from "../settings/settings.service.js";
 import { getQueueStats } from "../jobs/jobs.queue.js";
+import { getEmailUsageCounts } from "../email/usage.service.js";
 import { MANAGE_API_VERSION } from "../../../../../shared/manage-contract/index.js";
 
 /**
@@ -85,12 +86,15 @@ export const collectBranchHealth = async (db) => {
   };
 
   if (company) {
-    const [queue, settings] = await Promise.all([
+    const [queue, settings, email] = await Promise.all([
       getQueueStats(db, company.companyId),
       getAllSettings(db, company.companyId),
+      getEmailUsageCounts(db, company.companyId),
     ]);
     report.jobs = { queued: queue.queued, failed: queue.failed, dead: queue.dead };
     report.dryRun = settings.DRY_RUN === "true";
+    // A count, not the emails: no recipients or customers leave the branch (D10).
+    report.email = email;
   }
 
   return report;

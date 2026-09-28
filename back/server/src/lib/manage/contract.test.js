@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   MANAGE_API_VERSION,
+  emailUsageLevel,
   readBranchHealth,
   versionCompatibility,
 } from "../../../../../shared/manage-contract/index.js";
@@ -36,5 +37,25 @@ describe("manage contract", () => {
     expect(versionCompatibility(MANAGE_API_VERSION + 1)).toBe("superadmin_outdated");
     expect(versionCompatibility(0)).toBe("branch_outdated");
     expect(versionCompatibility("1")).toBe("unknown");
+  });
+});
+
+describe("email usage in the health report", () => {
+  const email = { sentLast24h: 12, failedLast24h: 0, quotaRefusedLast24h: 0, limit: 500, configured: true };
+
+  it("is optional, so older branches still pass", () => {
+    expect(readBranchHealth({ ...valid, email }).ok).toBe(true);
+    expect(readBranchHealth(valid).ok).toBe(true);
+    expect(readBranchHealth({ ...valid, email: { ...email, limit: "500" } })).toEqual({
+      ok: false,
+      problem: 'unexpected "email"',
+    });
+  });
+
+  it("levels: ok below 80%, high from 80%, full at the limit or on a refusal", () => {
+    expect(emailUsageLevel({ sentLast24h: 399, limit: 500 })).toBe("ok");
+    expect(emailUsageLevel({ sentLast24h: 400, limit: 500 })).toBe("high");
+    expect(emailUsageLevel({ sentLast24h: 500, limit: 500 })).toBe("full");
+    expect(emailUsageLevel({ sentLast24h: 10, quotaRefusedLast24h: 1, limit: 500 })).toBe("full");
   });
 });

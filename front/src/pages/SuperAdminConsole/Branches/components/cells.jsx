@@ -48,3 +48,31 @@ export const WarningsCell = ({ check }) => {
     </div>
   );
 };
+
+/**
+ * Emails sent in the last 24 hours against the branch's Gmail limit. `level`
+ * is set by superadmin-server with the same `emailUsageLevel` the branch's own
+ * Admin uses (shared/manage-contract), so the two never disagree.
+ */
+const EMAIL_LEVEL_COLOR = {
+  ok: "var(--color-text-secondary)",
+  high: "var(--color-warning)",
+  full: "var(--color-error)",
+};
+
+export const EmailCell = ({ check }) => {
+  const email = check?.health?.email;
+  // Not checked yet, unreachable, or a branch built before it reported email.
+  if (!email) return <span style={muted}>—</span>;
+  if (!email.configured) return <span style={{ fontSize: 13, color: "var(--color-warning)" }}>Not set up</span>;
+
+  const level = email.level ?? "ok";
+  return (
+    <div className="min-w-0">
+      <div style={{ fontSize: 13.5, color: EMAIL_LEVEL_COLOR[level] }}>
+        {email.sentLast24h} <span style={muted}>/ {email.limit}</span>
+      </div>
+      {email.failedLast24h > 0 && <div style={muted}>{email.failedLast24h} not sent</div>}
+    </div>
+  );
+};

@@ -3,6 +3,7 @@ import dayjs from "dayjs";
 
 import { usePermissions } from "../../../hooks/usePermissions";
 import {
+  useGetEmailUsage,
   useGetJobs,
   useGetSystemSettings,
   useUpdateSystemSettings,
@@ -30,6 +31,7 @@ export const useSystemData = () => {
   const [pagination, setPagination] = useState({ current: 1, pageSize: 20 });
 
   const settingsQuery = useGetSystemSettings();
+  const emailUsageQuery = useGetEmailUsage();
   const updateMutation = useUpdateSystemSettings();
 
   const jobsQuery = useGetJobs({
@@ -167,6 +169,9 @@ export const useSystemData = () => {
     settingsError: settingsQuery.error,
     isSaving: updateMutation.isPending,
     canWrite,
+
+    emailUsage: emailUsageQuery.data?.data?.usage,
+    emailUsageLoading: emailUsageQuery.isLoading,
 
     jobs: jobsQuery.data?.data?.jobs || [],
     jobsLoading: jobsQuery.isLoading,

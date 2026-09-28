@@ -23,3 +23,9 @@ export const getJobsApi = async (filters = {}) => {
   const response = await api.get("/api/v1/admin/system/jobs", { params: filters });
   return response.data;
 };
+
+/** Emails sent in the last 24 hours against the Gmail account's daily limit. */
+export const getEmailUsageApi = async () => {
+  const response = await api.get("/api/v1/admin/system/email-usage");
+  return response.data;
+};

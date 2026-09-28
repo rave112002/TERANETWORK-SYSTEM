@@ -11,7 +11,7 @@ its own copy** (own server, own database) — [D7](decisions.md#d7--one-branch-p
 
 ```
 Customer signs up → subscription → ONU provisioned on the OLT
-  → invoice on the 15th → customer pays by GCash → staff record it (reference no.)
+  → invoice on the 25th (due the 2nd) → customer pays by GCash → staff record it (reference no.)
   → unpaid after the due date → disconnected at the OLT → pays → reconnected
   → 60 days suspended → modem pulled out
 ```
@@ -22,9 +22,10 @@ Customer signs up → subscription → ONU provisioned on the OLT
 | --- | --- |
 | Customers | Plans, customers, subscriptions, pull-out / recovery after 60 days |
 | Network | OLTs, PON ports, splitters, NAPs, ONUs, topology, discovery (OLT side) |
-| Billing | Invoices on the 15th, adjustments, invoice email, record payment. Invoice PDF in the **client's existing layout**, viewable in a drawer (**View PDF**) without downloading |
+| Billing | Invoices on the 25th, adjustments, invoice email, record payment. Invoice PDF in the **client's existing layout**, viewable in a drawer (**View PDF**) without downloading |
 | Payments | **Personal GCash + GCash Check** (statement PDF upload, typo detection) — [payments.md](payments.md) |
 | How to pay | GCash number, account name, Facebook page and **Terms and conditions** set in **Settings → How customers pay**, printed on every invoice PDF (and the payment steps on every billing email) |
+| Email sending | Invoices go by email only, **never without the PDF**. Emails in the last 24 h vs the Gmail limit: Admin → System, Dashboard alert, SuperAdmin → Branches |
 | Collections | Dunning sweep after the due date, exemptions, automatic reconnection on payment |
 | Admin | Dashboard with "needs attention", reports, users & roles, audit trail, runbooks |
 | **Central SuperAdmin** | **Branches** (health, version, warnings), **Company Profile** (logo, TIN), **Users** (Owner/Admin logins, password reset), **System Settings** (dry-run, billing schedule). Changes audited on the branch as `system:superadmin:<user>`. Old in-branch `/superadmin` removed. See [superadmin-server/README.md](../superadmin-server/README.md) |
@@ -41,14 +42,14 @@ Customer signs up → subscription → ONU provisioned on the OLT
 | Need | Unblocks |
 | --- | --- |
 | **MikroTik** router IP, RouterOS version, login — and what the old Sheets→MikroTik step changed | Reconnecting on the router, if it's needed beyond the OLT |
-| Do they send invoices by **SMS**? Through which provider? | SMS (only email exists) |
 
 ## ▶️ Next, in order (before go-live)
 
 1. **Customer import** from the client's subscriber spreadsheet — the biggest go-live gap.
 2. **Automatic backups** (mysqldump + Task Scheduler, per the deployment doc).
 3. **One full dry run** on dev data: bill → pay → record → check → sweep → reconnect.
-4. **Per installation:** set `PORT=8787`, `NODE_ENV=production`, `MANAGE_API_KEY`, add the branch
+4. **Per installation:** set `PORT=8787`, `NODE_ENV=production`, `MANAGE_API_KEY`, the branch's
+   own Gmail in `SMTP_*` (App Password) and `EMAIL_DAILY_LIMIT=500`, add the branch
    in SuperAdmin, create the Owner login, fill in Settings → How customers pay (incl. Terms),
    upload the logo. Build `front` with a real `VITE_SENTRY_DSN` or none (not the placeholder).
 5. `npm run gcash:inspect` on a multi-page statement when one is available.
@@ -60,6 +61,7 @@ Customer signs up → subscription → ONU provisioned on the OLT
 
 - **HitPay** online checkout, and **GCash for Business** merchant QR — [D8](decisions.md#d8--gcash-business-merchant-qr-on-the-invoice-option-a-hitpay-parked)
 - **Multi-branch business features** (cross-branch reports, shared data). Each branch is standalone; only SuperAdmin spans them ([D7](decisions.md#d7--one-branch-per-installation), [D10](decisions.md#d10--one-central-superadmin-over-tailscale)).
+- **SMS** invoices and notices — parked 2026-09-28; invoices go by email only (with the PDF attached).
 - Outage credits, alert emails, data export/anonymise — not started, not needed yet.
 
 ## Where things are

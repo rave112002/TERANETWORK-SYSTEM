@@ -10,6 +10,7 @@ import {
   getSystemSettingsApi,
   updateSystemSettingsApi,
   getJobsApi,
+  getEmailUsageApi,
 } from "../../api/admin/system";
 
 export const useGetSystemSettings = () => {
@@ -55,5 +56,15 @@ export const useGetJobs = (filters = {}, options = {}) => {
     refetchInterval: 10 * 1000,
     staleTime: 0,
     ...options,
+  });
+};
+
+export const useGetEmailUsage = () => {
+  return useQuery({
+    queryKey: ["emailUsage"],
+    queryFn: getEmailUsageApi,
+    // A count that moves while invoices go out; a minute behind is fine.
+    refetchInterval: 60 * 1000,
+    staleTime: 30 * 1000,
   });
 };

@@ -28,6 +28,7 @@ const buildAttention = (attention) => {
   if (!attention) return [];
 
   const items = [];
+  const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
   if (attention.deadLetters > 0) {
     items.push({
@@ -53,10 +54,36 @@ const buildAttention = (attention) => {
     });
   }
 
+  // The branch's Gmail account refuses mail past ~500 in a rolling 24 hours.
+  // Invoices that bounce off the limit are not retried for long, so this has
+  // to be seen the same day. Shown only when high — see buildAttention's note.
+  const email = attention.email;
+  if (email?.level === "full") {
+    items.push({
+      key: "email-full",
+      severity: "error",
+      title:
+        email.quotaRefusedLast24h > 0
+          ? `Gmail refused ${plural(email.quotaRefusedLast24h, "email")}: daily limit reached`
+          : `Email limit reached: ${email.sentLast24h} of ${email.limit} in 24 hours`,
+      detail: "Emails past the limit are not delivered. Resend them once it frees up.",
+      to: "/admin/system",
+      cta: "Open email sending",
+    });
+  } else if (email?.level === "high") {
+    items.push({
+      key: "email-high",
+      severity: "warning",
+      title: `Email use is high: ${email.sentLast24h} of ${email.limit} in 24 hours`,
+      detail: "Close to the Gmail account's daily sending limit.",
+      to: "/admin/system",
+      cta: "Open email sending",
+    });
+  }
+
   // The latest GCash statement check. Money that arrived unrecorded comes
   // first: that customer paid and may still be disconnected.
   const gcash = attention.gcash;
-  const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
   if (gcash?.inFileNotRecorded > 0) {
     items.push({
       key: "gcash-unrecorded",
