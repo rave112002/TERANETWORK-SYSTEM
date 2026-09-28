@@ -159,12 +159,25 @@ export const emailProcessor = async (job, { db, logger }) => {
         contentType: "application/pdf",
       });
     } catch (err) {
-      // Send the email without it rather than not at all. The summary and the
-      // pay link are the parts the customer actually needs; the PDF is
-      // downloadable from the payment page.
-      logger.error(`[email] could not attach PDF for ${invoice.invoiceNo}: ${err.message}`, {
+      // No PDF, no email. The PDF IS the invoice to the customer — an email
+      // without it is a bill they can't keep, print or show — and there is no
+      // other place they can get it. Thrown so the queue retries (a locked
+      // file or a missing logo is usually fixed by the next attempt); if it
+      // never builds, the job dead-letters and the failed row below says why.
+      await recordEmailEvent(db, {
+        companyId: invoice.companyId,
+        invoiceId,
+        customerId: invoice.customerId,
+        type: kind,
+        recipient: customer.email,
+        subject: message.subject,
+        providerStatus: "failed",
+        error: `Not sent: the invoice PDF could not be built (${err.message})`,
+      });
+      logger.error(`[email] not sending ${invoice.invoiceNo}: PDF failed: ${err.message}`, {
         jobId: job.jobId,
       });
+      throw err;
     }
   }
 
@@ -188,12 +201,7 @@ export const emailProcessor = async (job, { db, logger }) => {
       providerStatus: "sent",
     });
 
-    return {
-      sent: true,
-      to: customer.email,
-      subject: message.subject,
-      attachedPdf: attachments.length > 0,
-    };
+    return { sent: true, to: customer.email, subject: message.subject };
   } catch (err) {
     await recordEmailEvent(db, {
       companyId: invoice.companyId,

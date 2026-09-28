@@ -1,8 +1,25 @@
 import fs from "node:fs";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { EMAIL_KINDS } from "./email.processor.js";
+import { ensureInvoicePdf, loadInvoiceForRender } from "../../billing/invoice.render.js";
+import { recordEmailEvent, sendEmail } from "../../email/email.service.js";
+import { EMAIL_KINDS, emailProcessor } from "./email.processor.js";
+
+vi.mock("node:fs/promises", () => ({ default: { readFile: vi.fn(() => Promise.resolve(Buffer.from("%PDF"))) } }));
+vi.mock("../../billing/invoice.render.js", () => ({
+  ensureInvoicePdf: vi.fn(),
+  loadInvoiceForRender: vi.fn(),
+}));
+vi.mock("../../email/email.service.js", () => ({
+  recordEmailEvent: vi.fn(() => Promise.resolve()),
+  sendEmail: vi.fn(() => Promise.resolve({ messageId: "msg-1" })),
+}));
+vi.mock("../../payments/instructions.js", () => ({
+  getPaymentInstructions: vi.fn(() => Promise.resolve({ facebookPageUrl: null })),
+  paymentInstructionLines: vi.fn(() => []),
+}));
+vi.mock("../../settings/settings.service.js", () => ({ getBillingSchedule: vi.fn() }));
 
 /**
  * One test, guarding one mistake.
@@ -37,5 +54,59 @@ describe("email kinds and the email_events ENUM", () => {
     for (const kind of EMAIL_KINDS) {
       expect(accepted, `email_events.type has no '${kind}'`).toContain(kind);
     }
+  });
+});
+
+/**
+ * The PDF is the invoice. An "invoice issued" email without it is not sent at
+ * all — the job fails, the queue retries, and the attempt is on record.
+ */
+describe("invoice_issued and its PDF", () => {
+  const job = { jobId: "job-1", payload: { kind: "invoice_issued", invoiceId: "inv-1" } };
+  const ctx = { db: {}, logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    loadInvoiceForRender.mockResolvedValue({
+      invoice: {
+        invoiceId: "inv-1",
+        invoiceNo: "INV-2026-000001",
+        companyId: "co-1",
+        customerId: "cu-1",
+        status: "issued",
+        total: "1299.00",
+        dueDate: "2026-10-02",
+        lines: [],
+      },
+      customer: { accountNo: "ACC-1", email: "juan@example.com", name: "Juan" },
+      company: { name: "TERANETWORK" },
+    });
+  });
+
+  it("does not send the email when the PDF cannot be built", async () => {
+    ensureInvoicePdf.mockRejectedValue(new Error("logo file is locked"));
+
+    await expect(emailProcessor(job, ctx)).rejects.toThrow("logo file is locked");
+
+    expect(sendEmail).not.toHaveBeenCalled();
+    expect(recordEmailEvent).toHaveBeenCalledWith(
+      ctx.db,
+      expect.objectContaining({
+        providerStatus: "failed",
+        error: expect.stringContaining("invoice PDF could not be built"),
+      })
+    );
+  });
+
+  it("sends with the PDF attached when it builds", async () => {
+    ensureInvoicePdf.mockResolvedValue("/tmp/INV-2026-000001.pdf");
+
+    await expect(emailProcessor(job, ctx)).resolves.toMatchObject({ sent: true });
+
+    expect(sendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        attachments: [expect.objectContaining({ filename: "INV-2026-000001.pdf" })],
+      })
+    );
   });
 });
