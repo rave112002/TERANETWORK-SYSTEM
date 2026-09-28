@@ -39,15 +39,18 @@ telnet session to the OLT.
 
 ## 3. Wipe and set up one clean branch
 
-Edit `back\.env`:
+Edit `back\.env`, setting these three (change the existing lines if they are there):
 
 ```ini
 COMPANY_NAME=TERANETWORK
 COMPANY_EMAIL=ops@teranetwork.ph      # required
 BRANCH_NAME=Test Branch               # required — the name of this installation's one branch
-MANAGE_API_KEY=<keep what is there>   # SuperAdmin already knows this key
-CREDENTIAL_MASTER_KEY=<keep what is there>
 ```
+
+**Do not touch `MANAGE_API_KEY` or `CREDENTIAL_MASTER_KEY`, and don't add second copies of them.**
+The later line wins, so a second line replaces the real key. SuperAdmin already knows the manage
+key, and the credential key decrypts saved OLT passwords. Each should appear exactly once in the
+file.
 
 Then:
 
@@ -98,30 +101,37 @@ Log in at http://localhost:5173/admin with the Owner login from part 4.
 
 ## 6. Real hardware: the HSGQ OLT
 
-Your bench ([HSGQ_DOCUMENTATION.md](vendor-transcripts/hsgq-xe04i/HSGQ_DOCUMENTATION.md)):
+Your bench (updated 2026-09-24; see
+[HSGQ-XE04I-CLI-Validation-v2.md](vendor-transcripts/hsgq-xe04i/HSGQ-XE04I-CLI-Validation-v2.md) §1).
+The PC is now on the MikroTik's LAN by cable, with no USB LAN adapter:
 
 ```
-PC 192.168.100.219 ──route──▶ MikroTik 192.168.100.132 ──vlan88──▶ HSGQ XE04I 192.168.88.10:23 (telnet, root)
-                                                                     └─ PON 1 → 1:16 NAP → Huawei EG8145V5
-                                                                        ONU 1/27 · MAC 30:c5:0f:d8:7f:2c
+Converge router ──LAN──▶ MikroTik ether1-ISP1
+PC 192.168.50.253 (DHCP) ──LAN──▶ MikroTik ether4-LAN 192.168.50.1 ──vlan88 on ether3──▶ HSGQ XE04I 192.168.88.10:23 (telnet)
+                                                                                           └─ PON 1 → Huawei EG8145V5
+                                                                                              ONU 1/27 · MAC 30:c5:0f:d8:7f:2c
 ```
 
 ### Before you start
 
-- **The route to the OLT still works.** The API and the worker run on this PC and telnet to the
-  OLT themselves:
+- **The OLT is reachable.** The MikroTik is the PC's default gateway and routes to VLAN 88 itself,
+  so no static route is needed. The API and the worker run on this PC and telnet to the OLT
+  themselves:
   ```powershell
-  route print 192.168.88.*                           # the persistent route via 192.168.100.132
   Test-NetConnection 192.168.88.10 -Port 23          # → TcpTestSucceeded : True
   ```
-  If the route is missing: `route -p add 192.168.88.0 mask 255.255.255.0 192.168.100.132`
-  (admin PowerShell).
+  `PingSucceeded : False` is normal; ICMP is blocked. A persistent route to `192.168.88.0` via
+  `192.168.50.1` is harmless; delete any old one via `192.168.100.132`
+  (`route delete 192.168.88.0`, admin PowerShell).
 - **Close PuTTY and the Winbox terminal.** The XE04I allows **one** CLI session. An open PuTTY
   window blocks the system, and it looks like a connection error.
 - **Dry-run is ON** (part 4, step 3). Check the banner on SuperAdmin → System Settings.
-- **The test ONU is 1/27** (the Huawei, MAC `30:c5:0f:d8:7f:2c`). It is the only ONU online. Its
-  description on the OLT ("Jacqueline-Rebancos PON 2 NAP 1 PORT 5") is left over from the
-  previous ISP; ignore it.
+- **The test ONU is 1/27** (the Huawei, MAC `30:c5:0f:d8:7f:2c`). It is the only ONU online.
+- ⚠️ **Never reboot the OLT from the GUI or the CLI.** On this firmware it hangs until someone
+  pulls the power (v2 §16). The system never sends `reboot`.
+- ⚠️ **Never plug the OLT's MGMT port into the Converge router.** It is set to `192.168.100.1`,
+  the Converge router's own address.
+- The OLT, the ONU and the MikroTik share one power source. Cutting it restarts all three.
 
 ### Step A: add the OLT and its port
 
@@ -146,14 +156,19 @@ later if you need them.
 
 ### Step B: read-only discovery (safe even with dry-run off)
 
-**Network → Discovery → Sweep an OLT.** This only **reads** (`show onu-info all`). It creates
-nothing.
+**Network → Discovery → Sweep an OLT.** This only **reads** (`show onu-info all`, one session
+per PON port you registered). It creates nothing.
 
-- ✅ **It works:** about **200 ONUs** appear marked **Not on file**: bindings left over from the
-  previous ISP (60 on PON 1, 36 / 56 / 48 on 2–4), **only 1/27 online**. Check 1/27's MAC reads
-  `30:c5:0f:d8:7f:2c`.
-- ❌ **Errors, or the list is empty or garbled:** the parser needs adjusting. Send me the error
-  and the raw output (Discovery → the run → item details).
+- ✅ **It works:** with only PON 1 registered, **60 ONUs** appear marked **Not on file**. They
+  are bindings left over from the previous ISP. **Only 1/27 is online.** Check 1/27's MAC reads
+  `30:c5:0f:d8:7f:2c`. (Registering ports 2–4 as well gives about 200: 36 / 56 / 48.)
+- ❌ **Errors:** the sweep now fails loudly rather than returning a short list. It fails if the
+  OLT answers `vty% …`, if the list never reaches its `Total:` footer, or if the number of rows
+  read differs from `Total:`. Send me the error message and the raw output (Discovery → the run →
+  item details).
+- ❌ **"Timed out waiting for prompt/more":** send me the `got: "…"` text at the end of the
+  message. It shows the last thing the OLT printed.
+- ❌ **"The OLT refused the login":** re-enter the credentials on the OLT (Step A).
 
 Add **only 1/27**: its row's ⋮ → **Add to inventory**, on PON 1 and your NAP. **Leave the other
 ~199 alone.** They are not TERANETWORK customers.
@@ -167,17 +182,31 @@ read-only). Expect it **online**, with RX power around −12 dBm (the bench meas
 
 ### Step C: rehearse with dry-run ON
 
+0. 1/27 must show **Active** first: the ⋮ menu offers *Suspend service* only on an active ONU.
+   An ONU imported from Discovery while online starts active. One added by hand with **Add ONU**
+   starts **Unprovisioned**, and a dry-run *Check status now* does not change that. In that case,
+   turn dry-run OFF for one **Check status now** (it only sends `show` commands), then turn it back
+   ON.
 1. Add a **test customer** by hand ("TEST – Bench ONU") and a **subscription** on ONU 1/27.
-2. **Network → ONUs →** 1/27 ⋮ → **Suspend service**, then **Restore service**. (Staff can't
-   suspend a *subscription* directly; only the unpaid-account sweep does that (D6). The ONU's own
-   actions are the manual test.)
-3. Same menu → **Device history.** Both entries are marked `dry_run`, and the commands should be
-   exactly what you validated on the bench:
+2. **Network → ONUs →** 1/27 ⋮ → **Suspend service**. (Staff can't suspend a *subscription*
+   directly; only the unpaid-account sweep does that (D6). The ONU's own actions are the manual
+   test.) A dry-run changes nothing, so 1/27 stays **Active**, and **Restore service**, which
+   appears only on a suspended ONU, can't be rehearsed here. You'll see its commands for real in
+   step D, and the driver's tests check them.
+3. Same menu → **Device history.** The entry is marked `dry_run`, and the commands should be
+   exactly these:
 
-   | Action | Commands (inside `interface epon 1`) |
+   | Action | Commands |
    | --- | --- |
-   | Suspend | `blacklist add mac 30:c5:0f:d8:7f:2c` → `onu-deregister 27` → `save` |
-   | Restore | `blacklist delete mac 30:c5:0f:d8:7f:2c` → `save` |
+   | Suspend | `interface epon 1` → `blacklist add mac 30:c5:0f:d8:7f:2c` → `show blacklist onu-info all` → `end` → `copy running-config startup-config` |
+   | Restore | `interface epon 1` → `blacklist delete mac 30:c5:0f:d8:7f:2c` → `show blacklist onu-info all` → `end` → `copy running-config startup-config` |
+
+   **No `onu-deregister`** (changed 2026-09-24). The v2 re-test showed that `blacklist add` alone
+   unbinds and drops the ONU. A deregister after it only answers "ONU is not exist", which the
+   system would count as a failure and retry. Each action reads the blacklist back: that table is
+   the proof, not the command's reply. `blacklist delete` sometimes prints an error even when it
+   worked. Before every session the system also sends `enable`, `terminal length 0` and
+   `configure`; those aren't listed here.
 
 If anything differs, stop here and send me the Device history entry.
 
@@ -185,11 +214,31 @@ If anything differs, stop here and send me the Device history entry.
 
 1. SuperAdmin → System Settings → **Dry-run OFF** (it asks to confirm).
 2. 1/27 ⋮ → **Suspend service.** The worker runs it within seconds.
-3. Check it really dropped: the Huawei's PON light goes off/red, and 1/27 shows offline in a
-   fresh **Check status now**. Device history shows the OLT's real replies.
-4. 1/27 ⋮ → **Restore service.** It should re-register on its own within a minute (removing it
-   from the blacklist is enough; you confirmed this on the bench).
+3. Check it really dropped: the Huawei's PON light goes off/red. Device history shows the
+   OLT's real replies, and the blacklist table in them lists the MAC. A fresh **Check status now**
+   shows 1/27 **not online**. It is missing from the OLT's ONU table altogether, because
+   blacklisting deletes its binding.
+4. 1/27 ⋮ → **Restore service.** The OLT's reply may include `Error, No Bind ONU fail, reason:
+   ONU is not exist.`, which is a known false alarm. The job succeeds if the blacklist table in
+   the reply no longer lists the MAC. The ONU retries about **every 60 s**, so wait **1–2
+   minutes**, then **Check status now**: online, RX about −12 dBm.
 5. **Dry-run back ON.**
+
+**If something goes wrong half-way**, put the OLT back by hand. Stop the worker first so it
+doesn't retry, then in PuTTY:
+
+```text
+enable
+configure
+interface epon 1
+show blacklist onu-info all
+blacklist delete mac 30:c5:0f:d8:7f:2c
+show blacklist onu-info all        ← must be empty
+end
+copy running-config startup-config ← " Configuration saved successfully"
+```
+
+Then close PuTTY before you start the worker again.
 
 Send me the Device history entries (commands and replies) from this step, working or not. They
 are the first transcripts of the system driving the OLT itself, and the driver is tuned from them.
@@ -228,9 +277,9 @@ Until then:
 - [ ] Owner login created, company profile filled
 - [ ] How customers pay and Plans set up (part 5)
 - [ ] `Test-NetConnection 192.168.88.10 -Port 23` succeeds, PuTTY closed
-- [ ] OLT, PON 1, splitter, NAP added; discovery lists ~200 ONUs with 1/27 online
+- [ ] OLT, PON 1, splitter, NAP added; discovery lists 60 ONUs on PON 1 with only 1/27 online
 - [ ] Only ONU 1/27 added to inventory; Check status now shows it online
-- [ ] Dry-run commands match the bench (blacklist + deregister + save / blacklist delete + save)
+- [ ] Dry-run commands match part 6 step C (blacklist add/delete + blacklist read-back + save, no deregister)
 - [ ] One real suspend and restore on 1/27, transcripts sent
 - [ ] **Dry-run back ON**
 
