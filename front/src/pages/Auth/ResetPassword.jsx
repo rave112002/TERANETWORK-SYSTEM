@@ -46,7 +46,8 @@ const ResetPassword = ({ portal = "admin" }) => {
   });
   const newPassword = form.watch("password");
 
-  const loginPath = `/${portal}`;
+  // The login lives at the site root; the password pages stay under the portal.
+  const loginPath = "/";
 
   const onSubmit = ({ password }) => {
     mutate(
@@ -88,7 +89,7 @@ const ResetPassword = ({ portal = "admin" }) => {
           title="Invalid reset link"
           subtitle="This link is missing its reset token. Please request a new one."
         />
-        <NavLink to={`${loginPath}/forgot-password`}>
+        <NavLink to={`/${portal}/forgot-password`}>
           <Button size="lg" className="mt-6 w-full">
             Request a new link
           </Button>

@@ -34,6 +34,7 @@ const SubscriptionsPage = () => {
     error,
     refetch,
     canWrite,
+    networkEnabled,
     columns,
     handleTableChange,
     handleSearch,
@@ -50,6 +51,7 @@ const SubscriptionsPage = () => {
   const totalSubscriptions = pagination?.total || 0;
   const activeSubs = data?.filter((s) => s.status === "active") || [];
   const suspended = data?.filter((s) => s.status === "suspended").length || 0;
+  const pending = data?.filter((s) => s.status === "pending").length || 0;
   // Recurring revenue counts suspended subscriptions too — they are still
   // customers, just ones currently cut off for non-payment.
   //
@@ -82,7 +84,11 @@ const SubscriptionsPage = () => {
     <div className="p-8 space-y-5">
       <PageHeader
         title="Subscriptions"
-        subtitle="Who is on which plan, through which modem — and what the billing cycle will pick up."
+        subtitle={
+          networkEnabled
+            ? "Who is on which plan, through which modem — and what the billing cycle will pick up."
+            : "Who is on which plan — and what the billing cycle will pick up."
+        }
         actions={
           canWrite && (
             <Button onClick={handleCreate}>
@@ -106,12 +112,22 @@ const SubscriptionsPage = () => {
           change="on this page"
           icon={<FileSignature className="w-4.25 h-4.25" strokeWidth={1.8} />}
         />
-        <StatCard
-          title="Suspended"
-          value={suspended}
-          change="cut off for non-payment"
-          icon={<WifiOff className="w-4.25 h-4.25" strokeWidth={1.8} />}
-        />
+        {/* A billing-only branch suspends nobody (D11). */}
+        {networkEnabled ? (
+          <StatCard
+            title="Suspended"
+            value={suspended}
+            change="cut off for non-payment"
+            icon={<WifiOff className="w-4.25 h-4.25" strokeWidth={1.8} />}
+          />
+        ) : (
+          <StatCard
+            title="Pending"
+            value={pending}
+            change="not billed until activated, this page"
+            icon={<FileSignature className="w-4.25 h-4.25" strokeWidth={1.8} />}
+          />
+        )}
         <StatCard
           title="Monthly recurring"
           value={formatPeso(mrr)}
@@ -177,8 +193,12 @@ const SubscriptionsPage = () => {
                   <SelectItem value="all">Any status</SelectItem>
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="suspended">Suspended</SelectItem>
-                  <SelectItem value="for_recovery">For pull-out</SelectItem>
+                  {networkEnabled && (
+                    <>
+                      <SelectItem value="suspended">Suspended</SelectItem>
+                      <SelectItem value="for_recovery">For pull-out</SelectItem>
+                    </>
+                  )}
                   <SelectItem value="terminated">Closed</SelectItem>
                 </SelectContent>
               </Select>

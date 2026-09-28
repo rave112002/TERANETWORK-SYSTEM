@@ -7,6 +7,7 @@ import {
   useGetCollectionsReport,
   useGetSubscriberReport,
 } from "../../../services/requests/admin/reports";
+import { usePermissions } from "../../../hooks/usePermissions";
 import { decodeHTML } from "../../../utils/decode-html";
 import { formatPeso } from "../../../utils/currency";
 
@@ -44,7 +45,7 @@ export const REPORTS = [
     key: "subscribers",
     label: "Subscribers",
     title: "Subscribers",
-    subtitle: "The roster, with plan, modem and what each one owes.",
+    subtitle: "The roster, with plan, service and what each one owes.",
     noun: "subscription",
   },
 ];
@@ -72,6 +73,7 @@ const bucket = (value) => {
 };
 
 export const useReportsData = () => {
+  const { networkEnabled } = usePermissions();
   const [report, setReport] = useState("aging");
 
   const [from, setFrom] = useState(dayjs().startOf("month").format("YYYY-MM-DD"));
@@ -256,9 +258,11 @@ export const useReportsData = () => {
             <div style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
               {row.serviceStatus}
             </div>
-            <div className="truncate" style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
-              {row.provisioningState ?? "no modem"}
-            </div>
+            {networkEnabled && (
+              <div className="truncate" style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+                {row.provisioningState ?? "no modem"}
+              </div>
+            )}
           </div>
         ),
       },
@@ -289,8 +293,9 @@ export const useReportsData = () => {
             <span style={{ fontSize: 12.5, color: "var(--color-text-muted)" }}>—</span>
           ),
       },
-    ],
-    []
+      // A billing-only branch tracks no modems (D11).
+    ].filter((column) => networkEnabled || column.key !== "onuMac"),
+    [networkEnabled]
   );
 
   const columns = { aging: agingColumns, collections: collectionsColumns, subscribers: subscriberColumns }[
@@ -320,5 +325,6 @@ export const useReportsData = () => {
     error: active?.error ?? null,
     refetch: active?.refetch ?? (() => {}),
     handleExport,
+    networkEnabled,
   };
 };

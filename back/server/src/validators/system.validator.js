@@ -28,9 +28,9 @@ const hourOfDay = (label) =>
     .max(23, `${label} must be between 00:00 and 23:00`)
     .optional();
 
-// PUT /settings — every field optional; send only what is changing.
-export const updateSettingsSchema = z
-  .object({
+// Every field optional; send only what is changing. Shared by both callers
+// below — only whether NETWORK_ENABLED is accepted differs.
+const settingsFields = {
     // The kill switch. Boolean, and only a boolean.
     DRY_RUN: z.boolean().optional(),
     // 0 is the client's configured value, not a missing one — see
@@ -82,10 +82,35 @@ export const updateSettingsSchema = z
       .min(1, "At least one day — the same evening they were cut off is not a decision")
       .max(365, "More than a year of waiting is almost certainly a mistake")
       .optional(),
+};
+
+const atLeastOne = [
+  (data) => Object.keys(data).length > 0,
+  { message: "Provide at least one setting to update" },
+];
+
+// PUT /api/v1/admin/system/settings — the branch's own Admin portal.
+//
+// NETWORK_ENABLED is refused outright rather than silently dropped: whether a
+// branch runs the network side is decided centrally (D11), and a request that
+// tries to change it should say so instead of reporting success.
+export const updateSettingsSchema = z
+  .object({
+    ...settingsFields,
+    NETWORK_ENABLED: z
+      .never({ error: "Network features can only be turned on or off from the central SuperAdmin" })
+      .optional(),
   })
-  .refine((data) => Object.keys(data).length > 0, {
-    message: "Provide at least one setting to update",
-  });
+  .refine(...atLeastOne);
+
+// PUT /api/v1/manage/system-settings — the central SuperAdmin.
+export const manageUpdateSettingsSchema = z
+  .object({
+    ...settingsFields,
+    // The network switch. Boolean, and only a boolean.
+    NETWORK_ENABLED: z.boolean().optional(),
+  })
+  .refine(...atLeastOne);
 
 // GET /jobs — the queue view
 export const listJobsQuerySchema = z.object({

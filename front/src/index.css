@@ -18,6 +18,17 @@
 
    Never hardcode a hex in a page — reference these tokens so light/dark and
    future re-themes "just work".
+
+   TERANETWORK BRAND PALETTE — the neutrals below are built from it:
+     Jet Black #1A1A1A  primary   — text, primary button; dark-mode canvas
+     Onyx      #222526            — dark-mode surface
+     Graphite  #353A3E            — secondary text; dark-mode borders
+     Platinum  #E0E0E0  secondary — borders; dark-mode text and button
+     Ash       #BFBFBF            — dark-mode secondary text
+   Levels the palette has no colour for (page tint, hover wells, muted
+   captions) are marked "derived": steps between two brand colours, not new
+   hues. The green accent and the status colours are not part of the brand
+   palette and are unchanged.
    ============================================================================ */
 @theme {
   /* ── TYPE ───────────────────────────────────────────────────────────────
@@ -49,33 +60,33 @@
 
   /* ── SEMANTIC · Text ────────────────────────────────────────────────────── */
   --color-text-color: #ffffff; /* on-accent text */
-  --color-text-dark: #18181b; /* primary text / values */
-  --color-text2: #27272a; /* mid text (expanded-parent nav label) */
-  --color-text-secondary: #52525b; /* body / labels */
-  --color-text-muted: #a1a1aa; /* captions, icons, `#`, units */
+  --color-text-dark: #1a1a1a; /* Jet Black — primary text / values */
+  --color-text2: #222526; /* Onyx — mid text (expanded-parent nav label) */
+  --color-text-secondary: #353a3e; /* Graphite — body / labels */
+  --color-text-muted: #8a8e91; /* derived, Graphite→Ash — captions, icons, `#`, units */
 
   /* ── SEMANTIC · Surfaces ────────────────────────────────────────────────── */
-  --color-canvas: #f5f5f6; /* page background */
+  --color-canvas: #f2f2f2; /* derived, Platinum tint — page background */
   --color-surface: #ffffff; /* cards, table, drawer body */
   --color-surface-raised: #ffffff; /* dropdowns, popovers */
-  --color-surface-sunken: #f4f4f5; /* wells, hover, toggle track */
+  --color-surface-sunken: #ebebeb; /* derived, Platinum tint — wells, hover, toggle track */
 
   /* ── SEMANTIC · Lines (hairline borders, not shadows) ───────────────────── */
-  --color-line: #e4e4e7; /* hairline borders */
-  --color-line-soft: #f4f4f5; /* row dividers */
+  --color-line: #e0e0e0; /* Platinum — hairline borders */
+  --color-line-soft: #ebebeb; /* derived — row dividers */
 
   /* Legacy aliases */
-  --color-border: #e4e4e7;
-  --color-border-light: #f4f4f5;
-  --color-primary-pale: #f4f4f5; /* was a pastel tint — now neutral */
-  --color-secondary-pale: #f4f4f5;
-  --color-bg-primary: #f5f5f6;
-  --color-bg-secondary: #f4f4f5;
-  --color-bg-tertiary: #e4e4e7;
+  --color-border: #e0e0e0;
+  --color-border-light: #ebebeb;
+  --color-primary-pale: #ebebeb; /* was a pastel tint — now neutral */
+  --color-secondary-pale: #ebebeb;
+  --color-bg-primary: #f2f2f2;
+  --color-bg-secondary: #ebebeb;
+  --color-bg-tertiary: #e0e0e0;
 
   /* ── INVERTED PRIMARY BUTTON ────────────────────────────────────────────── */
-  --color-btn-bg: #18181b;
-  --color-btn-text: #fafafa;
+  --color-btn-bg: #1a1a1a; /* Jet Black */
+  --color-btn-text: #ffffff;
 
   /* ── RADII ──────────────────────────────────────────────────────────────── */
   --radius-card: 14px;
@@ -89,7 +100,7 @@
 
   /* ── ACCENT CHIP GRADIENT (drawer header mark only) ─────────────────────── */
   --gradient-primary: linear-gradient(135deg, #22c55e 0%, #4ade80 100%);
-  --gradient-background: linear-gradient(135deg, #f5f5f6 0%, #ffffff 100%);
+  --gradient-background: linear-gradient(135deg, #f2f2f2 0%, #ffffff 100%);
 
   /* ── SHADOWS — structure comes from borders, not shadows. Flat by design;
      floating layers (dropdown/modal/drawer) get their shadow from shadcn/Radix. ── */
@@ -107,40 +118,39 @@
   --color-primary-color: #4ade80;
 
   /* Chart series — a *selected* dark step from the same green ramp (not an
-     automatic flip of the light value). Validated against the dark surface:
-     inside the dark OKLCH lightness band and >=3:1 contrast. */
+     automatic flip of the light value). >=3:1 against the Onyx surface. */
   --chart-series-1: #1eb055;
 
   /* Text */
-  --color-text-dark: #f4f4f5;
-  --color-text2: #e4e4e7;
-  --color-text-secondary: #a1a1aa;
-  --color-text-muted: #52525b;
+  --color-text-dark: #e0e0e0; /* Platinum */
+  --color-text2: #e0e0e0; /* Platinum */
+  --color-text-secondary: #bfbfbf; /* Ash */
+  --color-text-muted: #7d8286; /* derived, Graphite→Ash */
 
   /* Surfaces */
-  --color-canvas: #09090b;
-  --color-surface: #0f0f12;
-  --color-surface-raised: #18181b;
-  --color-surface-sunken: #18181b;
+  --color-canvas: #1a1a1a; /* Jet Black */
+  --color-surface: #222526; /* Onyx */
+  --color-surface-raised: #2a2e31; /* derived, Onyx→Graphite */
+  --color-surface-sunken: #2a2e31; /* derived, Onyx→Graphite */
 
   /* Lines */
-  --color-line: #27272a;
-  --color-line-soft: #1c1c20;
+  --color-line: #353a3e; /* Graphite */
+  --color-line-soft: #2a2e31; /* derived */
 
   /* Legacy aliases */
-  --color-border: #27272a;
-  --color-border-light: #1c1c20;
-  --color-primary-pale: #18181b;
-  --color-secondary-pale: #18181b;
-  --color-bg-primary: #09090b;
-  --color-bg-secondary: #18181b;
-  --color-bg-tertiary: #27272a;
+  --color-border: #353a3e;
+  --color-border-light: #2a2e31;
+  --color-primary-pale: #2a2e31;
+  --color-secondary-pale: #2a2e31;
+  --color-bg-primary: #1a1a1a;
+  --color-bg-secondary: #2a2e31;
+  --color-bg-tertiary: #353a3e;
 
   /* Inverted primary flips in dark */
-  --color-btn-bg: #fafafa;
-  --color-btn-text: #09090b;
+  --color-btn-bg: #e0e0e0; /* Platinum */
+  --color-btn-text: #1a1a1a; /* Jet Black */
 
-  --gradient-background: linear-gradient(135deg, #09090b 0%, #0f0f12 100%);
+  --gradient-background: linear-gradient(135deg, #1a1a1a 0%, #222526 100%);
 }
 
 /* ============================================================================

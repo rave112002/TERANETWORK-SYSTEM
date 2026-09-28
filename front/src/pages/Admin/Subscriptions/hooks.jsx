@@ -40,7 +40,7 @@ export const SUBSCRIPTION_STATUS = {
 };
 
 export const useSubscriptionsData = () => {
-  const { hasPermission } = usePermissions();
+  const { hasPermission, networkEnabled } = usePermissions();
   const canWrite = hasPermission("subscriptions", null, "write");
 
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10 });
@@ -79,7 +79,12 @@ export const useSubscriptionsData = () => {
 
   // Any ONU can be offered; the API is what rejects one already bound to a live
   // subscription, so the two can never disagree about what "free" means.
-  const { data: onusData } = useGetOnus({ page: 1, pageSize: 100, recordStatus: "Active" });
+  // Not fetched on a billing-only branch: there are no modems, and the
+  // endpoint would refuse anyway (D11).
+  const { data: onusData } = useGetOnus(
+    { page: 1, pageSize: 100, recordStatus: "Active" },
+    { enabled: networkEnabled },
+  );
   const onuOptions = useMemo(
     () =>
       (onusData?.data?.onus || []).map((o) => ({
@@ -145,7 +150,9 @@ export const useSubscriptionsData = () => {
     async (record) => {
       const ok = await confirm({
         title: "Terminate subscription",
-        description: `End service for ${decodeHTML(record.customerName)}? This cannot be undone. The ONU is released for reuse, but the modem still needs deprovisioning at the OLT.`,
+        description: networkEnabled
+          ? `End service for ${decodeHTML(record.customerName)}? This cannot be undone. The ONU is released for reuse, but the modem still needs deprovisioning at the OLT.`
+          : `End service for ${decodeHTML(record.customerName)}? This cannot be undone, and no further invoices are generated for it.`,
         confirmText: "Terminate",
         cancelText: "Cancel",
         danger: true,
@@ -154,7 +161,7 @@ export const useSubscriptionsData = () => {
         transitionMutation.mutate({ subscriptionId: record.subscriptionId, action: "terminate" });
       }
     },
-    [transitionMutation],
+    [transitionMutation, networkEnabled],
   );
 
   const handleRevoke = useCallback(
@@ -249,7 +256,8 @@ export const useSubscriptionsData = () => {
       // Marking for pull-out is offered here as well as on the Recovery screen,
       // because this is where somebody ends up when they go looking at one
       // specific customer rather than working through a list.
-      if (record.status === "suspended") {
+      // Pull-out belongs to the network side, with Modem Recovery (D11).
+      if (networkEnabled && record.status === "suspended") {
         items.push({
           key: "revoke",
           label: "Mark for pull-out",
@@ -262,7 +270,7 @@ export const useSubscriptionsData = () => {
       // Closing is deliberately NOT here: it needs the technician's answer about
       // whether the modem came back, and that is a question, not a confirmation.
       // It lives on the Recovery screen.
-      if (record.status === "for_recovery") {
+      if (networkEnabled && record.status === "for_recovery") {
         items.push({
           key: "unrevoke",
           label: "Cancel pull-out",
@@ -285,6 +293,7 @@ export const useSubscriptionsData = () => {
     },
     [
       canWrite,
+      networkEnabled,
       handleActivate,
       handleEdit,
       handleTerminate,
@@ -295,7 +304,8 @@ export const useSubscriptionsData = () => {
   );
 
   const columns = useMemo(
-    () => [
+    () =>
+      [
       {
         title: "Subscriber",
         key: "subscriber",
@@ -389,8 +399,8 @@ export const useSubscriptionsData = () => {
         align: "right",
         render: (_, record) => <RowActions items={getActionItems(record)} />,
       },
-    ],
-    [getActionItems],
+    ].filter((column) => networkEnabled || column.key !== "onu"),
+    [getActionItems, networkEnabled],
   );
 
   return {
@@ -405,6 +415,7 @@ export const useSubscriptionsData = () => {
     error,
     refetch,
     canWrite,
+    networkEnabled,
     columns,
     handleTableChange,
     handleSearch,

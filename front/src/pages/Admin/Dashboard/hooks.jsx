@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 
+import { usePermissions } from "../../../hooks/usePermissions";
 import { useGetOperationsSummary } from "../../../services/requests/admin/reports";
 
 /**
@@ -24,7 +25,7 @@ import { useGetOperationsSummary } from "../../../services/requests/admin/report
  * because a screen full of zeroes trains people to skim past it on the morning
  * one of them is not zero.
  */
-const buildAttention = (attention) => {
+const buildAttention = (attention, { network = true } = {}) => {
   if (!attention) return [];
 
   const items = [];
@@ -128,7 +129,9 @@ const buildAttention = (attention) => {
     });
   }
 
-  if (attention.atRisk > 0) {
+  // Disconnection and exemptions only exist with the network switch on; on a
+  // billing-only branch the Overdue card above already says who is behind.
+  if (network && attention.atRisk > 0) {
     items.push({
       key: "at-risk",
       severity: "warning",
@@ -150,7 +153,7 @@ const buildAttention = (attention) => {
     });
   }
 
-  if (attention.liveExemptions > 0) {
+  if (network && attention.liveExemptions > 0) {
     items.push({
       key: "exemptions",
       severity: "info",
@@ -165,15 +168,20 @@ const buildAttention = (attention) => {
 };
 
 export const useDashboardData = () => {
+  const { networkEnabled } = usePermissions();
   const { data, isLoading, isFetching, error, refetch } = useGetOperationsSummary();
 
   const summary = data?.data ?? null;
 
-  const attention = useMemo(() => buildAttention(summary?.attention), [summary]);
+  const attention = useMemo(
+    () => buildAttention(summary?.attention, { network: networkEnabled }),
+    [summary, networkEnabled],
+  );
 
   return {
     summary,
     attention,
+    networkEnabled,
     money: summary?.money ?? { billedThisMonth: 0, outstanding: 0, overdue: 0, openInvoices: 0 },
     service: summary?.service ?? { active: 0, suspended: 0, pending: 0, monthlyRecurring: 0 },
     network:

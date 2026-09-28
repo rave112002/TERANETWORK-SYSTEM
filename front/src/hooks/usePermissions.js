@@ -92,6 +92,15 @@ export const usePermissions = () => {
     [isSuperAdmin, hasPermission],
   );
 
+  /**
+   * Branch-wide switches, decided by the central SuperAdmin (D11). With
+   * `network` off the backend already leaves the Network and Dunning
+   * permissions out of `permissions`; this is for the network parts of screens
+   * everyone can open — a subscription's modem, the dashboard's modem counts.
+   * Anything but an explicit false is on, as on the backend.
+   */
+  const networkEnabled = isSuperAdmin || data?.features?.network !== false;
+
   const role = useMemo(
     () =>
       data
@@ -113,6 +122,7 @@ export const usePermissions = () => {
       hasSubmoduleAccess,
       getModulePermissions,
       hasAnyPermission,
+      networkEnabled,
       isLoading: isSuperAdmin ? false : isLoading,
       error: isSuperAdmin ? null : error,
     }),
@@ -124,6 +134,7 @@ export const usePermissions = () => {
       hasSubmoduleAccess,
       getModulePermissions,
       hasAnyPermission,
+      networkEnabled,
       isSuperAdmin,
       isLoading,
       error,

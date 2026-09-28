@@ -1,5 +1,10 @@
 import { logger } from "../../config/logger.js";
 import { ERROR_CODES } from "../utils/APIError.js";
+import {
+  isNetworkEnabled,
+  isNetworkPermission,
+  NETWORK_OFF_MESSAGE,
+} from "../lib/settings/features.js";
 
 /**
  * Permission check middleware for RBAC
@@ -16,6 +21,19 @@ export const checkPermission = (module, submodule = null, accessLevel = "read") 
           success: false,
           message: "User not authenticated",
           code: ERROR_CODES.TOKEN_INVALID,
+        });
+      }
+
+      // With the network switch off, nobody holds a network permission,
+      // whatever their role says (lib/settings/features.js).
+      if (
+        isNetworkPermission(module, submodule) &&
+        !(await isNetworkEnabled(req.db, req.user.companyId))
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: NETWORK_OFF_MESSAGE,
+          code: ERROR_CODES.FORBIDDEN,
         });
       }
 

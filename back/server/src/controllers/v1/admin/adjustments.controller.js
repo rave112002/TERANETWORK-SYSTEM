@@ -7,6 +7,7 @@ import { getAuditContext, writeAudit } from "../../../utils/audit.js";
 import { getCurrentTimestampLocal } from "../../../utils/dateUtils.js";
 import { money, toAmount } from "../../../lib/money/money.js";
 import {
+  bulkCreateAdjustmentSchema,
   createAdjustmentSchema,
   listAdjustmentsQuerySchema,
 } from "../../../validators/billing.validator.js";
@@ -210,6 +211,169 @@ router.post(
       return res.sendSuccess(
         "Adjustment recorded. It will appear on the next invoice.",
         { pendingChargeId, amount: signed },
+        201
+      );
+    } catch (err) {
+      if (conn) await req.db.rollback(conn);
+      throw err;
+    }
+  })
+);
+
+/**
+ * GET /targets
+ *
+ * Every subscription an adjustment can go on — active or suspended — for the
+ * bulk picker. Unpaginated on purpose: "credit everyone on this plan" has to
+ * be able to see everyone, and the subscription list stops at 100 a page. A
+ * branch has hundreds of subscriptions, not hundreds of thousands, and these
+ * rows are small.
+ */
+router.get(
+  "/targets",
+  checkPermission("billing", "adjustments", "read"),
+  catchAsync(async (req, res) => {
+    const scope = branchScope("s.branchId", getScopedBranchIds(req.user));
+
+    const subscriptions = await req.db.query(
+      `SELECT s.subscriptionId, s.status, s.planId,
+              c.customerId, c.name AS customerName, c.accountNo,
+              p.name AS planName, p.monthlyPrice
+         FROM subscriptions s
+         JOIN customers c ON c.customerId = s.customerId
+         LEFT JOIN plans p ON p.planId = s.planId
+        WHERE s.companyId = ?${scope.clause}
+          AND s.recordStatus != 'Deleted'
+          AND s.status IN ('active', 'suspended')
+        ORDER BY c.name ASC, c.accountNo ASC`,
+      [req.user.companyId, ...scope.params]
+    );
+
+    return res.sendSuccess("Adjustment targets retrieved successfully", { subscriptions });
+  })
+);
+
+/** Rows per INSERT statement in a bulk create; keeps each packet small. */
+const INSERT_CHUNK = 200;
+
+/**
+ * POST /bulk
+ *
+ * The same adjustment on many subscriptions — an outage credit for a whole
+ * area, a promo discount for one plan. Same rules as POST /, applied to every
+ * subscription in the list.
+ *
+ * ── All or nothing ──────────────────────────────────────────────────────────
+ *
+ * One transaction. If any subscription is missing or terminated, nothing is
+ * recorded and the response names which ones. A batch that half-applies leaves
+ * somebody working out by hand who got the credit and who did not, and the
+ * only honest answer to "did everyone get it?" is then "check each one".
+ */
+router.post(
+  "/bulk",
+  checkPermission("billing", "adjustments", "write"),
+  validateBody(bulkCreateAdjustmentSchema),
+  catchAsync(async (req, res) => {
+    const { subscriptionIds, kind, description, amount } = req.body;
+    const { companyId, accountId } = req.user;
+
+    let conn;
+    try {
+      conn = await req.db.beginTransaction();
+
+      // One new pendingChargeId per subscription, from MySQL, in the same read.
+      const scope = branchScope("s.branchId", getScopedBranchIds(req.user));
+      const placeholders = subscriptionIds.map(() => "?").join(", ");
+      const [subs] = await conn.execute(
+        `SELECT s.subscriptionId, s.branchId, s.customerId, s.status, c.accountNo,
+                UUID() AS pendingChargeId
+           FROM subscriptions s
+           JOIN customers c ON c.customerId = s.customerId
+          WHERE s.subscriptionId IN (${placeholders}) AND s.companyId = ?${scope.clause}
+            AND s.recordStatus != 'Deleted'
+          FOR UPDATE`,
+        [...subscriptionIds, companyId, ...scope.params]
+      );
+
+      const found = new Set(subs.map((s) => s.subscriptionId));
+      const missing = subscriptionIds.filter((id) => !found.has(id));
+      if (missing.length > 0) {
+        await req.db.rollback(conn);
+        return res.sendError(
+          `${missing.length} of the selected subscriptions no longer exist. Nothing was recorded — refresh and try again.`,
+          404
+        );
+      }
+
+      // Same reason as POST /: a terminated subscription is never invoiced
+      // again, so its adjustment would sit unapplied forever.
+      const terminated = subs.filter((s) => s.status === "terminated");
+      if (terminated.length > 0) {
+        await req.db.rollback(conn);
+        return res.sendError(
+          `Nothing was recorded: ${terminated.map((s) => s.accountNo).join(", ")} ` +
+            `${terminated.length === 1 ? "is" : "are"} terminated and will not be invoiced again. ` +
+            `Leave ${terminated.length === 1 ? "it" : "them"} out and try again.`,
+          409
+        );
+      }
+
+      const signed = NEGATIVE_KINDS.has(kind)
+        ? money(amount).negated().toFixed(2)
+        : toAmount(amount);
+      const now = getCurrentTimestampLocal();
+
+      for (let i = 0; i < subs.length; i += INSERT_CHUNK) {
+        const chunk = subs.slice(i, i + INSERT_CHUNK);
+        await conn.execute(
+          `INSERT INTO pending_charges
+             (pendingChargeId, companyId, branchId, customerId, subscriptionId, kind,
+              description, amount, createdBy, dateCreated, dateUpdated)
+           VALUES ${chunk.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ")}`,
+          chunk.flatMap((s) => [
+            s.pendingChargeId,
+            companyId,
+            s.branchId,
+            s.customerId,
+            s.subscriptionId,
+            kind,
+            description,
+            signed,
+            accountId,
+            now,
+            now,
+          ])
+        );
+      }
+
+      const total = money(signed).times(subs.length).toFixed(2);
+
+      // One entry for the batch, listing every charge it made, so "who got the
+      // July outage credit?" is one audit row rather than hundreds.
+      await writeAudit(conn, {
+        context: getAuditContext(req),
+        module: "billing",
+        action: "adjustment_bulk_created",
+        description: `${kind}: ${description} — ${subs.length} subscription${subs.length === 1 ? "" : "s"}`,
+        after: {
+          kind,
+          amountEach: signed,
+          count: subs.length,
+          total,
+          charges: subs.map((s) => ({
+            pendingChargeId: s.pendingChargeId,
+            subscriptionId: s.subscriptionId,
+            accountNo: s.accountNo,
+          })),
+        },
+      });
+
+      await req.db.commit(conn);
+
+      return res.sendSuccess(
+        `${subs.length} adjustment${subs.length === 1 ? "" : "s"} recorded. Each will appear on that customer's next invoice.`,
+        { count: subs.length, amountEach: signed, total },
         201
       );
     } catch (err) {

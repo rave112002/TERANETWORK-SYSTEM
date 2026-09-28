@@ -1,6 +1,7 @@
 import express from "express";
 import { catchAsync, validateBody } from "../../../utils/catchAsync.js";
 import { checkPermissionSchema } from "../../../validators/permissions.validator.js";
+import { isNetworkEnabled, isNetworkPermission } from "../../../lib/settings/features.js";
 
 const router = express.Router();
 
@@ -111,9 +112,19 @@ router.get(
       }
     }
 
-    const permissions = Array.from(permissionMap.values());
+    // The network switch outranks the role: with it off, network permissions
+    // are dropped here as they are in checkPermission, so the menu matches
+    // what the API will allow. `features` lets pages hide the network parts
+    // of screens everyone can open (a subscription's modem, say).
+    const network = await isNetworkEnabled(req.db, req.user.companyId);
+    const permissions = Array.from(permissionMap.values()).filter(
+      (p) => network || !isNetworkPermission(p.module, p.submodule)
+    );
 
-    return res.sendSuccess("User permissions retrieved", { permissions });
+    return res.sendSuccess("User permissions retrieved", {
+      permissions,
+      features: { network },
+    });
   })
 );
 
@@ -130,6 +141,13 @@ router.post(
 
     if (!accountId) {
       return res.sendError("Unauthorized", 401);
+    }
+
+    if (
+      isNetworkPermission(module, submodule || null) &&
+      !(await isNetworkEnabled(req.db, req.user.companyId))
+    ) {
+      return res.sendSuccess("Permission check", { hasPermission: false });
     }
 
     // roleId is already on the authenticated user (set by passport). Coerce to

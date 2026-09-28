@@ -15,8 +15,9 @@ import { Auth, UnAuth } from "./ValidateAuth";
  * points `@app-routes` here). The branch build uses routes/index.jsx and never
  * imports this file, so none of these pages ship to a branch PC.
  *
- * Paths stay under /superadmin so the shared layout pieces (sidebar, the
- * permission hook) recognise this as the SuperAdmin portal.
+ * Pages stay under /superadmin so the shared layout pieces (sidebar, the
+ * permission hook) recognise this as the SuperAdmin portal. Only the login is
+ * at "/", and it uses none of those pieces.
  */
 
 // Checked by scripts/check-build.mjs: present in this build, absent from the branch build.
@@ -85,13 +86,16 @@ const useLayoutStore = () => {
 const SuperAdminRoutes = () => (
   <BrowserRouter>
     <Routes>
+      {/* The login is the front door, at "/". Signed in already → Branches. */}
       <Route
         element={<UnAuth store={useSuperAdminConsoleStore} redirect="/superadmin/branches" />}
       >
-        <Route path="/superadmin/login" element={page(Login)} />
+        <Route path="/" element={page(Login)} />
       </Route>
+      {/* Where the login used to be; old bookmarks land on the new one. */}
+      <Route path="/superadmin/login" element={<Navigate to="/" replace />} />
 
-      <Route element={<Auth store={useSuperAdminConsoleStore} redirect="/superadmin/login" />}>
+      <Route element={<Auth store={useSuperAdminConsoleStore} redirect="/" />}>
         <Route element={<BasicLayout navigations={navigations} store={useLayoutStore} />}>
           {navigations.map((nav) => (
             <Route key={nav.route} path={nav.route} element={nav.component} />

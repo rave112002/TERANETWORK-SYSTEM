@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -23,10 +23,13 @@ import {
 } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 
+import SubscriptionChecklist from "./SubscriptionChecklist";
 import SectionLabel from "../../../../../components/SectionLabel";
-import { useCreateAdjustment } from "../../../../../services/requests/admin/billing";
-import { useGetSubscriptions } from "../../../../../services/requests/admin/subscriptions";
-import { decodeHTML } from "../../../../../utils/decode-html";
+import {
+  useCreateBulkAdjustment,
+  useGetAdjustmentTargets,
+} from "../../../../../services/requests/admin/billing";
+import { confirm } from "../../../../../store/confirmStore";
 import { formatPeso } from "../../../../../utils/currency";
 
 /**
@@ -39,6 +42,13 @@ import { formatPeso } from "../../../../../utils/currency";
  * peso charge on somebody's bill, and the person who typed it has no reason to
  * look twice. So: a positive figure, and a line underneath saying, in words,
  * which direction the bill will move.
+ *
+ * ── One subscription or many ────────────────────────────────────────────────
+ *
+ * The same adjustment can go on any number of subscriptions at once (an outage
+ * credit for a whole area). It is saved in one all-or-nothing request, and
+ * anything over one asks first, naming the count and the total, because a
+ * wrong amount times three hundred is a morning of removals.
  */
 
 const ADJUSTMENT_KINDS = [
@@ -60,7 +70,7 @@ const ADJUSTMENT_KINDS = [
 ];
 
 const adjustmentSchema = z.object({
-  subscriptionId: z.string().min(1, "Choose whose bill this affects"),
+  subscriptionIds: z.array(z.string()).min(1, "Choose whose bill this affects"),
   kind: z.string().min(1, "Choose what kind of adjustment this is"),
   description: z
     .string()
@@ -73,36 +83,26 @@ const adjustmentSchema = z.object({
     .max(9999999999.99, "That amount is too large"),
 });
 
-const EMPTY = { subscriptionId: "", kind: "credit", description: "", amount: "" };
+const EMPTY = { subscriptionIds: [], kind: "credit", description: "", amount: "" };
 
 const req = <span style={{ color: "var(--color-error)" }}>*</span>;
 
 const AdjustmentFormDrawer = ({ open, onClose, onSuccess }) => {
-  const createMutation = useCreateAdjustment();
+  const createMutation = useCreateBulkAdjustment();
 
-  // Only active and suspended subscriptions: a terminated one is never invoiced
-  // again, so a charge against it would sit unapplied forever — the backend
-  // refuses it, and offering it here would be an invitation to that refusal.
-  const { data: subsData, isLoading: subsLoading } = useGetSubscriptions(
-    { page: 1, pageSize: 100, search: "", status: "" },
-    { enabled: open }
-  );
-
-  const subscriptionOptions = useMemo(
-    () =>
-      (subsData?.data?.subscriptions || [])
-        .filter((s) => s.status === "active" || s.status === "suspended")
-        .map((s) => ({
-          value: s.subscriptionId,
-          label: decodeHTML(s.customerName) || s.accountNo,
-          sub: `${s.accountNo} · ${decodeHTML(s.planName) || "no plan"}`,
-        })),
-    [subsData]
-  );
+  // Only active and suspended subscriptions, and all of them: a terminated one
+  // is never invoiced again, so a charge against it would sit unapplied
+  // forever — the backend refuses it, and offering it here would be an
+  // invitation to that refusal.
+  const { data: targetsData, isLoading: targetsLoading } = useGetAdjustmentTargets({
+    enabled: open,
+  });
+  const targets = targetsData?.data?.subscriptions ?? [];
 
   const form = useForm({ resolver: zodResolver(adjustmentSchema), defaultValues: EMPTY });
   const kind = form.watch("kind");
   const amount = form.watch("amount");
+  const selectedCount = form.watch("subscriptionIds").length;
   const kindMeta = ADJUSTMENT_KINDS.find((k) => k.value === kind);
 
   useEffect(() => {
@@ -115,9 +115,25 @@ const AdjustmentFormDrawer = ({ open, onClose, onSuccess }) => {
   };
 
   const onSubmit = async (values) => {
+    const count = values.subscriptionIds.length;
+    if (count > 1) {
+      const meta = ADJUSTMENT_KINDS.find((k) => k.value === values.kind);
+      const each = Number(values.amount);
+      const ok = await confirm({
+        title: `Add this to ${count} subscriptions?`,
+        description:
+          `"${values.description.trim()}" — ${meta?.label ?? values.kind} of ${formatPeso(each)} on each, ` +
+          `${formatPeso(each * count)} in all. Each customer's next invoice will be ` +
+          `${meta?.reduces ? "lower" : "higher"} by ${formatPeso(each)}.`,
+        confirmText: `Add to ${count}`,
+        cancelText: "Go back",
+      });
+      if (!ok) return;
+    }
+
     try {
       await createMutation.mutateAsync({
-        subscriptionId: values.subscriptionId,
+        subscriptionIds: values.subscriptionIds,
         kind: values.kind,
         description: values.description,
         amount: values.amount,
@@ -169,7 +185,7 @@ const AdjustmentFormDrawer = ({ open, onClose, onSuccess }) => {
                       className="m-0 mt-0.5"
                       style={{ fontSize: 13, color: "var(--color-text-secondary)" }}
                     >
-                      Appears as its own line on the next invoice
+                      On one subscription or many. Each gets its own line on the next invoice.
                     </p>
                   </div>
                 </div>
@@ -193,41 +209,16 @@ const AdjustmentFormDrawer = ({ open, onClose, onSuccess }) => {
               <SectionLabel>Who</SectionLabel>
               <FormField
                 control={form.control}
-                name="subscriptionId"
+                name="subscriptionIds"
                 render={({ field }) => (
                   <FormItem className="mb-5">
-                    <FormLabel>Subscription {req}</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger className="h-10 w-full">
-                          <SelectValue
-                            placeholder={
-                              subsLoading ? "Loading subscriptions…" : "Choose a subscription"
-                            }
-                          />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {subscriptionOptions.length === 0 && !subsLoading && (
-                          <div
-                            className="px-2 py-3 text-center"
-                            style={{ fontSize: 12.5, color: "var(--color-text-muted)" }}
-                          >
-                            No active subscriptions found
-                          </div>
-                        )}
-                        {subscriptionOptions.map((o) => (
-                          <SelectItem key={o.value} value={o.value}>
-                            <span className="flex flex-col items-start">
-                              <span>{o.label}</span>
-                              <span style={{ fontSize: 11.5, color: "var(--color-text-muted)" }}>
-                                {o.sub}
-                              </span>
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormLabel>Subscriptions {req}</FormLabel>
+                    <SubscriptionChecklist
+                      options={targets}
+                      value={field.value}
+                      onChange={field.onChange}
+                      isLoading={targetsLoading}
+                    />
                     <FormMessage />
                   </FormItem>
                 )}
@@ -336,9 +327,17 @@ const AdjustmentFormDrawer = ({ open, onClose, onSuccess }) => {
                       color: kindMeta.reduces ? "var(--color-success)" : "var(--color-text-dark)",
                     }}
                   >
-                    The next invoice will be{" "}
+                    {selectedCount > 1 ? "Each customer's next invoice" : "The next invoice"} will be{" "}
                     <strong>{kindMeta.reduces ? "lower" : "higher"}</strong> by{" "}
-                    <span className="font-mono">{formatPeso(previewAmount)}</span>.
+                    <span className="font-mono">{formatPeso(previewAmount)}</span>
+                    {selectedCount > 1 ? (
+                      <>
+                        {" "}— <span className="font-mono">{formatPeso(previewAmount * selectedCount)}</span>{" "}
+                        across {selectedCount} subscriptions.
+                      </>
+                    ) : (
+                      "."
+                    )}
                   </p>
                 </div>
               )}
@@ -356,7 +355,7 @@ const AdjustmentFormDrawer = ({ open, onClose, onSuccess }) => {
               </Button>
               <Button type="submit" size="lg" disabled={createMutation.isPending}>
                 {createMutation.isPending ? <Loader2 className="animate-spin" /> : <Plus />}
-                Save adjustment
+                {selectedCount > 1 ? `Save ${selectedCount} adjustments` : "Save adjustment"}
               </Button>
             </div>
           </form>

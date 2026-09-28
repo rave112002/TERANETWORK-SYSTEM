@@ -76,7 +76,7 @@ Four terminals:
 | --- | --- | --- | --- |
 | 1. Branch API | `back` | `npm run dev` | http://localhost:4000 |
 | 2. Worker (device jobs, schedules, emails) | `back` | `npm run worker:dev` | — |
-| 3. Admin portal | `front` | `npm run dev` | http://localhost:5173/admin |
+| 3. Admin portal | `front` | `npm run dev` | http://localhost:5173/ |
 | 4. SuperAdmin | `superadmin-server` | `npm start` | http://127.0.0.1:8788 |
 
 In **SuperAdmin** (http://127.0.0.1:8788):
@@ -92,7 +92,7 @@ In **SuperAdmin** (http://127.0.0.1:8788):
 
 ## 5. Set up the branch in the Admin portal
 
-Log in at http://localhost:5173/admin with the Owner login from part 4.
+Log in at http://localhost:5173/ with the Owner login from part 4.
 
 1. **Settings → How customers pay:** GCash number, account name, Facebook page, Terms.
 2. **Subscribers → Plans:** the client's plans (₱699 / ₱850 / ₱950 / ₱1,399 per the interim spec;

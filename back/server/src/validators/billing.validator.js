@@ -205,6 +205,25 @@ export const createAdjustmentSchema = z.object({
   amount: money({ min: 0.01 }),
 });
 
+/** More than a branch has subscriptions; the cap keeps one request bounded. */
+export const MAX_BULK_ADJUSTMENTS = 1000;
+
+/**
+ * POST /adjustments/bulk — the same adjustment on many subscriptions at once
+ * (an outage credit for everyone on a PON, say). Same rules as a single one;
+ * duplicates in the list are dropped rather than charged twice.
+ */
+export const bulkCreateAdjustmentSchema = z.object({
+  subscriptionIds: z
+    .array(z.string().min(1).max(50), { error: "Choose at least one subscription" })
+    .min(1, "Choose at least one subscription")
+    .max(MAX_BULK_ADJUSTMENTS, `At most ${MAX_BULK_ADJUSTMENTS} subscriptions at a time`)
+    .transform((ids) => [...new Set(ids)]),
+  kind: z.enum(ADJUSTMENT_KINDS, { error: "Select what kind of adjustment this is" }),
+  description: z.string().min(3, "A description is required").max(255),
+  amount: money({ min: 0.01 }),
+});
+
 export default {
   INVOICE_STATUSES,
   PAYMENT_CHANNELS,
@@ -218,4 +237,5 @@ export default {
   recordPaymentSchema,
   listAdjustmentsQuerySchema,
   createAdjustmentSchema,
+  bulkCreateAdjustmentSchema,
 };

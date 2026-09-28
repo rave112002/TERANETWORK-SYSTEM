@@ -55,7 +55,9 @@ const SystemPage = () => {
     );
   }
 
-  const dryRun = Boolean(settings?.DRY_RUN);
+  // Dry-run only matters where devices are driven; a billing-only branch
+  // (network switch off, D11) has none.
+  const dryRun = Boolean(settings?.DRY_RUN) && settings?.NETWORK_ENABLED !== false;
   const deadJobs = Number(stats.dead) || 0;
 
   return (
@@ -99,7 +101,6 @@ const SystemPage = () => {
         </div>
       ) : (
         <div
-          className="max-w-4xl"
           style={{
             background: "var(--color-surface)",
             border: "1px solid var(--color-line)",

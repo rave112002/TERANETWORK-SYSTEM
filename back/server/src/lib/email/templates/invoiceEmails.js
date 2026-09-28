@@ -181,6 +181,8 @@ export const buildInvoiceIssuedEmail = ({
  *   0 means the disconnection has already happened by the time it is read.
  * @param {number} [args.cutOffHour] the hour the sweep runs, named on the final
  *   notice so "today" has a deadline attached to it.
+ * @param {boolean} [args.disconnects=true] false on a billing-only branch (the
+ *   network switch is off): nobody is disconnected, so no notice may say so.
  * @param {string} [args.companyName="TERANETWORK"]
  * @returns {{subject: string, html: string, text: string}}
  */
@@ -192,6 +194,7 @@ export const buildInvoiceNoticeEmail = ({
   facebookPageUrl,
   graceDays = null,
   cutOffHour = null,
+  disconnects = true,
   companyName = "TERANETWORK",
 }) => {
   const due = dateOnly(invoice.dueDate);
@@ -238,6 +241,13 @@ export const buildInvoiceNoticeEmail = ({
             : null,
     },
   };
+
+  // A billing-only branch does not disconnect anybody, so neither notice may
+  // threaten it or promise an automatic restore. Saying nothing is true.
+  if (!disconnects) {
+    COPY.final = { ...COPY.final, heading: "Your invoice is past due", consequence: null };
+    COPY.overdue = { ...COPY.overdue, consequence: null };
+  }
 
   const copy = COPY[kind] ?? COPY.reminder;
 

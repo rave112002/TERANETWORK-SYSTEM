@@ -208,7 +208,6 @@ const SettingsPage = () => {
       />
 
       <div
-        className="max-w-2xl"
         style={{
           background: "var(--color-surface)",
           border: "1px solid var(--color-line)",
@@ -223,244 +222,252 @@ const SettingsPage = () => {
           <div className="px-4.5 py-5">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} autoComplete="off">
-                <SectionLabel>General</SectionLabel>
-                <FormField
-                  control={form.control}
-                  name="companyDisplayName"
-                  render={({ field }) => (
-                    <FormItem className="mb-5">
-                      <FormLabel>Company display name</FormLabel>
-                      <div className="relative">
-                        <Building2
-                          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
-                          style={{ color: "var(--color-text-muted)" }}
-                        />
-                        <FormControl>
-                          <Input
-                            placeholder="e.g., Acme Corp"
-                            className="h-10 pl-9"
-                            disabled={!canWrite}
-                            {...field}
-                          />
-                        </FormControl>
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="supportEmail"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Support email</FormLabel>
-                      <div className="relative">
-                        <Mail
-                          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
-                          style={{ color: "var(--color-text-muted)" }}
-                        />
-                        <FormControl>
-                          <Input
-                            placeholder="support@example.com"
-                            className="h-10 pl-9"
-                            disabled={!canWrite}
-                            {...field}
-                          />
-                        </FormControl>
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {/* Two columns on a wide screen so the page is used without
+                    stretching any field: the branch's own details on the left,
+                    what customers are told on the right. One column below xl. */}
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-10">
+                  <div>
+                    <SectionLabel>General</SectionLabel>
+                    <FormField
+                      control={form.control}
+                      name="companyDisplayName"
+                      render={({ field }) => (
+                        <FormItem className="mb-5">
+                          <FormLabel>Company display name</FormLabel>
+                          <div className="relative">
+                            <Building2
+                              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
+                              style={{ color: "var(--color-text-muted)" }}
+                            />
+                            <FormControl>
+                              <Input
+                                placeholder="e.g., Acme Corp"
+                                className="h-10 pl-9"
+                                disabled={!canWrite}
+                                {...field}
+                              />
+                            </FormControl>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="supportEmail"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Support email</FormLabel>
+                          <div className="relative">
+                            <Mail
+                              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
+                              style={{ color: "var(--color-text-muted)" }}
+                            />
+                            <FormControl>
+                              <Input
+                                placeholder="support@example.com"
+                                className="h-10 pl-9"
+                                disabled={!canWrite}
+                                {...field}
+                              />
+                            </FormControl>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-                <div className="mt-7">
-                  <SectionLabel>Localization</SectionLabel>
-                  <FormField
-                    control={form.control}
-                    name="dateFormat"
-                    render={({ field }) => (
-                      <FormItem className="mb-5">
-                        <FormLabel>Date format</FormLabel>
-                        <Select
-                          value={field.value || undefined}
-                          onValueChange={field.onChange}
-                          disabled={!canWrite}
-                        >
-                          <FormControl>
-                            <SelectTrigger className="h-10 w-full">
-                              <SelectValue placeholder="Select a format" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {DATE_FORMAT_OPTIONS.map((o) => (
-                              <SelectItem key={o.value} value={o.value}>
-                                {o.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="timezone"
-                    render={({ field }) => (
-                      <FormItem className="mb-5">
-                        <FormLabel>Timezone</FormLabel>
-                        <div className="relative">
-                          <Clock
-                            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
-                            style={{ color: "var(--color-text-muted)" }}
-                          />
-                          <FormControl>
-                            <Input
-                              placeholder="e.g., Asia/Manila"
-                              className="h-10 pl-9"
+                    <div className="mt-7">
+                      <SectionLabel>Localization</SectionLabel>
+                      <FormField
+                        control={form.control}
+                        name="dateFormat"
+                        render={({ field }) => (
+                          <FormItem className="mb-5">
+                            <FormLabel>Date format</FormLabel>
+                            <Select
+                              value={field.value || undefined}
+                              onValueChange={field.onChange}
                               disabled={!canWrite}
-                              {...field}
+                            >
+                              <FormControl>
+                                <SelectTrigger className="h-10 w-full">
+                                  <SelectValue placeholder="Select a format" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {DATE_FORMAT_OPTIONS.map((o) => (
+                                  <SelectItem key={o.value} value={o.value}>
+                                    {o.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="timezone"
+                        render={({ field }) => (
+                          <FormItem className="mb-5">
+                            <FormLabel>Timezone</FormLabel>
+                            <div className="relative">
+                              <Clock
+                                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
+                                style={{ color: "var(--color-text-muted)" }}
+                              />
+                              <FormControl>
+                                <Input
+                                  placeholder="e.g., Asia/Manila"
+                                  className="h-10 pl-9"
+                                  disabled={!canWrite}
+                                  {...field}
+                                />
+                              </FormControl>
+                            </div>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="weekStartsOn"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Week starts on</FormLabel>
+                            <StatusToggle
+                              value={field.value}
+                              onChange={field.onChange}
+                              options={WEEK_START_OPTIONS}
                             />
-                          </FormControl>
-                        </div>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="weekStartsOn"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Week starts on</FormLabel>
-                        <StatusToggle
-                          value={field.value}
-                          onChange={field.onChange}
-                          options={WEEK_START_OPTIONS}
-                        />
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                  </div>
 
-                <div className="mt-7">
-                  <SectionLabel>How customers pay</SectionLabel>
-                  <FormField
-                    control={form.control}
-                    name="gcashNumber"
-                    render={({ field }) => (
-                      <FormItem className="mb-5">
-                        <FormLabel>GCash number</FormLabel>
-                        <div className="relative">
-                          <Smartphone
-                            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
-                            style={{ color: "var(--color-text-muted)" }}
-                          />
-                          <FormControl>
-                            <Input
-                              placeholder={PHONE_PLACEHOLDER}
-                              className="h-10 pl-9 font-mono"
-                              inputMode="numeric"
-                              disabled={!canWrite}
-                              {...field}
-                              onChange={(e) =>
-                                field.onChange(formatPhoneOnChange(e.target.value))
-                              }
-                            />
-                          </FormControl>
-                        </div>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="gcashAccountName"
-                    render={({ field }) => (
-                      <FormItem className="mb-5">
-                        <FormLabel>GCash account name</FormLabel>
-                        <div className="relative">
-                          <UserRound
-                            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
-                            style={{ color: "var(--color-text-muted)" }}
-                          />
-                          <FormControl>
-                            <Input
-                              placeholder="e.g., JU** DE** C."
-                              className="h-10 pl-9"
-                              disabled={!canWrite}
-                              {...field}
-                            />
-                          </FormControl>
-                        </div>
-                        <p
-                          className="m-0 mt-1.5"
-                          style={{ fontSize: 12, color: "var(--color-text-muted)" }}
-                        >
-                          Customers check this before sending, so write it the way GCash
-                          shows it.
-                        </p>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="facebookPageUrl"
-                    render={({ field }) => (
-                      <FormItem className="mb-5">
-                        <FormLabel>Facebook page link</FormLabel>
-                        <div className="relative">
-                          <Link2
-                            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
-                            style={{ color: "var(--color-text-muted)" }}
-                          />
-                          <FormControl>
-                            <Input
-                              placeholder="https://www.facebook.com/teranetwork"
-                              className="h-10 pl-9"
-                              disabled={!canWrite}
-                              {...field}
-                            />
-                          </FormControl>
-                        </div>
-                        <p
-                          className="m-0 mt-1.5"
-                          style={{ fontSize: 12, color: "var(--color-text-muted)" }}
-                        >
-                          Where customers send their proof of payment.
-                        </p>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <PaymentPreview control={form.control} />
+                  </div>
 
-                  <FormField
-                    control={form.control}
-                    name="invoiceTerms"
-                    render={({ field }) => (
-                      <FormItem className="mt-5">
-                        <FormLabel>Terms and conditions</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            rows={4}
-                            placeholder="e.g., Pay by the due date to avoid temporary disconnection."
-                            disabled={!canWrite}
-                            {...field}
-                          />
-                        </FormControl>
-                        <p
-                          className="m-0 mt-1.5"
-                          style={{ fontSize: 12, color: "var(--color-text-muted)" }}
-                        >
-                          Printed at the bottom of every invoice. Leave blank to leave it off.
-                        </p>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <div className="mt-7 xl:mt-0">
+                    <SectionLabel>How customers pay</SectionLabel>
+                    <FormField
+                      control={form.control}
+                      name="gcashNumber"
+                      render={({ field }) => (
+                        <FormItem className="mb-5">
+                          <FormLabel>GCash number</FormLabel>
+                          <div className="relative">
+                            <Smartphone
+                              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
+                              style={{ color: "var(--color-text-muted)" }}
+                            />
+                            <FormControl>
+                              <Input
+                                placeholder={PHONE_PLACEHOLDER}
+                                className="h-10 pl-9 font-mono"
+                                inputMode="numeric"
+                                disabled={!canWrite}
+                                {...field}
+                                onChange={(e) =>
+                                  field.onChange(formatPhoneOnChange(e.target.value))
+                                }
+                              />
+                            </FormControl>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="gcashAccountName"
+                      render={({ field }) => (
+                        <FormItem className="mb-5">
+                          <FormLabel>GCash account name</FormLabel>
+                          <div className="relative">
+                            <UserRound
+                              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
+                              style={{ color: "var(--color-text-muted)" }}
+                            />
+                            <FormControl>
+                              <Input
+                                placeholder="e.g., JU** DE** C."
+                                className="h-10 pl-9"
+                                disabled={!canWrite}
+                                {...field}
+                              />
+                            </FormControl>
+                          </div>
+                          <p
+                            className="m-0 mt-1.5"
+                            style={{ fontSize: 12, color: "var(--color-text-muted)" }}
+                          >
+                            Customers check this before sending, so write it the way GCash
+                            shows it.
+                          </p>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="facebookPageUrl"
+                      render={({ field }) => (
+                        <FormItem className="mb-5">
+                          <FormLabel>Facebook page link</FormLabel>
+                          <div className="relative">
+                            <Link2
+                              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
+                              style={{ color: "var(--color-text-muted)" }}
+                            />
+                            <FormControl>
+                              <Input
+                                placeholder="https://www.facebook.com/teranetwork"
+                                className="h-10 pl-9"
+                                disabled={!canWrite}
+                                {...field}
+                              />
+                            </FormControl>
+                          </div>
+                          <p
+                            className="m-0 mt-1.5"
+                            style={{ fontSize: 12, color: "var(--color-text-muted)" }}
+                          >
+                            Where customers send their proof of payment.
+                          </p>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <PaymentPreview control={form.control} />
+
+                    <FormField
+                      control={form.control}
+                      name="invoiceTerms"
+                      render={({ field }) => (
+                        <FormItem className="mt-5">
+                          <FormLabel>Terms and conditions</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              rows={4}
+                              placeholder="e.g., Pay by the due date to avoid temporary disconnection."
+                              disabled={!canWrite}
+                              {...field}
+                            />
+                          </FormControl>
+                          <p
+                            className="m-0 mt-1.5"
+                            style={{ fontSize: 12, color: "var(--color-text-muted)" }}
+                          >
+                            Printed at the bottom of every invoice. Leave blank to leave it off.
+                          </p>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 </div>
 
                 {canWrite && (

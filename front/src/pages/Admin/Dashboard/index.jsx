@@ -115,6 +115,7 @@ const DashboardPage = () => {
     money,
     service,
     network,
+    networkEnabled,
     series,
     period,
     isLoading,
@@ -201,44 +202,57 @@ const DashboardPage = () => {
         <NeedsAttention items={attention} />
       </div>
 
-      {/* Service and network state: what is actually switched on right now. */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
+      {/* Service and network state: what is actually switched on right now.
+          A billing-only branch has no modems and suspends nobody (D11). */}
+      <div
+        className={
+          networkEnabled
+            ? "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5"
+            : "grid grid-cols-2 lg:grid-cols-4 gap-3.5"
+        }
+      >
         <StatCard
           title="Active"
           value={service.active}
           change="subscriptions"
           icon={<CircleCheck className="w-4.25 h-4.25" strokeWidth={1.8} />}
         />
-        <StatCard
-          title="Suspended"
-          value={service.suspended}
-          change="no service"
-          icon={<TriangleAlert className="w-4.25 h-4.25" strokeWidth={1.8} />}
-        />
+        {networkEnabled && (
+          <StatCard
+            title="Suspended"
+            value={service.suspended}
+            change="no service"
+            icon={<TriangleAlert className="w-4.25 h-4.25" strokeWidth={1.8} />}
+          />
+        )}
         <StatCard
           title="Pending"
           value={service.pending}
-          change="awaiting install"
+          change={networkEnabled ? "awaiting install" : "not billed until activated"}
           icon={<Users className="w-4.25 h-4.25" strokeWidth={1.8} />}
         />
-        <StatCard
-          title="Modems up"
-          value={network.onusActive}
-          change="active at the OLT"
-          icon={<Router className="w-4.25 h-4.25" strokeWidth={1.8} />}
-        />
-        <StatCard
-          title="Modems cut"
-          value={network.onusSuspended}
-          change="blacklisted"
-          icon={<Router className="w-4.25 h-4.25" strokeWidth={1.8} />}
-        />
-        <StatCard
-          title="Not provisioned"
-          value={network.onusUnprovisioned}
-          change="in stock or unseated"
-          icon={<Router className="w-4.25 h-4.25" strokeWidth={1.8} />}
-        />
+        {networkEnabled && (
+          <>
+            <StatCard
+              title="Modems up"
+              value={network.onusActive}
+              change="active at the OLT"
+              icon={<Router className="w-4.25 h-4.25" strokeWidth={1.8} />}
+            />
+            <StatCard
+              title="Modems cut"
+              value={network.onusSuspended}
+              change="blacklisted"
+              icon={<Router className="w-4.25 h-4.25" strokeWidth={1.8} />}
+            />
+            <StatCard
+              title="Not provisioned"
+              value={network.onusUnprovisioned}
+              change="in stock or unseated"
+              icon={<Router className="w-4.25 h-4.25" strokeWidth={1.8} />}
+            />
+          </>
+        )}
       </div>
     </div>
   );

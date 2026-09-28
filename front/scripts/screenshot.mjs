@@ -146,7 +146,7 @@ const run = async () => {
 
   // ── Log in ────────────────────────────────────────────────────────
   current = "login";
-  await page.goto(`${APP}/admin/login`, { waitUntil: "networkidle" });
+  await page.goto(`${APP}/`, { waitUntil: "networkidle" });
   await page.screenshot({ path: path.join(OUT, "00-login.png"), fullPage: true });
 
   await page.fill('input[type="email"], input[name="email"]', ADMIN.email);

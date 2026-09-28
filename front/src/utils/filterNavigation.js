@@ -2,11 +2,15 @@
  * Filter navigation items based on user permissions
  * @param {Array} navigation - Array of navigation items
  * @param {Function} hasPermission - Permission check function
+ * @param {{network?: boolean}} [features] - branch switches; an item marked
+ *   `requiresNetwork` is dropped when `network` is false (D11)
  * @returns {Array} Filtered navigation items
  */
-export const filterNavigationByPermissions = (navigation, hasPermission) => {
+export const filterNavigationByPermissions = (navigation, hasPermission, features = {}) => {
   return navigation
     .filter((item) => {
+      if (item.requiresNetwork && features.network === false) return false;
+
       // If no permission required, show item
       if (!item.permission) return true;
 
@@ -27,7 +31,7 @@ export const filterNavigationByPermissions = (navigation, hasPermission) => {
       if (item.children) {
         return {
           ...item,
-          children: filterNavigationByPermissions(item.children, hasPermission),
+          children: filterNavigationByPermissions(item.children, hasPermission, features),
         };
       }
       return item;

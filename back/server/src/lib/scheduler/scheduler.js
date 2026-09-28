@@ -3,6 +3,7 @@ import moment from "moment-timezone";
 
 import { logger } from "../../../config/logger.js";
 import { getBillingSchedule } from "../settings/settings.service.js";
+import { isNetworkEnabled } from "../settings/features.js";
 import { runDailyBilling } from "../billing/reminders.service.js";
 import { runDunningSweep } from "../dunning/dunning.service.js";
 import { runMonthlyCycle } from "../billing/cycle.service.js";
@@ -280,7 +281,19 @@ export const tick = async (db, { now = new Date() } = {}) => {
       dueDaily.push(company);
     }
     if (claimRun("dunning", company.companyId, at, schedule.dunningHour)) {
-      dueDunning.push(company);
+      // A branch with the network switch off has nothing to disconnect with.
+      // If the switch cannot be read, skip: a missed sweep is recovered
+      // tomorrow, a wrong disconnection is not.
+      let network = false;
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        network = await isNetworkEnabled(db, company.companyId);
+      } catch (error) {
+        logger.error(
+          `🚨 [scheduler] could not read NETWORK_ENABLED for ${company.name}, skipping the sweep: ${error.message}`
+        );
+      }
+      if (network) dueDunning.push(company);
     }
   }
 

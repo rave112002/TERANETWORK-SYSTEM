@@ -1,7 +1,7 @@
 import dayjs from "dayjs";
 
 import { loginBg } from "../assets/images";
-import { teraWordmarkDark, teraWordmarkWhite } from "../assets/images/logos";
+import { teraNetworkBlack, teraLogoWhite } from "../assets/images/logos";
 
 const PORTAL_LABEL = {
   admin: "Admin Portal",
@@ -51,7 +51,7 @@ const AuthLayout = ({ portal = "admin", children }) => (
 
       <div className="relative z-10 flex h-full w-full flex-col justify-between p-12">
         <img
-          src={teraWordmarkWhite}
+          src={teraLogoWhite}
           alt="TERANETWORK"
           className="h-11 w-fit"
           onContextMenu={(e) => e.preventDefault()}
@@ -87,14 +87,14 @@ const AuthLayout = ({ portal = "admin", children }) => (
             one once the theme flips. */}
         <div className="mb-8 lg:hidden">
           <img
-            src={teraWordmarkDark}
+            src={teraNetworkBlack}
             alt="TERANETWORK"
             className="h-10 w-fit dark:hidden"
             onContextMenu={(e) => e.preventDefault()}
             onDragStart={(e) => e.preventDefault()}
           />
           <img
-            src={teraWordmarkWhite}
+            src={teraLogoWhite}
             alt="TERANETWORK"
             className="hidden h-10 w-fit dark:block"
             onContextMenu={(e) => e.preventDefault()}

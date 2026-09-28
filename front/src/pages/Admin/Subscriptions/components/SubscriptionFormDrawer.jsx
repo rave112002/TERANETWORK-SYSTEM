@@ -30,6 +30,7 @@ import {
 
 import SectionLabel from "../../../../components/SectionLabel";
 import { useDiscardGuard } from "../../../../hooks/useDiscardGuard";
+import { usePermissions } from "../../../../hooks/usePermissions";
 import {
   useCreateSubscription,
   useUpdateSubscription,
@@ -60,6 +61,10 @@ const SubscriptionFormDrawer = ({
   onuOptions = [],
 }) => {
   const isEditMode = !!entity;
+  // A billing-only branch tracks no modems, so the field is left out. The
+  // form still carries the subscription's current onuId, so saving an edit
+  // never detaches one (D11).
+  const { networkEnabled } = usePermissions();
 
   const createMutation = useCreateSubscription();
   const updateMutation = useUpdateSubscription();
@@ -170,7 +175,9 @@ const SubscriptionFormDrawer = ({
                     >
                       {isEditMode
                         ? `Currently ${entity?.status}`
-                        : "Binds a subscriber to a plan and a modem"}
+                        : networkEnabled
+                          ? "Binds a subscriber to a plan and a modem"
+                          : "Binds a subscriber to a plan"}
                     </p>
                   </div>
                 </div>
@@ -253,38 +260,40 @@ const SubscriptionFormDrawer = ({
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="onuId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Modem (ONU)</FormLabel>
-                    <Select value={field.value || NO_ONU} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger className="h-10 w-full">
-                          <SelectValue placeholder="Not attached yet" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value={NO_ONU}>Not attached yet</SelectItem>
-                        {onuOptions.map((o) => (
-                          <SelectItem key={o.value} value={o.value}>
-                            {o.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p
-                      className="m-0 mt-1.5"
-                      style={{ fontSize: 12, color: "var(--color-text-muted)" }}
-                    >
-                      A subscription can be created before installation, but cannot be
-                      activated without a modem.
-                    </p>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {networkEnabled && (
+                <FormField
+                  control={form.control}
+                  name="onuId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Modem (ONU)</FormLabel>
+                      <Select value={field.value || NO_ONU} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger className="h-10 w-full">
+                            <SelectValue placeholder="Not attached yet" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value={NO_ONU}>Not attached yet</SelectItem>
+                          {onuOptions.map((o) => (
+                            <SelectItem key={o.value} value={o.value}>
+                              {o.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p
+                        className="m-0 mt-1.5"
+                        style={{ fontSize: 12, color: "var(--color-text-muted)" }}
+                      >
+                        A subscription can be created before installation, but cannot be
+                        activated without a modem.
+                      </p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <div className="mt-7">
                 <SectionLabel>Notes</SectionLabel>

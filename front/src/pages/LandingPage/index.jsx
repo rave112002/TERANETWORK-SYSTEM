@@ -126,7 +126,7 @@ const LandingPage = () => {
           </p>
 
           <div className="flex items-center justify-center gap-2.5 mt-8">
-            <Button size="lg" onClick={() => navigate("/admin")}>
+            <Button size="lg" onClick={() => navigate("/")}>
               Admin Login
             </Button>
             <Button size="lg" variant="outline" asChild>

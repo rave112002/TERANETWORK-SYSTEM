@@ -7,7 +7,8 @@ import {
 import { useSelectedBranch } from "../components/useSelectedBranch";
 
 /**
- * One branch's runtime settings (dry-run, billing schedule, rules), read from
+ * One branch's runtime settings (network switch, dry-run, billing schedule,
+ * rules), read from
  * and saved to that branch (D10). The branch applies the same checks and audit
  * as its own System page.
  */
@@ -23,6 +24,12 @@ export const useBranchSystemSettingsData = () => {
 
   const handleDryRunChange = useCallback(
     (next) => mutation.mutate({ branchId, DRY_RUN: next }),
+    [branchId, mutation]
+  );
+
+  // Only SuperAdmin can flip it; the branch's own System page cannot (D11).
+  const handleNetworkChange = useCallback(
+    (next) => mutation.mutate({ branchId, NETWORK_ENABLED: next }),
     [branchId, mutation]
   );
 
@@ -42,6 +49,7 @@ export const useBranchSystemSettingsData = () => {
     refetch,
     isSaving: mutation.isPending,
     handleDryRunChange,
+    handleNetworkChange,
     handleSave,
   };
 };

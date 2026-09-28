@@ -8,6 +8,7 @@ import { getAuditContext, writeAudit } from "../../../utils/audit.js";
 import { enqueue } from "../../../lib/jobs/jobs.queue.js";
 import { findScopedRow } from "../../../lib/network/network.helpers.js";
 import { getRecoveryAfterDays } from "../../../lib/settings/settings.service.js";
+import { isNetworkEnabled } from "../../../lib/settings/features.js";
 import {
   findAwaitingPullOut,
   findRecoveryCandidates,
@@ -519,6 +520,8 @@ router.post(
     const { action, reason, outcome } = req.body;
     const { companyId } = req.user;
     const now = getCurrentTimestampLocal();
+    // Read before the transaction opens: it is a setting, not part of the change.
+    const networkEnabled = action === "activate" ? await isNetworkEnabled(req.db, companyId) : true;
 
     let conn;
     try {
@@ -542,7 +545,9 @@ router.post(
           );
         }
 
-        if (!before.onuId) {
+        // A billing-only branch (network switch off) tracks no modems, so
+        // there is nothing to attach — service is provided outside the system.
+        if (networkEnabled && !before.onuId) {
           await req.db.rollback(conn);
           return res.sendError(
             "Attach an ONU before activating — there is nothing to provide service through.",

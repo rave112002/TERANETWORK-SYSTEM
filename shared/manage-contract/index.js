@@ -100,6 +100,8 @@ export const versionCompatibility = (version) => {
  * @property {boolean} dryRun               device actions are simulated, not sent to the OLT
  * @property {{lastBackupAt: string|null}} backup  null until backups report in
  * @property {EmailUsage} [email]           absent on branches built before 2026-09-28
+ * @property {boolean} [networkEnabled]     false: the branch bills only (D11). Absent on
+ *           branches built before the switch existed, which run the full system.
  */
 
 /**
@@ -190,6 +192,8 @@ export const readBranchHealth = (data) => {
           isCount(d.email.limit) &&
           typeof d.email.configured === "boolean"),
     ],
+    // Optional for the same reason.
+    ["networkEnabled", d.networkEnabled === undefined || typeof d.networkEnabled === "boolean"],
   ];
 
   const bad = checks.find(([, valid]) => !valid);

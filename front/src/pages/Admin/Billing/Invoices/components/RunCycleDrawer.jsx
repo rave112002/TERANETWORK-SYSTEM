@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 
 import SectionLabel from "../../../../../components/SectionLabel";
+import { usePermissions } from "../../../../../hooks/usePermissions";
 import {
   useRunBillingCycle,
   useRunDailyBilling,
@@ -29,6 +30,8 @@ import {
 const RunCycleDrawer = ({ open, onClose }) => {
   const cycleMutation = useRunBillingCycle();
   const dailyMutation = useRunDailyBilling();
+  // A billing-only branch suspends nobody, so the suspension notes are left out (D11).
+  const { networkEnabled } = usePermissions();
 
   const [runDate, setRunDate] = useState("");
 
@@ -133,8 +136,9 @@ const RunCycleDrawer = ({ open, onClose }) => {
                 className="m-0 mt-2"
                 style={{ fontSize: 12.5, color: "var(--color-text-muted)" }}
               >
-                Suspended subscriptions are skipped and accrue nothing. Anything already
-                billed for this month is skipped too, so running it twice is safe.
+                {networkEnabled
+                  ? "Suspended subscriptions are skipped and accrue nothing. Anything already billed for this month is skipped too, so running it twice is safe."
+                  : "Anything already billed for this month is skipped, so running it twice is safe."}
               </p>
               <Button
                 type="button"
@@ -167,8 +171,9 @@ const RunCycleDrawer = ({ open, onClose }) => {
                 className="m-0 mt-2"
                 style={{ fontSize: 12.5, color: "var(--color-text-muted)" }}
               >
-                This does not disconnect anyone. Suspension happens separately, after the
-                grace period.
+                {networkEnabled
+                  ? "This does not disconnect anyone. Suspension happens separately, after the grace period."
+                  : "This does not disconnect anyone."}
               </p>
               <Button
                 type="button"

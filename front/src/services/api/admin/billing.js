@@ -135,13 +135,20 @@ export const getAdjustmentsApi = async (filters = {}) => {
   return response.data;
 };
 
+/** Every active or suspended subscription, for the bulk picker. */
+export const getAdjustmentTargetsApi = async () => {
+  const response = await api.get("/api/v1/admin/adjustments/targets");
+  return response.data;
+};
+
 /**
- * The amount is always positive; the backend applies the sign from `kind`.
+ * The same adjustment on one subscription or many, all or nothing. The amount
+ * is always positive; the backend applies the sign from `kind`.
  *
- * @param {{subscriptionId: string, kind: string, description: string, amount: number}} data
+ * @param {{subscriptionIds: string[], kind: string, description: string, amount: number}} data
  */
-export const createAdjustmentApi = async (data) => {
-  const response = await api.post("/api/v1/admin/adjustments", data);
+export const createBulkAdjustmentApi = async (data) => {
+  const response = await api.post("/api/v1/admin/adjustments/bulk", data);
   return response.data;
 };
 

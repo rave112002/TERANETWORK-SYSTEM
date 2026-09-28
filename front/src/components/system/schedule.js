@@ -26,15 +26,15 @@ export const asHour = (h) => `${String(Number(h) || 0).padStart(2, "0")}:00`;
  * first customer calls.
  *
  * @param {Object} values the live form values.
+ * @param {Object} [options]
+ * @param {boolean} [options.network=true] false on a billing-only branch, which
+ *   suspends nobody — so the sentence stops at the reminder.
  * @returns {string}
  */
-export const describeSchedule = ({
-  STATEMENT_DAY,
-  DUE_DAY,
-  GRACE_DAYS,
-  REMINDER_DAYS_BEFORE,
-  DUNNING_HOUR,
-}) => {
+export const describeSchedule = (
+  { STATEMENT_DAY, DUE_DAY, GRACE_DAYS, REMINDER_DAYS_BEFORE, DUNNING_HOUR },
+  { network = true } = {},
+) => {
   const grace = Number(GRACE_DAYS) || 0;
   const remind = Number(REMINDER_DAYS_BEFORE) || 0;
 
@@ -48,9 +48,10 @@ export const describeSchedule = ({
       ? "There is no advance reminder"
       : `A reminder goes out ${remind} day${remind === 1 ? "" : "s"} before that`;
 
-  return (
+  const invoices =
     `Invoices for the calendar month go out on the ${ordinal(STATEMENT_DAY)}, ` +
-    `due on the ${ordinal(DUE_DAY)} of the following month. ` +
-    `${reminder}. Unpaid accounts are suspended ${cutOff}.`
-  );
+    `due on the ${ordinal(DUE_DAY)} of the following month. ${reminder}.`;
+
+  if (!network) return `${invoices} Nobody is disconnected by the system.`;
+  return `${invoices} Unpaid accounts are suspended ${cutOff}.`;
 };

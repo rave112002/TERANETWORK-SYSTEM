@@ -43,7 +43,13 @@ import { asHour, describeSchedule } from "./schedule";
  * @param {boolean} props.isSaving
  * @param {(next: boolean) => void} props.onDryRunChange  called after confirmation when turning it off
  * @param {(values: Object) => void} props.onSave         the schedule and rules, as entered
+ * @param {(next: boolean) => void} [props.onNetworkChange] SuperAdmin only: shows the
+ *   network switch (D11). The branch's own page leaves it out — it cannot change it.
  * @param {React.ReactNode} [props.footerNote]            shown beside the Save button
+ *
+ * With the network switch off (`settings.NETWORK_ENABLED === false`) the branch
+ * bills only: dry-run, the disconnection hour, grace days and the pull-out delay
+ * do nothing there, so they are hidden rather than left to confuse.
  */
 
 /**
@@ -139,7 +145,7 @@ const NumberField = ({ control, name, label, hint, min, max, step, disabled }) =
     control={control}
     name={name}
     render={({ field }) => (
-      <FormItem>
+      <FormItem className="content-start">
         <FormLabel>{label}</FormLabel>
         <FormControl>
           <Input type="number" min={min} max={max} step={step} className="h-10" disabled={disabled} {...field} />
@@ -163,7 +169,7 @@ const HourField = ({ control, name, label, hint, disabled }) => (
     control={control}
     name={name}
     render={({ field }) => (
-      <FormItem>
+      <FormItem className="content-start">
         <FormLabel>{label}</FormLabel>
         <Select value={String(field.value)} onValueChange={field.onChange} disabled={disabled}>
           <FormControl>
@@ -186,7 +192,15 @@ const HourField = ({ control, name, label, hint, disabled }) => (
   />
 );
 
-const SystemSettingsPanel = ({ settings, canWrite, isSaving, onDryRunChange, onSave, footerNote }) => {
+const SystemSettingsPanel = ({
+  settings,
+  canWrite,
+  isSaving,
+  onDryRunChange,
+  onSave,
+  onNetworkChange,
+  footerNote,
+}) => {
   const form = useForm({ resolver: zodResolver(schema), defaultValues: toFormValues(null) });
   const {
     formState: { isDirty },
@@ -199,9 +213,39 @@ const SystemSettingsPanel = ({ settings, canWrite, isSaving, onDryRunChange, onS
   // Watched so the plain-English summary tracks what is being typed, not what
   // was last saved.
   const live = useWatch({ control: form.control });
-  const scheduleSentence = describeSchedule({ ...toFormValues(settings), ...live });
+  // Anything but an explicit false is on: a branch that predates the setting
+  // runs the full system.
+  const network = settings?.NETWORK_ENABLED !== false;
+  const scheduleSentence = describeSchedule({ ...toFormValues(settings), ...live }, { network });
 
   const dryRun = Boolean(settings?.DRY_RUN);
+
+  /**
+   * Both directions ask first. Off hides the network side of the branch from
+   * every user; on brings back the disconnection sweep for any subscription
+   * with a modem attached.
+   */
+  const handleNetwork = async (next) => {
+    const ok = await confirm(
+      next
+        ? {
+            title: "Turn network features on?",
+            description:
+              "The branch gets the Network and Dunning pages back, and a subscription needs a modem before it can be activated. The disconnection sweep runs again for every subscription with a modem attached.",
+            confirmText: "Turn them on",
+            cancelText: "Keep billing only",
+          }
+        : {
+            title: "Turn network features off?",
+            description:
+              "The branch becomes billing only: the Network, Dunning and Modem Recovery pages disappear for every user, subscriptions no longer need a modem, and nobody is disconnected. Nothing is deleted.",
+            confirmText: "Turn them off",
+            cancelText: "Keep them on",
+            danger: true,
+          },
+    );
+    if (ok) onNetworkChange(next);
+  };
 
   /**
    * Turning dry-run OFF is the moment the system starts cutting people off for
@@ -223,86 +267,140 @@ const SystemSettingsPanel = ({ settings, canWrite, isSaving, onDryRunChange, onS
     onDryRunChange(next);
   };
 
+  // Present when there is a switch to show: the network switch (SuperAdmin
+  // only) and dry-run (only while network features are on).
+  const hasSwitches = Boolean(onNetworkChange) || network;
+
   return (
-    <div className="px-4.5 py-5">
-      <SectionLabel>Safety</SectionLabel>
-
-      <div className="flex items-start justify-between gap-4 mb-2">
-        <div className="min-w-0">
-          <div style={{ fontSize: 14, fontWeight: 500, color: "var(--color-text-dark)" }}>Dry-run mode</div>
-          <p className="m-0 mt-1" style={{ fontSize: 12.5, color: "var(--color-text-secondary)" }}>
-            Rehearse everything without touching a device. The worker records the exact command it
-            would have sent and stops there.
-          </p>
-        </div>
-        <Switch
-          checked={dryRun}
-          onCheckedChange={handleDryRun}
-          disabled={!canWrite || isSaving}
-          aria-label="Dry-run mode"
-        />
-      </div>
-
-      <div className="mt-7">
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSave)} autoComplete="off">
-            <SectionLabel>Billing schedule</SectionLabel>
-
-            {/* The numbers below, said back as a sentence, live, before saving. */}
-            <p
-              className="m-0 mb-4 px-3.5 py-3"
-              style={{
-                fontSize: 13,
-                lineHeight: 1.6,
-                color: "var(--color-text-secondary)",
-                background: "var(--color-surface-sunken)",
-                borderRadius: "var(--radius-card)",
-              }}
-            >
-              {scheduleSentence}
-            </p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <NumberField control={form.control} name="STATEMENT_DAY" label="Invoices go out on" min={1} max={28} disabled={!canWrite} hint="The bill still covers the whole month." />
-              <NumberField control={form.control} name="DUE_DAY" label="Payment due on" min={1} max={28} disabled={!canWrite} hint="Day of the following month." />
-              <NumberField control={form.control} name="REMINDER_DAYS_BEFORE" label="Remind this many days early" min={0} max={28} disabled={!canWrite} hint="0 turns the advance reminder off." />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
-              <HourField control={form.control} name="CYCLE_HOUR" label="Billing run" disabled={!canWrite} hint="When invoices are generated on the day above." />
-              <HourField control={form.control} name="DAILY_HOUR" label="Notices" disabled={!canWrite} hint="Reminders and overdue notices, every day." />
-              <HourField control={form.control} name="DUNNING_HOUR" label="Disconnections" disabled={!canWrite} hint="When unpaid accounts are suspended." />
-            </div>
-
-            <p className="m-0 mt-3" style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
-              The worker checks these every hour, so a change takes effect on the next hour — no restart.
-            </p>
-
-            <div className="mt-7">
-              <SectionLabel>Billing rules</SectionLabel>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <NumberField control={form.control} name="GRACE_DAYS" label="Grace days" min={0} max={365} disabled={!canWrite} hint="Days after the due date before service is suspended. 0 means the due date itself — the client's current rule." />
-                <NumberField control={form.control} name="VAT_RATE" label="VAT rate" step="0.01" min={0} max={1} disabled={!canWrite} hint="A fraction, not a percentage: enter 0.12 for 12%." />
-                <NumberField control={form.control} name="RECOVERY_AFTER_DAYS" label="Suggest pull-out after" min={1} max={365} disabled={!canWrite} hint="Days without service before an account appears on Modem Recovery. Nothing happens automatically." />
-              </div>
-            </div>
-
-            {canWrite && (
-              <div className="mt-7 pt-5 flex items-center gap-3 justify-end" style={{ borderTop: "1px solid var(--color-line)" }}>
-                {footerNote && (
-                  <span className="mr-auto" style={{ fontSize: 12.5, color: "var(--color-text-muted)" }}>
-                    {footerNote}
-                  </span>
+    // Laid out by the panel's own width, not the screen's: two columns when the
+    // panel has room (the branch's full-width System page), one when it does
+    // not (SuperAdmin's narrower page). Stacked, the order is the original one:
+    // switches, schedule, rules.
+    <div className="@container px-4.5 py-5">
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSave)} autoComplete="off">
+          <div className="grid grid-cols-1 gap-y-7 @5xl:grid-cols-2 @5xl:grid-rows-[auto_1fr] @5xl:gap-x-10">
+            {hasSwitches && (
+              <div className="space-y-7 @5xl:col-start-2 @5xl:row-start-1">
+                {onNetworkChange && (
+                  <div>
+                    <SectionLabel>Features</SectionLabel>
+                    <div className="flex items-start justify-between gap-4 mb-2">
+                      <div className="min-w-0">
+                        <div style={{ fontSize: 14, fontWeight: 500, color: "var(--color-text-dark)" }}>
+                          Network features
+                        </div>
+                        <p className="m-0 mt-1" style={{ fontSize: 12.5, color: "var(--color-text-secondary)" }}>
+                          OLTs, modems, disconnections and modem recovery. Off, the branch bills only:
+                          customers, plans, subscriptions, invoices and payments. Only changeable here.
+                        </p>
+                      </div>
+                      <Switch
+                        checked={network}
+                        onCheckedChange={handleNetwork}
+                        disabled={!canWrite || isSaving}
+                        aria-label="Network features"
+                      />
+                    </div>
+                  </div>
                 )}
-                <Button type="submit" size="lg" disabled={!isDirty || isSaving}>
-                  {isSaving ? <Loader2 className="animate-spin" /> : <Save />}
-                  Save Changes
-                </Button>
+
+                {network && (
+                  <div>
+                    <SectionLabel>Safety</SectionLabel>
+                    <div className="flex items-start justify-between gap-4 mb-2">
+                      <div className="min-w-0">
+                        <div style={{ fontSize: 14, fontWeight: 500, color: "var(--color-text-dark)" }}>Dry-run mode</div>
+                        <p className="m-0 mt-1" style={{ fontSize: 12.5, color: "var(--color-text-secondary)" }}>
+                          Rehearse everything without touching a device. The worker records the exact command it
+                          would have sent and stops there.
+                        </p>
+                      </div>
+                      <Switch
+                        checked={dryRun}
+                        onCheckedChange={handleDryRun}
+                        disabled={!canWrite || isSaving}
+                        aria-label="Dry-run mode"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             )}
-          </form>
-        </Form>
-      </div>
+
+            {/* Left column on a wide panel, spanning both rows. */}
+            <div className="@5xl:col-start-1 @5xl:row-start-1 @5xl:row-span-2">
+              <SectionLabel>Billing schedule</SectionLabel>
+
+              {/* The numbers below, said back as a sentence, live, before saving. */}
+              <p
+                className="m-0 mb-4 px-3.5 py-3"
+                style={{
+                  fontSize: 13,
+                  lineHeight: 1.6,
+                  color: "var(--color-text-secondary)",
+                  background: "var(--color-surface-sunken)",
+                  borderRadius: "var(--radius-card)",
+                }}
+              >
+                {scheduleSentence}
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <NumberField control={form.control} name="STATEMENT_DAY" label="Invoices go out on" min={1} max={28} disabled={!canWrite} hint="The bill still covers the whole month." />
+                <NumberField control={form.control} name="DUE_DAY" label="Payment due on" min={1} max={28} disabled={!canWrite} hint="Day of the following month." />
+                <NumberField control={form.control} name="REMINDER_DAYS_BEFORE" label="Remind this many days early" min={0} max={28} disabled={!canWrite} hint="0 turns the advance reminder off." />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
+                <HourField control={form.control} name="CYCLE_HOUR" label="Billing run" disabled={!canWrite} hint="When invoices are generated on the day above." />
+                <HourField control={form.control} name="DAILY_HOUR" label="Notices" disabled={!canWrite} hint="Reminders and overdue notices, every day." />
+                {network && (
+                  <HourField control={form.control} name="DUNNING_HOUR" label="Disconnections" disabled={!canWrite} hint="When unpaid accounts are suspended." />
+                )}
+              </div>
+
+              <p className="m-0 mt-3" style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+                The worker checks these every hour, so a change takes effect on the next hour — no restart.
+              </p>
+            </div>
+
+            {/* Right column, under the switches when there are any. */}
+            <div
+              className={
+                hasSwitches
+                  ? "self-start @5xl:col-start-2 @5xl:row-start-2"
+                  : "self-start @5xl:col-start-2 @5xl:row-start-1"
+              }
+            >
+              <SectionLabel>Billing rules</SectionLabel>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {network && (
+                  <NumberField control={form.control} name="GRACE_DAYS" label="Grace days" min={0} max={365} disabled={!canWrite} hint="Days after the due date before service is suspended. 0 means the due date itself — the client's current rule." />
+                )}
+                <NumberField control={form.control} name="VAT_RATE" label="VAT rate" step="0.01" min={0} max={1} disabled={!canWrite} hint="A fraction, not a percentage: enter 0.12 for 12%." />
+                {network && (
+                  <NumberField control={form.control} name="RECOVERY_AFTER_DAYS" label="Suggest pull-out after" min={1} max={365} disabled={!canWrite} hint="Days without service before an account appears on Modem Recovery. Nothing happens automatically." />
+                )}
+              </div>
+            </div>
+          </div>
+
+          {canWrite && (
+            <div className="mt-7 pt-5 flex items-center gap-3 justify-end" style={{ borderTop: "1px solid var(--color-line)" }}>
+              {footerNote && (
+                <span className="mr-auto" style={{ fontSize: 12.5, color: "var(--color-text-muted)" }}>
+                  {footerNote}
+                </span>
+              )}
+              <Button type="submit" size="lg" disabled={!isDirty || isSaving}>
+                {isSaving ? <Loader2 className="animate-spin" /> : <Save />}
+                Save Changes
+              </Button>
+            </div>
+          )}
+        </form>
+      </Form>
     </div>
   );
 };

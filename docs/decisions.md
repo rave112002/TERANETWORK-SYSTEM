@@ -370,3 +370,41 @@ pages were not carried over: each branch holds one of each.
 - **`front/scripts/check-build.mjs`** fails the branch build if it contains the central SuperAdmin
   app or any call to `/api/v1/superadmin`.
 
+
+---
+
+## D11 — A billing-only branch: the network switch
+
+**Decided:** 2026-09-28, by the owner. **Amends** [D10](#d10--one-central-superadmin-over-tailscale)
+(one more setting only SuperAdmin can change).
+
+A branch can go live with **billing only**, before its network side is ready: customers, plans,
+subscriptions, invoices (PDF + email), payments, GCash Check, adjustments, dashboard, reports,
+settings, users/roles and the audit trail. No OLT, no modems, no disconnections, no modem recovery.
+It is **one build and one setting**, not a separate frontend build, so a branch moves to the full
+system by flipping it back, with no rebuild or redeploy.
+
+### The setting
+
+`NETWORK_ENABLED` in `system_settings`, **on by default**. A branch that predates it, or has no row,
+runs the full system. Only an explicit "off" is off.
+
+| | |
+| --- | --- |
+| **Only SuperAdmin changes it** | SuperAdmin → System Settings → **Network features**, over the management API. The branch's own Admin → System update refuses the key (400). Every change is audited on the branch as `system:superadmin:<user>`. |
+| **It outranks roles** | Off, nobody holds a `network/*` or `billing/dunning` permission, whatever their role says: `checkPermission` returns 403 and the permission list the menu is built from leaves them out. Roles are not edited, so switching back on restores exactly what each role had. |
+| **Subscriptions need no modem** | Off, a subscription activates without an ONU. On, "attach an ONU before activating" applies again. |
+| **Nobody is disconnected** | Off, the scheduler skips the disconnection sweep. (It would find nobody anyway: the sweep only acts on subscriptions with a modem.) Nothing is ever suspended, so reconnect-on-payment and Modem Recovery never start. |
+| **Customers are told nothing untrue** | Off, overdue and final notices drop the "will be suspended / restored automatically" line. |
+| **Screens that stay hide the network parts** | Modem Recovery leaves the menu; Subscriptions loses the modem picker, Modem column, pull-out actions and the Suspended/For pull-out filters; the Dashboard loses the disconnection items and modem cards; System hides dry-run, the disconnection hour, grace days and the pull-out delay; Reports loses the modem column. |
+
+### What it does not do
+
+- **Staff cut off non-payers by hand**, at the OLT, outside the system. The system still shows
+  them as active; there is no manual "Suspended" status.
+- **The billing schedule rules still apply.** The statement day must still fall after the due day
+  plus grace, and the notice hour before the (hidden) disconnection hour. The client's schedule
+  (25th, due the 2nd, notices 08:00, sweep 20:00) satisfies both.
+- **Turning it on later** brings back the Network and Dunning pages and the modem rule. Existing
+  subscriptions stay active without a modem until one is attached; the sweep ignores them until
+  then.

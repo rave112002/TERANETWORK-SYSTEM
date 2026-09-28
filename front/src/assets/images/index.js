@@ -1,4 +1,4 @@
-import loginBg from "./login-bg.webp";
+import loginBg from "./login-bg.png";
 
 /**
  * Decorative imagery. `loginBg` is the backdrop of the auth pages' brand panel —

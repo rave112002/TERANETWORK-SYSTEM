@@ -90,6 +90,25 @@ describe("tick — what is due this hour", () => {
     expect(runDunningSweep).toHaveBeenCalledTimes(1);
   });
 
+  it("skips the disconnection sweep when the network switch is off", async () => {
+    // A billing-only branch: invoices and notices still go out, nobody is
+    // disconnected.
+    const companyId = nextCompany();
+    const db = {
+      query: async (sql, params = []) => {
+        if (/FROM companies/.test(sql)) return [{ companyId, name: `Co ${companyId}` }];
+        if (params.includes("NETWORK_ENABLED")) return [{ settingValue: "false" }];
+        return SCHEDULE_ROWS;
+      },
+    };
+
+    const result = await tick(db, { now: at("2026-09-10T20:00:00") });
+
+    expect(runDunningSweep).not.toHaveBeenCalled();
+    expect(result.dunning).toEqual([]);
+    expect(runDailyBilling).toHaveBeenCalledTimes(1);
+  });
+
   it("bills only on the statement day, at the billing hour", async () => {
     // The 24th at 09:00 is not the statement day; the 25th at 09:00 is.
     await tick(fakeDb(nextCompany()), { now: at("2026-09-24T09:00:00") });

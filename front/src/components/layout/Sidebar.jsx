@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
-import { logo } from "../../assets/images/logos";
+import { teraBlack, teraWhite } from "../../assets/images/logos";
 import { confirm } from "../../store/confirmStore";
 import { useWindowSize } from "../../hooks/useWindowSize";
 
@@ -102,14 +102,39 @@ const Brand = ({ collapsed, companyLogo }) => {
           border: "1px solid var(--color-line)",
         }}
       >
-        <img
-          src={companyLogo || logo}
-          alt=""
-          width={22}
-          height={22}
-          decoding="async"
-          style={{ maxWidth: 22, maxHeight: 22, objectFit: "contain" }}
-        />
+        {companyLogo ? (
+          <img
+            src={companyLogo}
+            alt=""
+            width={22}
+            height={22}
+            decoding="async"
+            style={{ maxWidth: 22, maxHeight: 22, objectFit: "contain" }}
+          />
+        ) : (
+          // No uploaded logo: the TERANETWORK mark, black on the light
+          // theme's tile and white once the theme flips.
+          <>
+            <img
+              src={teraBlack}
+              alt=""
+              width={22}
+              height={22}
+              decoding="async"
+              className="dark:hidden"
+              style={{ maxWidth: 22, maxHeight: 22, objectFit: "contain" }}
+            />
+            <img
+              src={teraWhite}
+              alt=""
+              width={22}
+              height={22}
+              decoding="async"
+              className="hidden dark:block"
+              style={{ maxWidth: 22, maxHeight: 22, objectFit: "contain" }}
+            />
+          </>
+        )}
       </span>
       {!collapsed && (
         <div className="min-w-0 leading-tight">

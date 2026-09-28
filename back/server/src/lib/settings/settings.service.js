@@ -43,6 +43,11 @@ export const SETTING_KEYS = {
   // How long a suspended account waits before staff are prompted to pull the
   // modem out. Nothing happens automatically when it elapses.
   RECOVERY_AFTER_DAYS: "RECOVERY_AFTER_DAYS",
+
+  // Whether this branch runs the network side at all (OLT inventory, modem
+  // provisioning, the disconnection sweep, modem recovery). Changed only from
+  // the central SuperAdmin — see lib/settings/features.js.
+  NETWORK_ENABLED: "NETWORK_ENABLED",
 };
 
 /**
@@ -71,6 +76,10 @@ const DEFAULTS = {
   [SETTING_KEYS.DUNNING_HOUR]: "20",
 
   [SETTING_KEYS.RECOVERY_AFTER_DAYS]: "60",
+
+  // On unless SuperAdmin turns it off, so a branch that predates the setting
+  // keeps working exactly as before. No migration seeds it; this is the value.
+  [SETTING_KEYS.NETWORK_ENABLED]: "true",
 };
 
 /**

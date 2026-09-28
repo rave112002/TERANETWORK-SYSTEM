@@ -48,7 +48,7 @@ export const VIEWS = {
   inFileNotRecorded: {
     label: "In the file, not recorded",
     color: "var(--color-error)",
-    hint: "Money arrived but no invoice was marked paid. That customer may still be disconnected. Record the payment on their invoice, or mark the line as not a customer payment.",
+    hint: "Money arrived but no invoice was marked paid, so that customer still shows as owing (and, with network features on, may still be disconnected). Record the payment on their invoice, or mark the line as not a customer payment.",
   },
   recordedNotInFile: {
     label: "Recorded, not in the file",

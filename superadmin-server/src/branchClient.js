@@ -44,7 +44,10 @@ export const healthWarnings = (health) => {
       `This installation has ${health.installation.branchCount} branches; it should have exactly 1`
     );
   }
-  if (health.dryRun) warnings.push("Dry-run is on: disconnections are simulated, not sent to the OLT");
+  // Dry-run means nothing on a billing-only branch: it disconnects nobody.
+  if (health.dryRun && health.networkEnabled !== false) {
+    warnings.push("Dry-run is on: disconnections are simulated, not sent to the OLT");
+  }
   // Absent on branches built before the email count existed.
   if (health.email) {
     const { sentLast24h, limit, quotaRefusedLast24h, configured } = health.email;

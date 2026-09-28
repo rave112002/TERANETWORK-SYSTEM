@@ -6,13 +6,14 @@ import {
   readSystemSettings,
   updateSystemSettings,
 } from "../../../lib/settings/systemSettings.service.js";
-import { updateSettingsSchema } from "../../../validators/system.validator.js";
+import { manageUpdateSettingsSchema } from "../../../validators/system.validator.js";
 
 const router = express.Router();
 
 /**
  * Runtime settings — dry-run, billing schedule, grace days, VAT, pull-out
- * delay — managed from the central SuperAdmin (D10). Mounted at
+ * delay — managed from the central SuperAdmin (D10). The network switch
+ * (NETWORK_ENABLED, D11) can only be changed here, not from the branch. Mounted at
  * /api/v1/manage/system-settings, behind the management key.
  *
  * Same validation, same whole-schedule check and same audited transaction as
@@ -34,7 +35,7 @@ router.get(
 /** PUT / — partial: send only what changes. */
 router.put(
   "/",
-  validateBody(updateSettingsSchema),
+  validateBody(manageUpdateSettingsSchema),
   catchAsync(async (req, res) => {
     const context = manageAuditContext(req);
     const result = await updateSystemSettings(req.db, {

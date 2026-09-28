@@ -86,7 +86,8 @@ export const useBranchesData = () => {
         key: "branch",
         ellipsis: true,
         render: (_, record) => {
-          const installation = checks[record.branchId]?.health?.installation;
+          const health = checks[record.branchId]?.health;
+          const installation = health?.installation;
           return (
             <div className="min-w-0">
               <div className="truncate" style={{ fontSize: 13.5, color: "var(--color-text-dark)" }}>
@@ -95,6 +96,11 @@ export const useBranchesData = () => {
               <div className="truncate font-mono" style={muted}>
                 {record.baseUrl}
               </div>
+              {health?.networkEnabled === false && (
+                <div className="truncate" style={muted}>
+                  Billing only · network features off
+                </div>
+              )}
               {installation?.branchName && installation.branchName !== record.name && (
                 <div className="truncate" style={muted}>
                   Reports itself as {installation.companyName} · {installation.branchName}

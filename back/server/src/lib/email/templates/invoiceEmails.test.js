@@ -52,3 +52,31 @@ describe("billing emails — how to pay", () => {
     }
   });
 });
+
+describe("billing emails — a billing-only branch", () => {
+  const notice = (kind, disconnects) =>
+    buildInvoiceNoticeEmail({
+      kind,
+      invoice,
+      customer,
+      paymentLines,
+      facebookPageUrl,
+      graceDays: 0,
+      cutOffHour: 20,
+      disconnects,
+    });
+
+  it("says service is suspended when the branch disconnects", () => {
+    expect(notice("overdue", true).text).toMatch(/suspended/);
+    expect(notice("final", true).text).toMatch(/suspended/);
+  });
+
+  it("never mentions suspension or restoring when the network switch is off", () => {
+    for (const kind of ["reminder", "final", "overdue"]) {
+      const { subject, html, text } = notice(kind, false);
+      for (const part of [subject, html, text]) {
+        expect(part).not.toMatch(/suspend|restored|disconnect/i);
+      }
+    }
+  });
+});

@@ -1,7 +1,7 @@
 import { Home, User } from "lucide-react";
 import { FileText, Network, Receipt, Server, Settings, UsersRound } from "lucide-react";
 import { Suspense, lazy } from "react";
-import { Route, Routes } from "react-router";
+import { Navigate, Route, Routes } from "react-router";
 import BasicLayout from "../../components/layout/BasicLayout";
 import { ComponentLoader } from "../../components/LoadingFallback";
 import NotFound from "../../components/NotFound";
@@ -9,7 +9,6 @@ import { useAdminAuthStore } from "../../store/authStore";
 import { Auth, UnAuth } from "../ValidateAuth";
 import { ProtectedRoute } from "../../components/ProtectedRoute";
 
-const Login = lazy(() => import("../../pages/Admin/Login"));
 const ForgotPassword = lazy(() => import("../../pages/Auth/ForgotPassword"));
 const ResetPassword = lazy(() => import("../../pages/Auth/ResetPassword"));
 const Dashboard = lazy(() => import("../../pages/Admin/Dashboard"));
@@ -186,6 +185,9 @@ const AdminRoute = () => {
             submodule: null,
             accessLevel: "read",
           },
+          // Shares the Subscriptions permission, so it is hidden by the
+          // network switch instead (D11).
+          requiresNetwork: true,
           isFilter: true,
           isShow: true,
         },
@@ -572,15 +574,8 @@ const AdminRoute = () => {
           <UnAuth store={useAdminAuthStore} redirect="/admin/dashboard" />
         }
       >
-        <Route
-          path="/"
-          index
-          element={
-            <Suspense fallback={<ComponentLoader />}>
-              <Login />
-            </Suspense>
-          }
-        />
+        {/* The login moved to "/" (routes/index.jsx); old /admin links land there. */}
+        <Route index element={<Navigate to="/" replace />} />
         <Route
           path="forgot-password"
           element={
@@ -599,7 +594,7 @@ const AdminRoute = () => {
         />
       </Route>
 
-      <Route element={<Auth store={useAdminAuthStore} redirect="/admin" />}>
+      <Route element={<Auth store={useAdminAuthStore} redirect="/" />}>
         <Route
           element={
             <BasicLayout navigations={navigations} store={useAdminAuthStore} />

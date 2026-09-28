@@ -37,15 +37,17 @@ const BasicLayout = ({ navigations, store }) => {
   const [collapsed, setCollapsed] = useState(false);
   const { width } = useWindowSize();
   const { company, userData, reset } = store();
-  const { hasPermission, isLoading } = usePermissions();
+  const { hasPermission, networkEnabled, isLoading } = usePermissions();
   const location = useLocation();
 
   const isMobile = width < 992;
 
   const filteredNavigations = useMemo(() => {
     if (isLoading) return [];
-    return filterNavigationByPermissions(navigations, hasPermission);
-  }, [navigations, hasPermission, isLoading]);
+    return filterNavigationByPermissions(navigations, hasPermission, {
+      network: networkEnabled,
+    });
+  }, [navigations, hasPermission, networkEnabled, isLoading]);
 
   const { group, title } = getPageTitle(location.pathname, filteredNavigations);
 

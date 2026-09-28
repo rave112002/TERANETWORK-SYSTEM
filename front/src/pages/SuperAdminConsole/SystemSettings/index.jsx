@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import { CircleAlert, Server, ShieldAlert } from "lucide-react";
+import { CircleAlert, Receipt, Server, ShieldAlert } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,7 @@ const SystemSettingsPage = () => {
     refetch,
     isSaving,
     handleDryRunChange,
+    handleNetworkChange,
     handleSave,
   } = useBranchSystemSettingsData();
 
@@ -38,7 +39,7 @@ const SystemSettingsPage = () => {
     <div className="p-8 space-y-5">
       <PageHeader
         title="System Settings"
-        subtitle="Dry-run, billing schedule and billing rules for one branch. Same rules as the branch's own System page."
+        subtitle="Network features, dry-run, billing schedule and billing rules for one branch. Same rules as the branch's own System page."
       />
 
       <div className="flex items-center justify-between gap-3 flex-wrap max-w-4xl">
@@ -64,7 +65,17 @@ const SystemSettingsPage = () => {
         </Alert>
       ) : (
         <>
-          {settings?.DRY_RUN && (
+          {settings?.NETWORK_ENABLED === false && (
+            <Alert className="max-w-4xl">
+              <Receipt />
+              <AlertTitle>{branch?.name} is billing only</AlertTitle>
+              <AlertDescription>
+                Network features are off there: no OLT, no modems, and nobody is disconnected.
+                Customers, plans, subscriptions, invoices and payments work as usual.
+              </AlertDescription>
+            </Alert>
+          )}
+          {settings?.NETWORK_ENABLED !== false && settings?.DRY_RUN && (
             <Alert className="max-w-4xl">
               <ShieldAlert />
               <AlertTitle>Dry-run is on at {branch?.name}</AlertTitle>
@@ -85,6 +96,7 @@ const SystemSettingsPage = () => {
                 canWrite
                 isSaving={isSaving}
                 onDryRunChange={handleDryRunChange}
+                onNetworkChange={handleNetworkChange}
                 onSave={handleSave}
                 footerNote={
                   <>

@@ -387,7 +387,7 @@ router.delete(
       if (tableRows[0].present > 0) {
         const [active] = await conn.execute(
           `SELECT COUNT(*) AS total FROM subscriptions
-           WHERE customerId = ? AND status != 'terminated'`,
+           WHERE customerId = ? AND status != 'terminated' AND recordStatus != 'Deleted'`,
           [customerId]
         );
 

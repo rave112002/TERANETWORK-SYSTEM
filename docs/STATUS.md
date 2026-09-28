@@ -29,6 +29,7 @@ Customer signs up → subscription → ONU provisioned on the OLT
 | Collections | Dunning sweep after the due date, exemptions, automatic reconnection on payment |
 | **Real OLT** | The system suspended, restored and read 1/27 on the bench HSGQ XE04I itself (2026-09-24): blacklist + read-back + save, every step verified from the OLT's own tables. Discovery read all 60 ONUs on PON 1. [Transcript](vendor-transcripts/hsgq-xe04i/system-driven-2026-09-24.md) |
 | Admin | Dashboard with "needs attention", reports, users & roles, audit trail, runbooks |
+| **Billing-only branches** | SuperAdmin → System Settings → **Network features** off: a branch runs customers, plans, subscriptions (no modem needed), invoices, payments, GCash Check, reports; no OLT, no disconnections, no modem recovery. Same build; switch back on any time. Checked end to end on dev data (2026-09-28) — [D11](decisions.md#d11--a-billing-only-branch-the-network-switch) |
 | **Central SuperAdmin** | **Branches** (health, version, warnings), **Company Profile** (logo, TIN), **Users** (Owner/Admin logins, password reset), **System Settings** (dry-run, billing schedule). Changes audited on the branch as `system:superadmin:<user>`. Old in-branch `/superadmin` removed. See [superadmin-server/README.md](../superadmin-server/README.md) |
 
 ## ⚠️ Built but not proven on the real thing
@@ -54,7 +55,8 @@ Customer signs up → subscription → ONU provisioned on the OLT
 4. **One full dry run** on dev data: bill → pay → record → check → sweep → reconnect.
 5. **Per installation:** set `PORT=8787`, `NODE_ENV=production`, `MANAGE_API_KEY`, the branch's
    own Gmail in `SMTP_*` (App Password) and `EMAIL_DAILY_LIMIT=500`, add the branch
-   in SuperAdmin, create the Owner login, fill in Settings → How customers pay (incl. Terms),
+   in SuperAdmin, create the Owner login, turn **Network features** off if it starts billing
+   only (D11), fill in Settings → How customers pay (incl. Terms),
    upload the logo. Build `front` with a real `VITE_SENTRY_DSN` or none (not the placeholder).
 6. `npm run gcash:inspect` on a multi-page statement when one is available.
 

@@ -38,6 +38,7 @@ const ReportsPage = () => {
     error,
     refetch,
     handleExport,
+    networkEnabled,
   } = useReportsData();
 
   const meta = REPORTS.find((r) => r.key === report);
@@ -185,7 +186,7 @@ const ReportsPage = () => {
                 <SelectContent>
                   <SelectItem value="all">Any status</SelectItem>
                   <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="suspended">Suspended</SelectItem>
+                  {networkEnabled && <SelectItem value="suspended">Suspended</SelectItem>}
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="terminated">Terminated</SelectItem>
                 </SelectContent>

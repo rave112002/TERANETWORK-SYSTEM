@@ -1,4 +1,5 @@
 import { writeAudit } from "../../utils/audit.js";
+import { isNetworkEnabled } from "./features.js";
 import {
   getAllSettings,
   getBillingSchedule,
@@ -11,12 +12,15 @@ import {
 
 /**
  * Reading and changing the runtime settings (dry-run, billing schedule, grace
- * days, VAT, pull-out delay) — one implementation for both callers:
+ * days, VAT, pull-out delay, the network switch) — one implementation for both
+ * callers:
  *
  *   - the branch's Admin portal   (controllers/v1/admin/system.controller.js)
  *   - the central SuperAdmin      (controllers/v1/manage/system.controller.js)
  *
- * The rules must not differ by who is asking, so they live here.
+ * The rules must not differ by who is asking, so they live here. What each
+ * caller may change is decided by its validator: only the management API's
+ * accepts NETWORK_ENABLED (validators/system.validator.js).
  */
 
 /**
@@ -40,6 +44,7 @@ export const readSystemSettings = async (db, companyId) => {
   // a number the worker would reject as junk.
   const schedule = await getBillingSchedule(db, companyId);
   const recoveryAfterDays = await getRecoveryAfterDays(db, companyId);
+  const networkEnabled = await isNetworkEnabled(db, companyId);
 
   return {
     settings: {
@@ -56,6 +61,9 @@ export const readSystemSettings = async (db, companyId) => {
       DUNNING_HOUR: schedule.dunningHour,
 
       RECOVERY_AFTER_DAYS: recoveryAfterDays,
+
+      // Read by both portals; only the management API may change it.
+      NETWORK_ENABLED: networkEnabled,
     },
     meta,
   };
@@ -67,6 +75,22 @@ const SCHEDULE_FIELDS = {
   [SETTING_KEYS.GRACE_DAYS]: "graceDays",
   [SETTING_KEYS.DAILY_HOUR]: "dailyHour",
   [SETTING_KEYS.DUNNING_HOUR]: "dunningHour",
+};
+
+/**
+ * The audit line. The two switches are called out by name: dry-run stops
+ * device commands, and the network switch changes what the whole branch does.
+ */
+const describeUpdate = (updates, changed) => {
+  if ("NETWORK_ENABLED" in updates) {
+    return updates.NETWORK_ENABLED
+      ? "Network features turned ON — OLT, modems, disconnections and modem recovery"
+      : "Network features turned OFF — billing only, nobody is disconnected";
+  }
+  if ("DRY_RUN" in updates) {
+    return `Dry-run mode turned ${updates.DRY_RUN ? "ON — device commands will be logged, not executed" : "OFF — device commands will execute"}`;
+  }
+  return `Updated ${changed.join(", ") || "settings"}`;
 };
 
 /**
@@ -122,11 +146,7 @@ export const updateSystemSettings = async (db, { companyId, updates, updatedBy, 
       context,
       module: "system",
       action: "settings.update",
-      description:
-        // Called out by name: this is the one that stops device commands.
-        "DRY_RUN" in updates
-          ? `Dry-run mode turned ${updates.DRY_RUN ? "ON — device commands will be logged, not executed" : "OFF — device commands will execute"}`
-          : `Updated ${changed.join(", ") || "settings"}`,
+      description: describeUpdate(updates, changed),
       before,
       after,
     });

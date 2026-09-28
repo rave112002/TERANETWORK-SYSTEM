@@ -28,7 +28,7 @@ const muted = { fontSize: 12.5, color: "var(--color-text-muted)" };
 const EmailUsageCard = ({ usage, isLoading }) => {
   if (isLoading || !usage) {
     return (
-      <div className="max-w-4xl px-4.5 py-4" style={cardStyle}>
+      <div className="px-4.5 py-4" style={cardStyle}>
         <span style={muted}>Loading email usage…</span>
       </div>
     );
@@ -40,7 +40,7 @@ const EmailUsageCard = ({ usage, isLoading }) => {
   const failures = usage.recentFailures ?? [];
 
   return (
-    <div className="max-w-4xl" style={cardStyle}>
+    <div style={cardStyle}>
       <div
         className="flex items-center justify-between gap-3 flex-wrap px-4.5 py-3.5"
         style={{ borderBottom: "1px solid var(--color-line)" }}

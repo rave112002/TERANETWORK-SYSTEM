@@ -2,7 +2,7 @@ import { toast } from "sonner";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
-  createAdjustmentApi,
+  createBulkAdjustmentApi,
   createExemptionApi,
   deleteAdjustmentApi,
   getAtRiskApi,
@@ -11,6 +11,7 @@ import {
   runDunningSweepApi,
   generateInvoiceApi,
   getAdjustmentsApi,
+  getAdjustmentTargetsApi,
   getInvoiceByIdApi,
   getInvoicePdfApi,
   getInvoicesApi,
@@ -358,19 +359,31 @@ export const useGetAdjustments = (filters = {}, options = {}) =>
     ...options,
   });
 
-export const useCreateAdjustment = () => {
+/** The bulk picker's list. Refetched each time the drawer opens. */
+export const useGetAdjustmentTargets = (options = {}) =>
+  useQuery({
+    queryKey: ["adjustments", "targets"],
+    queryFn: getAdjustmentTargetsApi,
+    staleTime: 0,
+    ...options,
+  });
+
+export const useCreateBulkAdjustment = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: createAdjustmentApi,
-    onSuccess: () => {
-      // Says when it takes effect. An adjustment that appears to do nothing is
-      // an adjustment somebody enters a second time.
-      toast.success("Adjustment saved — it will appear on the next invoice");
+    mutationFn: createBulkAdjustmentApi,
+    onSuccess: (res) => {
+      // The server says how many, so the clerk can check it against what
+      // they meant to select.
+      toast.success(res?.message || "Adjustments saved — they will appear on the next invoices");
       invalidateBilling(queryClient);
     },
     onError: (error) => {
-      toast.error(error.response?.data?.message || "Could not save the adjustment");
+      // All or nothing: the message says nothing was recorded, and why.
+      toast.error(error.response?.data?.message || "Could not save the adjustments", {
+        duration: 10000,
+      });
     },
   });
 };

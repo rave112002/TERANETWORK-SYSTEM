@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { getCurrentTimestampLocal } from "../../utils/dateUtils.js";
-import { getAllSettings } from "../settings/settings.service.js";
+import { getAllSettings, parseBoolean } from "../settings/settings.service.js";
 import { getQueueStats } from "../jobs/jobs.queue.js";
 import { getEmailUsageCounts } from "../email/usage.service.js";
 import { MANAGE_API_VERSION } from "../../../../../shared/manage-contract/index.js";
@@ -93,6 +93,8 @@ export const collectBranchHealth = async (db) => {
     ]);
     report.jobs = { queued: queue.queued, failed: queue.failed, dead: queue.dead };
     report.dryRun = settings.DRY_RUN === "true";
+    // The same reading as everywhere else: only an explicit "off" is off.
+    report.networkEnabled = parseBoolean(settings.NETWORK_ENABLED, true);
     // A count, not the emails: no recipients or customers leave the branch (D10).
     report.email = email;
   }

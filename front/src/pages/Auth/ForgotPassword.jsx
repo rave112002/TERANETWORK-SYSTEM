@@ -40,7 +40,8 @@ const ForgotPassword = ({ portal = "admin" }) => {
     defaultValues: { email: "" },
   });
 
-  const loginPath = `/${portal}`;
+  // The login lives at the site root (routes/index.jsx).
+  const loginPath = "/";
 
   const onSubmit = ({ email }) => {
     mutate(email, {

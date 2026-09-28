@@ -11,6 +11,7 @@ import {
   paymentInstructionLines,
 } from "../../payments/instructions.js";
 import { getBillingSchedule } from "../../settings/settings.service.js";
+import { isNetworkEnabled } from "../../settings/features.js";
 import { recordEmailEvent, sendEmail } from "../../email/email.service.js";
 
 /**
@@ -133,6 +134,8 @@ export const emailProcessor = async (job, { db, logger }) => {
   // correctly: the overdue notice reads differently with no grace period, and
   // the final notice names the hour the sweep runs.
   const schedule = CHASING_KINDS.has(kind) ? await getBillingSchedule(db, invoice.companyId) : null;
+  // With the network switch off nobody is disconnected, so no notice says so.
+  const disconnects = CHASING_KINDS.has(kind) ? await isNetworkEnabled(db, invoice.companyId) : true;
 
   const message = render({
     invoice,
@@ -142,6 +145,7 @@ export const emailProcessor = async (job, { db, logger }) => {
     companyName,
     graceDays: schedule?.graceDays ?? null,
     cutOffHour: schedule?.dunningHour ?? null,
+    disconnects,
     payment: payload.payment ?? null,
     reconnecting: Boolean(payload.reconnecting),
   });
