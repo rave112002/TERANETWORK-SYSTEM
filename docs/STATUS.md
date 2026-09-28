@@ -56,6 +56,8 @@ Customer signs up → subscription → ONU provisioned on the OLT
 
 ✅ Done 2026-09-28: **Express serves the React build on :8787** — one process, one address
 (`back`: `npm run serve` builds `front` and starts). Checked in Chrome: pages, login, invoice PDF.
+Production mode now works over plain http from other devices (Tailscale IP): the CSRF cookie is
+Secure only when the server is on HTTPS (`certPath` or `COOKIE_SECURE=true`).
 
 ## ⏸️ Parked (code kept, don't build on it)
 

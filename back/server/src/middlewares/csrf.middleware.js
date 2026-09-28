@@ -33,10 +33,13 @@ import APIError from "../utils/APIError.js";
  *   - Frontend must use: credentials: 'include' in fetch/axios
  *   - Backend CORS must have: credentials: true
  *
- * Scenario 3: Production (both HTTPS, same origin)
+ * Scenario 3: Production (same origin — Express serves the app and the API)
  *   NODE_ENV=production
  *   CSRF_SECRET=<random-32-char-string>
- *   - Cookies work automatically with same-origin
+ *   - Over plain http (a branch PC, reached as localhost or over Tailscale):
+ *     nothing else to set.
+ *   - Over HTTPS: certPath set, or COOKIE_SECURE=true when something in front
+ *     terminates TLS (e.g. `tailscale serve`).
  *
  * ============================================================================
  */
@@ -59,11 +62,26 @@ const allowCrossSite = process.env.ALLOW_CROSS_SITE_CSRF === "true";
 const forceSecure = process.env.COOKIE_SECURE === "true";
 
 /**
+ * Whether browsers reach this server over HTTPS: it has its own certificate
+ * (certPath, see bin/www.js), or COOKIE_SECURE says a proxy in front does TLS.
+ *
+ * ── Why not just NODE_ENV ───────────────────────────────────────────────────
+ *
+ * A branch runs in production over plain http (docs/isp-invoice-generator-
+ * deployment-multibranch.md): http://localhost:8787 on the PC itself, and
+ * http://<tailscale-ip>:8787 from anywhere else. Browsers drop a Secure cookie
+ * on http — except on localhost — so tying Secure to NODE_ENV made every save
+ * and every login fail with "Invalid or expired CSRF token" for anyone not
+ * sitting at the branch PC. Tailscale already encrypts that traffic.
+ */
+const servedOverHttps = Boolean(process.env.certPath) || forceSecure;
+
+/**
  * Determine cookie settings based on environment
  *
  * | Scenario                  | sameSite | secure | Notes                          |
  * |---------------------------|----------|--------|--------------------------------|
- * | Production (same-origin)  | strict   | true   | Maximum security               |
+ * | Production (same-origin)  | strict   | HTTPS? | Secure only when served on HTTPS |
  * | Hybrid (cross-site HTTPS) | none     | true   | Requires credentials: include  |
  * | Local dev (same-origin)   | lax      | false  | Standard dev setup             |
  * | Local dev (cross-origin)  | lax      | false  | Won't work! Use DISABLE_CSRF   |
@@ -87,7 +105,7 @@ const getCookieConfig = () => {
   if (isProduction) {
     return {
       sameSite: "strict",
-      secure: true,
+      secure: servedOverHttps,
     };
   }
 
@@ -99,8 +117,9 @@ const getCookieConfig = () => {
 };
 
 const cookieConfig = getCookieConfig();
-// Use __Host- prefix only in production (requires HTTPS and path=/)
-const cookieName = isProduction ? "__Host-csrf" : "csrf-token";
+// The __Host- prefix is only accepted on a Secure cookie (and path=/), so it
+// follows `secure` — a plain-http production branch uses the plain name.
+const cookieName = cookieConfig.secure ? "__Host-csrf" : "csrf-token";
 
 const {
   generateCsrfToken: generateToken, // Use this to create CSRF tokens
