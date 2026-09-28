@@ -17,6 +17,7 @@ import {
 import APIError from "../src/utils/APIError.js"; // your custom error class
 import { error } from "../src/utils/responses.js"; // your custom error handling function
 import Database from "./database.js";
+import { serveFrontend } from "./frontend.js";
 import { httpLogger, logger, maskSensitiveData } from "./logger.js"; // your winston logger setup
 import { loggerMiddleware } from "../src/middlewares/logger.middleware.js"; // Global logger middleware
 
@@ -257,6 +258,9 @@ app.get("/health", async (req, res) => {
 });
 
 app.use(api);
+
+// The built Admin portal, when there is one (production: one process, one port).
+serveFrontend(app);
 
 // CSRF Error Handler - Must be before global error handlers
 app.use(csrfErrorHandler);

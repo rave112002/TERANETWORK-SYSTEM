@@ -13,8 +13,10 @@ Each entry states the symptom first, because that is what you have.
 
 ## The system in one paragraph
 
-Two processes. **The API** (`back`, `npm start`) serves the portals and the
-public payment page. **The worker** (`back`, `npm run worker`) does everything
+Two processes. **The API** (`back`, `npm start`) serves the Admin portal and
+its API together on one port — staff open http://localhost:8787 (the built
+screens come from `FRONTEND_DIST`, default `front/dist`; `npm run serve`
+rebuilds them first). **The worker** (`back`, `npm run worker`) does everything
 slow or failure-prone: talking to the OLT, sending email, and running the
 schedules. They share one MySQL database and communicate only through the
 `jobs` table. The worker can be restarted at any time without losing work — a

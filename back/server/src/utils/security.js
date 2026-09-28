@@ -66,6 +66,14 @@ function purifyReqBody(obj, fieldModes = {}) {
 // =========================
 // 2) Helmet + CORS for API
 // =========================
+function isSameOrigin(origin, host) {
+  try {
+    return Boolean(host) && new URL(origin).host === host;
+  } catch {
+    return false;
+  }
+}
+
 export function securityHeaders(options = {}) {
   const {
     isDevelopment = process.env.NODE_ENV === "development",
@@ -122,16 +130,20 @@ export function securityHeaders(options = {}) {
               styleSrc: ["'self'", "'unsafe-inline'"], // unsafe-inline for inline styles if needed
               imgSrc: ["'self'", "data:", "https:"],
               connectSrc: ["'self'"],
-              fontSrc: ["'self'"],
+              fontSrc: ["'self'", "data:"], // Vite inlines small font files as data: URLs
               mediaSrc: ["'self'"],
-              // Only in production. On a local HTTP backend this rewrites every
-              // request to https:// and the API stops answering.
+              // The invoice PDF drawer shows a blob: URL in an iframe.
+              frameSrc: ["'self'", "blob:"],
+              // Only when this server itself speaks HTTPS (certPath set). A
+              // branch serves plain HTTP on :8787 — over Tailscale too — and
+              // there this rewrites every script and API call to https:// and
+              // the app stops loading.
               //
               // `null`, not "omitted": helmet merges these directives over its
               // own defaults, and `upgrade-insecure-requests` is one of them —
               // leaving the key out keeps the default, so it has to be
               // explicitly cancelled.
-              upgradeInsecureRequests: isDevelopment ? null : [],
+              upgradeInsecureRequests: process.env.certPath ? [] : null,
             },
           }
         : false,
@@ -159,12 +171,21 @@ export function securityHeaders(options = {}) {
       );
       next();
     },
-    cors({
+    // A delegate, so the origin check can see the request's own Host.
+    cors((req, delegate) => delegate(null, {
       origin: function (origin, callback) {
-        // Allow requests with no origin (same-origin requests, mobile apps, Postman, etc.)
+        // Allow requests with no origin (mobile apps, Postman, curl, etc.)
         if (!origin) {
-          // Same-origin requests don't send Origin header - these should be allowed
-          // This is the case when frontend and backend are on the same domain
+          return callback(null, true);
+        }
+
+        // Same origin: the page was served by this server (production — Express
+        // serves the built app on the same port). Browsers still send Origin
+        // on every POST/PUT/DELETE and on <script type="module">, so without
+        // this the app would be refused by its own server — and the address
+        // differs per branch and per access path (localhost, Tailscale IP),
+        // so it can't just be listed in FRONTEND_URL.
+        if (isSameOrigin(origin, req.headers.host)) {
           return callback(null, true);
         }
 
@@ -195,7 +216,7 @@ export function securityHeaders(options = {}) {
         "X-Rate-Limit-Reset",
       ],
       maxAge: 86400, // Cache preflight for 24 hours
-    }),
+    })),
     hpp(),
   ];
 }

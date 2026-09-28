@@ -2,18 +2,21 @@
  * Upload utility helpers (no API calls — those live in services/api/upload.js)
  */
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
-
 /**
- * Get full image URL from a server path
+ * Get the URL of an uploaded file from its server path.
+ *
+ * Same-origin on purpose: in production Express serves the app and /public on
+ * one port, and in development Vite proxies /public/uploads to the API. A host
+ * baked in at build time would break the moment the app is opened from any
+ * other address (e.g. over Tailscale).
  * @param {string} path - The file path (e.g., "/public/uploads/logos/abc.jpg")
- * @returns {string|null} Full URL to the image
+ * @returns {string|null} URL to the file
  */
 export const getImageUrl = (path) => {
   if (!path) return null;
   if (path.startsWith("http")) return path;
   if (path.startsWith("data:")) return path;
-  return `${API_URL}${path}`;
+  return path.startsWith("/") ? path : `/${path}`;
 };
 
 /**

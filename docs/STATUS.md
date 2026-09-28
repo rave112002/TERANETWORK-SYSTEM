@@ -1,6 +1,6 @@
 # Project status
 
-**Updated:** 2026-09-18 · Keep this page to one screen. Update it whenever something moves.
+**Updated:** 2026-09-28 · Keep this page to one screen. Update it whenever something moves.
 
 ## What the system is
 
@@ -47,11 +47,14 @@ Customer signs up → subscription → ONU provisioned on the OLT
 
 1. **Customer import** from the client's subscriber spreadsheet — the biggest go-live gap.
 2. **Automatic backups** (mysqldump + Task Scheduler, per the deployment doc).
-3. **Express serves the React build on :8787** (today they run as two servers).
-4. **One full dry run** on dev data: bill → pay → record → check → sweep → reconnect.
-5. **Per installation:** set `MANAGE_API_KEY`, add the branch in SuperAdmin, create the Owner login,
-   fill in Settings → How customers pay (incl. Terms), upload the logo.
-6. `npm run gcash:inspect` on a multi-page statement when one is available.
+3. **One full dry run** on dev data: bill → pay → record → check → sweep → reconnect.
+4. **Per installation:** set `PORT=8787`, `NODE_ENV=production`, `MANAGE_API_KEY`, add the branch
+   in SuperAdmin, create the Owner login, fill in Settings → How customers pay (incl. Terms),
+   upload the logo. Build `front` with a real `VITE_SENTRY_DSN` or none (not the placeholder).
+5. `npm run gcash:inspect` on a multi-page statement when one is available.
+
+✅ Done 2026-09-28: **Express serves the React build on :8787** — one process, one address
+(`back`: `npm run serve` builds `front` and starts). Checked in Chrome: pages, login, invoice PDF.
 
 ## ⏸️ Parked (code kept, don't build on it)
 

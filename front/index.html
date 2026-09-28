@@ -17,21 +17,8 @@
     <!-- Fonts are self-hosted via @fontsource-variable (imported in main.jsx).
          No Google Fonts <link> here: it double-loaded the same families and made
          every production page hit an external origin. -->
-    <!-- Apply the saved/system theme before paint to avoid a flash of the wrong mode -->
-    <script>
-      (function () {
-        try {
-          var stored = localStorage.getItem("ui-theme");
-          var mode = stored ? JSON.parse(stored).state.mode : null;
-          if (!mode) {
-            mode = window.matchMedia("(prefers-color-scheme: dark)").matches
-              ? "dark"
-              : "light";
-          }
-          if (mode === "dark") document.documentElement.classList.add("dark");
-        } catch (e) {}
-      })();
-    </script>
+    <!-- Apply the saved/system theme before paint (see public/theme-init.js) -->
+    <script src="/theme-init.js"></script>
   </head>
   <body>
     <div id="root"></div>

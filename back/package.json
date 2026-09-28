@@ -6,6 +6,8 @@
   "type": "module",
   "scripts": {
     "start": "node ./server/bin/www.js",
+    "build:front": "npm --prefix ../front run build",
+    "serve": "npm run build:front && node ./server/bin/www.js",
     "dev": "nodemon ./server/bin/www.js",
     "worker": "node ./server/bin/worker.js",
     "worker:dev": "nodemon ./server/bin/worker.js",
