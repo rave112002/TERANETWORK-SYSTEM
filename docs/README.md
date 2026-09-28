@@ -9,9 +9,10 @@ clean) or inside `front/` / `back/` (those hold code conventions only).
 | File | Read it for |
 | --- | --- |
 | **[STATUS.md](STATUS.md)** | Where the project stands: done, blocked, next. One page. |
-| [decisions.md](decisions.md) | Why things are the way they are (D1–D9). Newest at the bottom. |
+| [decisions.md](decisions.md) | Why things are the way they are (D1–D11). Newest at the bottom. |
 | [payments.md](payments.md) | How payments work: personal GCash, recording references, GCash Check. |
 | [runbooks.md](runbooks.md) | What to do when something goes wrong. |
+| [deployment-steps.md](deployment-steps.md) | Deploying a branch PC + SuperAdmin step by step, and the two-PC rehearsal checklist. |
 | [test-branch-guide.md](test-branch-guide.md) | Fresh test branch: wipe dev data, connect SuperAdmin, test the real OLT, customers. |
 | [vendor-transcripts/](vendor-transcripts/) | Real OLT command output the drivers were written against. |
 | [archive/](archive/) | Finished migration docs and parked designs. History only. |

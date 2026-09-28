@@ -16,13 +16,27 @@ Customer signs up → subscription → ONU provisioned on the OLT
   → 60 days suspended → modem pulled out
 ```
 
+## 🧪 Now: two-PC deployment rehearsal
+
+A full simulated deployment on two computers, following **[deployment-steps.md](deployment-steps.md)**:
+
+| PC | Plays | Runs |
+| --- | --- | --- |
+| **PC 1** (the developer's computer) | The central SuperAdmin PC | `superadmin-server` + SuperAdmin web app, Tailscale |
+| **PC 2** (a second computer) | The client's branch PC | MySQL, the branch server on :8787 serving the built app, the worker, Tailscale |
+
+Set PC 2 up from nothing (Node, MySQL, code, `.env`, keys, `db:setup`, services, firewall), connect
+it from SuperAdmin over Tailscale, then run the full test: billing end to end with real emails,
+GCash Check, reports, audit, restarting PC 2, PC 1 off, MySQL down, backup + restore. Results go
+here when it's done.
+
 ## ✅ Built and working
 
 | Area | What |
 | --- | --- |
 | Customers | Plans, customers, subscriptions, pull-out / recovery after 60 days |
 | Network | OLTs, PON ports, splitters, NAPs, ONUs, topology, discovery (OLT side) |
-| Billing | Invoices on the 25th, adjustments, invoice email, record payment. Invoice PDF in the **client's existing layout**, viewable in a drawer (**View PDF**) without downloading |
+| Billing | Invoices on the 25th, adjustments (one subscription or **many at once**), invoice email, record payment. Invoice PDF in the **client's existing layout**, viewable in a drawer (**View PDF**) without downloading |
 | Payments | **Personal GCash + GCash Check** (statement PDF upload, typo detection) — [payments.md](payments.md) |
 | How to pay | GCash number, account name, Facebook page and **Terms and conditions** set in **Settings → How customers pay**, printed on every invoice PDF (and the payment steps on every billing email) |
 | Email sending | Invoices go by email only, **never without the PDF**. Emails in the last 24 h vs the Gmail limit: Admin → System, Dashboard alert, SuperAdmin → Branches |
@@ -52,16 +66,14 @@ Customer signs up → subscription → ONU provisioned on the OLT
 2. **Follow an ONU's new ID**: when a status read finds the ONU by MAC under a different
    PON/ONU, update `onuIndex` (and log it), so what staff see matches the OLT.
 3. **Automatic backups** (mysqldump + Task Scheduler, per the deployment doc).
-4. **One full dry run** on dev data: bill → pay → record → check → sweep → reconnect.
-5. **Per installation:** set `PORT=8787`, `NODE_ENV=production`, `MANAGE_API_KEY`, the branch's
-   own Gmail in `SMTP_*` (App Password) and `EMAIL_DAILY_LIMIT=500`, add the branch
-   in SuperAdmin, create the Owner login, turn **Network features** off if it starts billing
-   only (D11), fill in Settings → How customers pay (incl. Terms),
-   upload the logo. Build `front` with a real `VITE_SENTRY_DSN` or none (not the placeholder).
+4. **The two-PC deployment rehearsal** above — the full test, on a clean second PC.
+5. **Per installation:** follow [deployment-steps.md](deployment-steps.md) on the client's PC
+   (fresh database, the client's Gmail, real branch name).
 6. `npm run gcash:inspect` on a multi-page statement when one is available.
 
 ✅ Done 2026-09-28: **Express serves the React build on :8787** — one process, one address
 (`back`: `npm run serve` builds `front` and starts). Checked in Chrome: pages, login, invoice PDF.
+The login is at **`/`** in both apps (branch and SuperAdmin); old `/admin` links land there.
 Production mode now works over plain http from other devices (Tailscale IP): the CSRF cookie is
 Secure only when the server is on HTTPS (`certPath` or `COOKIE_SECURE=true`).
 
@@ -77,6 +89,7 @@ Secure only when the server is on HTTPS (`certPath` or `COOKIE_SECURE=true`).
 | | |
 | --- | --- |
 | Decisions (why things are the way they are) | [decisions.md](decisions.md) |
+| Deploying a branch, step by step (and the two-PC rehearsal) | [deployment-steps.md](deployment-steps.md) |
 | How it is deployed (branches, SuperAdmin, Tailscale) | [isp-invoice-generator-deployment-multibranch.md](isp-invoice-generator-deployment-multibranch.md) |
 | Payments, day to day | [payments.md](payments.md) |
 | What to do when something breaks | [runbooks.md](runbooks.md) |
