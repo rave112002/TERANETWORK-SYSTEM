@@ -1,0 +1,72 @@
+2026-10-02 21:42:37 [[32minfo[39m]: Database connection test successful 
+2026-10-02 21:42:37 [[32minfo[39m]: Database connection pool initialized {"host":"localhost","database":"teranetwork","connectionLimit":10,"charset":"utf8mb4","timezone":"+08:00"}
+2026-10-02 21:42:37 [[32minfo[39m]: [worker] started as worker-16484 {"types":["deactivate","activate","status","email"]}
+2026-10-02 21:42:37 [[32minfo[39m]: [scheduler] ticking '0 * * * *' (Asia/Manila); the billing schedule is read from system settings on every tick 
+2026-10-02 22:00:00 [[32minfo[39m]: [scheduler] daily billing for TERANETWORK: 0 marked overdue, 0 final notice(s), 0 reminder(s) for 2026-10-04 
+2026-10-02 22:10:22 [[32minfo[39m]: [email] transport: SMTP smtp.gmail.com 
+2026-10-02 22:10:27 [[32minfo[39m]: [email] sent "Invoice INV-2026-000001 — PHP 1,451.61 due 2026-11-02" → johnravenbayatan@gmail.com {"messageId":"<9046fbf9-a94f-0549-1c98-f7744abd17a9@gmail.com>"}
+2026-10-02 22:10:27 [[32minfo[39m]: [worker] email succeeded {"jobId":"0038f31c-be6b-11f1-8891-088fc3017818","workerId":"worker-16484"}
+2026-10-02 22:10:31 [[32minfo[39m]: [email] sent "Invoice INV-2026-000002 — PHP 1,451.61 due 2026-11-02" → ravenbayatan11@gmail.com {"messageId":"<6da72576-2c73-7dca-7247-40358202b665@gmail.com>"}
+2026-10-02 22:10:31 [[32minfo[39m]: [worker] email succeeded {"jobId":"003b1c99-be6b-11f1-8891-088fc3017818","workerId":"worker-16484"}
+2026-10-02 22:15:59 [[32minfo[39m]: [email] sent "Payment received — invoice INV-2026-000001" → johnravenbayatan@gmail.com {"messageId":"<61e9b28a-85f5-352f-7c32-e16310400904@gmail.com>"}
+2026-10-02 22:15:59 [[32minfo[39m]: [worker] email succeeded {"jobId":"c76466c8-be6b-11f1-8891-088fc3017818","workerId":"worker-16484"}
+2026-10-02 22:19:16 [[32minfo[39m]: [email] sent "Payment received — invoice INV-2026-000002" → ravenbayatan11@gmail.com {"messageId":"<7efdf330-6bf6-03d4-d5b2-73c51dc6137d@gmail.com>"}
+2026-10-02 22:19:16 [[32minfo[39m]: [worker] email succeeded {"jobId":"3c900664-be6c-11f1-8891-088fc3017818","workerId":"worker-16484"}
+2026-10-02 22:26:23 [[32minfo[39m]: [worker] SIGINT received, finishing the job in flight… 
+2026-10-02 22:27:02 [[32minfo[39m]: Database connection test successful 
+2026-10-02 22:27:02 [[32minfo[39m]: Database connection pool initialized {"host":"localhost","database":"teranetwork","connectionLimit":10,"charset":"utf8mb4","timezone":"+08:00"}
+2026-10-02 22:27:02 [[32minfo[39m]: [worker] started as worker-9116 {"types":["deactivate","activate","status","email"]}
+2026-10-02 22:27:03 [[32minfo[39m]: [scheduler] ticking '0 * * * *' (Asia/Manila); the billing schedule is read from system settings on every tick 
+2026-10-02 22:31:23 [[32minfo[39m]: [worker] SIGINT received, finishing the job in flight… 
+2026-10-02 22:38:12 [[32minfo[39m]: Database connection test successful 
+2026-10-02 22:38:12 [[32minfo[39m]: Database connection pool initialized {"host":"localhost","database":"teranetwork","connectionLimit":10,"charset":"utf8mb4","timezone":"+08:00"}
+2026-10-02 22:38:12 [[32minfo[39m]: [worker] started as worker-20596 {"types":["deactivate","activate","status","email"]}
+2026-10-02 22:38:12 [[32minfo[39m]: [scheduler] ticking '0 * * * *' (Asia/Manila); the billing schedule is read from system settings on every tick 
+2026-10-02 22:38:55 [[31merror[39m]: Failed to begin transaction {"error":"","code":"ECONNREFUSED"}
+2026-10-02 22:38:55 [[31merror[39m]: Transaction rollback failed {"error":"Cannot read properties of undefined (reading 'rollback')"}
+2026-10-02 22:38:55 [[31merror[39m]: [worker] loop error, continuing {"error":"Cannot read properties of undefined (reading 'release')"}
+2026-10-02 22:38:58 [[31merror[39m]: Failed to begin transaction {"error":"","code":"ECONNREFUSED"}
+2026-10-02 22:38:58 [[31merror[39m]: Transaction rollback failed {"error":"Cannot read properties of undefined (reading 'rollback')"}
+2026-10-02 22:38:58 [[31merror[39m]: [worker] loop error, continuing {"error":"Cannot read properties of undefined (reading 'release')"}
+2026-10-02 22:39:01 [[31merror[39m]: Failed to begin transaction {"error":"","code":"ECONNREFUSED"}
+2026-10-02 22:39:01 [[31merror[39m]: Transaction rollback failed {"error":"Cannot read properties of undefined (reading 'rollback')"}
+2026-10-02 22:39:01 [[31merror[39m]: [worker] loop error, continuing {"error":"Cannot read properties of undefined (reading 'release')"}
+2026-10-02 22:39:04 [[31merror[39m]: Failed to begin transaction {"error":"","code":"ECONNREFUSED"}
+2026-10-02 22:39:04 [[31merror[39m]: Transaction rollback failed {"error":"Cannot read properties of undefined (reading 'rollback')"}
+2026-10-02 22:39:04 [[31merror[39m]: [worker] loop error, continuing {"error":"Cannot read properties of undefined (reading 'release')"}
+2026-10-02 22:39:07 [[31merror[39m]: Failed to begin transaction {"error":"","code":"ECONNREFUSED"}
+2026-10-02 22:39:07 [[31merror[39m]: Transaction rollback failed {"error":"Cannot read properties of undefined (reading 'rollback')"}
+2026-10-02 22:39:07 [[31merror[39m]: [worker] loop error, continuing {"error":"Cannot read properties of undefined (reading 'release')"}
+2026-10-02 22:39:10 [[31merror[39m]: Failed to begin transaction {"error":"","code":"ECONNREFUSED"}
+2026-10-02 22:39:10 [[31merror[39m]: Transaction rollback failed {"error":"Cannot read properties of undefined (reading 'rollback')"}
+2026-10-02 22:39:10 [[31merror[39m]: [worker] loop error, continuing {"error":"Cannot read properties of undefined (reading 'release')"}
+2026-10-02 22:39:13 [[31merror[39m]: Failed to begin transaction {"error":"","code":"ECONNREFUSED"}
+2026-10-02 22:39:13 [[31merror[39m]: Transaction rollback failed {"error":"Cannot read properties of undefined (reading 'rollback')"}
+2026-10-02 22:39:13 [[31merror[39m]: [worker] loop error, continuing {"error":"Cannot read properties of undefined (reading 'release')"}
+2026-10-02 22:39:16 [[31merror[39m]: Failed to begin transaction {"error":"","code":"ECONNREFUSED"}
+2026-10-02 22:39:16 [[31merror[39m]: Transaction rollback failed {"error":"Cannot read properties of undefined (reading 'rollback')"}
+2026-10-02 22:39:16 [[31merror[39m]: [worker] loop error, continuing {"error":"Cannot read properties of undefined (reading 'release')"}
+2026-10-02 22:39:19 [[31merror[39m]: Failed to begin transaction {"error":"","code":"ECONNREFUSED"}
+2026-10-02 22:39:19 [[31merror[39m]: Transaction rollback failed {"error":"Cannot read properties of undefined (reading 'rollback')"}
+2026-10-02 22:39:19 [[31merror[39m]: [worker] loop error, continuing {"error":"Cannot read properties of undefined (reading 'release')"}
+2026-10-02 22:39:22 [[31merror[39m]: Failed to begin transaction {"error":"","code":"ECONNREFUSED"}
+2026-10-02 22:39:22 [[31merror[39m]: Transaction rollback failed {"error":"Cannot read properties of undefined (reading 'rollback')"}
+2026-10-02 22:39:22 [[31merror[39m]: [worker] loop error, continuing {"error":"Cannot read properties of undefined (reading 'release')"}
+2026-10-02 22:39:25 [[31merror[39m]: Failed to begin transaction {"error":"","code":"ECONNREFUSED"}
+2026-10-02 22:39:25 [[31merror[39m]: Transaction rollback failed {"error":"Cannot read properties of undefined (reading 'rollback')"}
+2026-10-02 22:39:25 [[31merror[39m]: [worker] loop error, continuing {"error":"Cannot read properties of undefined (reading 'release')"}
+2026-10-02 22:39:28 [[31merror[39m]: Failed to begin transaction {"error":"","code":"ECONNREFUSED"}
+2026-10-02 22:39:28 [[31merror[39m]: Transaction rollback failed {"error":"Cannot read properties of undefined (reading 'rollback')"}
+2026-10-02 22:39:28 [[31merror[39m]: [worker] loop error, continuing {"error":"Cannot read properties of undefined (reading 'release')"}
+2026-10-02 22:39:31 [[31merror[39m]: Failed to begin transaction {"error":"","code":"ECONNREFUSED"}
+2026-10-02 22:39:31 [[31merror[39m]: Transaction rollback failed {"error":"Cannot read properties of undefined (reading 'rollback')"}
+2026-10-02 22:39:31 [[31merror[39m]: [worker] loop error, continuing {"error":"Cannot read properties of undefined (reading 'release')"}
+2026-10-02 22:39:34 [[31merror[39m]: Failed to begin transaction {"error":"","code":"ECONNREFUSED"}
+2026-10-02 22:39:34 [[31merror[39m]: Transaction rollback failed {"error":"Cannot read properties of undefined (reading 'rollback')"}
+2026-10-02 22:39:34 [[31merror[39m]: [worker] loop error, continuing {"error":"Cannot read properties of undefined (reading 'release')"}
+2026-10-02 22:39:52 [[32minfo[39m]: [worker] SIGINT received, finishing the job in flight… 
+2026-10-02 22:40:26 [[32minfo[39m]: Database connection test successful 
+2026-10-02 22:40:26 [[32minfo[39m]: Database connection pool initialized {"host":"localhost","database":"teranetwork","connectionLimit":10,"charset":"utf8mb4","timezone":"+08:00"}
+2026-10-02 22:40:26 [[32minfo[39m]: [worker] started as worker-9984 {"types":["deactivate","activate","status","email"]}
+2026-10-02 22:40:26 [[32minfo[39m]: [scheduler] ticking '0 * * * *' (Asia/Manila); the billing schedule is read from system settings on every tick 
+2026-10-02 22:54:05 [[32minfo[39m]: [worker] SIGINT received, finishing the job in flight… 

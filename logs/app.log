@@ -1,0 +1,253 @@
+node:internal/modules/cjs/loader:1424
+  throw err;
+  ^
+
+Error: Cannot find module 'C:\Users\techn\Documents\PROJECTS\TERA\TERANETWORK-SYSTEM-FINAL\back\server\binwww.js'
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+    at Module._load (node:internal/modules/cjs/loader:1227:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+    at node:internal/main/run_main_module:33:47 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: []
+}
+
+Node.js v24.11.1
+node:internal/modules/cjs/loader:1424
+  throw err;
+  ^
+
+Error: Cannot find module 'C:\Users\techn\Documents\PROJECTS\TERA\TERANETWORK-SYSTEM-FINAL\back\server\binwww.js'
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+    at Module._load (node:internal/modules/cjs/loader:1227:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+    at node:internal/main/run_main_module:33:47 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: []
+}
+
+Node.js v24.11.1
+node:internal/modules/cjs/loader:1424
+  throw err;
+  ^
+
+Error: Cannot find module 'C:\Users\techn\Documents\PROJECTS\TERA\TERANETWORK-SYSTEM-FINAL\back\server\binwww.js'
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+    at Module._load (node:internal/modules/cjs/loader:1227:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+    at node:internal/main/run_main_module:33:47 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: []
+}
+
+Node.js v24.11.1
+node:internal/modules/cjs/loader:1424
+  throw err;
+  ^
+
+Error: Cannot find module 'C:\Users\techn\Documents\PROJECTS\TERA\TERANETWORK-SYSTEM-FINAL\back\server\binwww.js'
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+    at Module._load (node:internal/modules/cjs/loader:1227:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+    at node:internal/main/run_main_module:33:47 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: []
+}
+
+Node.js v24.11.1
+node:internal/modules/cjs/loader:1424
+  throw err;
+  ^
+
+Error: Cannot find module 'C:\Users\techn\Documents\PROJECTS\TERA\TERANETWORK-SYSTEM-FINAL\back\server\binwww.js'
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+    at Module._load (node:internal/modules/cjs/loader:1227:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+    at node:internal/main/run_main_module:33:47 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: []
+}
+
+Node.js v24.11.1
+node:internal/modules/cjs/loader:1424
+  throw err;
+  ^
+
+Error: Cannot find module 'C:\Users\techn\Documents\PROJECTS\TERA\TERANETWORK-SYSTEM-FINAL\back\server\binwww.js'
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+    at Module._load (node:internal/modules/cjs/loader:1227:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+    at node:internal/main/run_main_module:33:47 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: []
+}
+
+Node.js v24.11.1
+2026-10-02 21:44:42 [[32minfo[39m]: Serving the frontend build from C:\Users\techn\Documents\PROJECTS\TERA\TERANETWORK-SYSTEM-FINAL\front\dist 
+2026-10-02 21:44:42 [[32minfo[39m]: Running startup health checks... 
+2026-10-02 21:44:42 [[32minfo[39m]: Database connection test successful 
+2026-10-02 21:44:42 [[32minfo[39m]: Database connection pool initialized {"host":"localhost","database":"teranetwork","connectionLimit":10,"charset":"utf8mb4","timezone":"+08:00"}
+2026-10-02 21:44:42 [[32minfo[39m]: ✓ Database connectivity verified 
+2026-10-02 21:44:42 [[32minfo[39m]: ✓ JWT keys verified 
+2026-10-02 21:44:42 [[32minfo[39m]: ✓ Required directories verified 
+2026-10-02 21:44:42 [[32minfo[39m]: All startup health checks passed ✓ 
+[33m
+---------------------------
+✓ SERVER READY
+Address: 192.168.100.146
+Port: 8787
+Environment: production
+---------------------------
+[0m
+2026-10-02 21:50:38 [[33mwarn[39m]: CSRF validation failed {"method":"POST","url":"/api/v1/admin/auth/login","ip":"::ffff:100.122.158.28","errorMessage":"invalid csrf token"}
+2026-10-02 21:50:38 [[31merror[39m]: HTTP Error: [403] POST /api/v1/admin/auth/login - 6.025 ms 
+2026-10-02 21:50:38 [[32minfo[39m]: User logged in successfully {"accountId":"324de890-be68-11f1-8891-088fc3017818"}
+2026-10-02 21:52:56 [[33mwarn[39m]: CSRF validation failed {"method":"POST","url":"/api/v1/admin/auth/login","ip":"::1","errorMessage":"invalid csrf token"}
+2026-10-02 21:52:56 [[31merror[39m]: HTTP Error: [403] POST /api/v1/admin/auth/login - 5.105 ms 
+2026-10-02 21:52:56 [[32minfo[39m]: User logged in successfully {"accountId":"324de890-be68-11f1-8891-088fc3017818"}
+2026-10-02 22:00:44 [[32minfo[39m]: API Error (4xx) Invalid email or password {"requestId":"c08969e6-5f79-4ed9-aff7-1394481e47ed","statusCode":401,"method":"POST","url":"/api/v1/admin/auth/login","ip":"::ffff:100.122.158.28"}
+2026-10-02 22:00:44 [[31merror[39m]: HTTP Error: [401] POST /api/v1/admin/auth/login - 41.554 ms 
+2026-10-02 22:00:51 [[32minfo[39m]: User logged in successfully {"accountId":"8e1f1195-be69-11f1-8891-088fc3017818"}
+2026-10-02 22:01:06 [[31merror[39m]: HTTP Error: [403] GET /api/v1/admin/system/settings - 4.769 ms 
+2026-10-02 22:01:06 [[31merror[39m]: HTTP Error: [403] GET /api/v1/admin/system/jobs?page=1&pageSize=20&status=&type= - 4.975 ms 
+2026-10-02 22:01:06 [[31merror[39m]: HTTP Error: [403] GET /api/v1/admin/system/email-usage - 6.553 ms 
+2026-10-02 22:01:07 [[31merror[39m]: HTTP Error: [403] GET /api/v1/admin/system/settings - 4.401 ms 
+2026-10-02 22:01:07 [[31merror[39m]: HTTP Error: [403] GET /api/v1/admin/system/jobs?page=1&pageSize=20&status=&type= - 4.215 ms 
+2026-10-02 22:01:07 [[31merror[39m]: HTTP Error: [403] GET /api/v1/admin/system/email-usage - 2.984 ms 
+2026-10-02 22:01:24 [[32minfo[39m]: API Error (4xx) Invalid email or password {"requestId":"67b9148c-5dda-4062-931d-cf40f4848702","statusCode":401,"method":"POST","url":"/api/v1/admin/auth/login","ip":"::ffff:100.122.158.28"}
+2026-10-02 22:01:24 [[31merror[39m]: HTTP Error: [401] POST /api/v1/admin/auth/login - 41.339 ms 
+2026-10-02 22:01:28 [[32minfo[39m]: API Error (4xx) Invalid email or password {"requestId":"5cf86f24-1d96-4780-9d2b-d5767d34edd6","statusCode":401,"method":"POST","url":"/api/v1/admin/auth/login","ip":"::ffff:100.122.158.28"}
+2026-10-02 22:01:28 [[31merror[39m]: HTTP Error: [401] POST /api/v1/admin/auth/login - 39.960 ms 
+2026-10-02 22:01:35 [[32minfo[39m]: API Error (4xx) Invalid email or password {"requestId":"8a92a967-a25c-4338-a2d0-1b8c588cbfeb","statusCode":401,"method":"POST","url":"/api/v1/admin/auth/login","ip":"::ffff:100.122.158.28"}
+2026-10-02 22:01:35 [[31merror[39m]: HTTP Error: [401] POST /api/v1/admin/auth/login - 42.678 ms 
+2026-10-02 22:02:02 [[33mwarn[39m]: Rate limit exceeded: auth {"key":"::ffff:100.122.158.28","profile":"auth","retryAfter":900}
+2026-10-02 22:02:02 [[31merror[39m]: HTTP Error: [429] POST /api/v1/admin/auth/login - 2.516 ms 
+2026-10-02 22:03:09 [[31merror[39m]: API Error (5xx) Internal Server Error {"requestId":"86a38696-b52b-47d9-9656-d6273db2ef78","statusCode":500,"stack":"APIError: Internal Server Error\n    at file:///C:/Users/techn/Documents/PROJECTS/TERA/TERANETWORK-SYSTEM-FINAL/back/server/config/express.js:317:22\n    at Layer.handleError (C:\\Users\\techn\\Documents\\PROJECTS\\TERA\\TERANETWORK-SYSTEM-FINAL\\back\\node_modules\\router\\lib\\layer.js:116:17)\n    at trimPrefix (C:\\Users\\techn\\Documents\\PROJECTS\\TERA\\TERANETWORK-SYSTEM-FINAL\\back\\node_modules\\router\\index.js:340:13)\n    at C:\\Users\\techn\\Documents\\PROJECTS\\TERA\\TERANETWORK-SYSTEM-FINAL\\back\\node_modules\\router\\index.js:297:9\n    at processParams (C:\\Users\\techn\\Documents\\PROJECTS\\TERA\\TERANETWORK-SYSTEM-FINAL\\back\\node_modules\\router\\index.js:582:12)\n    at next (C:\\Users\\techn\\Documents\\PROJECTS\\TERA\\TERANETWORK-SYSTEM-FINAL\\back\\node_modules\\router\\index.js:291:5)\n    at csrfErrorHandler (file:///C:/Users/techn/Documents/PROJECTS/TERA/TERANETWORK-SYSTEM-FINAL/back/server/src/middlewares/csrf.middleware.js:311:3)\n    at Layer.handleError (C:\\Users\\techn\\Documents\\PROJECTS\\TERA\\TERANETWORK-SYSTEM-FINAL\\back\\node_modules\\router\\lib\\layer.js:116:17)\n    at trimPrefix (C:\\Users\\techn\\Documents\\PROJECTS\\TERA\\TERANETWORK-SYSTEM-FINAL\\back\\node_modules\\router\\index.js:340:13)\n    at C:\\Users\\techn\\Documents\\PROJECTS\\TERA\\TERANETWORK-SYSTEM-FINAL\\back\\node_modules\\router\\index.js:297:9","method":"POST","url":"/api/v1/admin/users","ip":"::1","userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36"}
+2026-10-02 22:03:09 [[31merror[39m]: HTTP Error: [500] POST /api/v1/admin/users - 78.106 ms 
+2026-10-02 22:03:12 [[31merror[39m]: API Error (5xx) Internal Server Error {"requestId":"b9b0bb58-4f0b-482e-a809-5033dd990631","statusCode":500,"stack":"APIError: Internal Server Error\n    at file:///C:/Users/techn/Documents/PROJECTS/TERA/TERANETWORK-SYSTEM-FINAL/back/server/config/express.js:317:22\n    at Layer.handleError (C:\\Users\\techn\\Documents\\PROJECTS\\TERA\\TERANETWORK-SYSTEM-FINAL\\back\\node_modules\\router\\lib\\layer.js:116:17)\n    at trimPrefix (C:\\Users\\techn\\Documents\\PROJECTS\\TERA\\TERANETWORK-SYSTEM-FINAL\\back\\node_modules\\router\\index.js:340:13)\n    at C:\\Users\\techn\\Documents\\PROJECTS\\TERA\\TERANETWORK-SYSTEM-FINAL\\back\\node_modules\\router\\index.js:297:9\n    at processParams (C:\\Users\\techn\\Documents\\PROJECTS\\TERA\\TERANETWORK-SYSTEM-FINAL\\back\\node_modules\\router\\index.js:582:12)\n    at next (C:\\Users\\techn\\Documents\\PROJECTS\\TERA\\TERANETWORK-SYSTEM-FINAL\\back\\node_modules\\router\\index.js:291:5)\n    at csrfErrorHandler (file:///C:/Users/techn/Documents/PROJECTS/TERA/TERANETWORK-SYSTEM-FINAL/back/server/src/middlewares/csrf.middleware.js:311:3)\n    at Layer.handleError (C:\\Users\\techn\\Documents\\PROJECTS\\TERA\\TERANETWORK-SYSTEM-FINAL\\back\\node_modules\\router\\lib\\layer.js:116:17)\n    at trimPrefix (C:\\Users\\techn\\Documents\\PROJECTS\\TERA\\TERANETWORK-SYSTEM-FINAL\\back\\node_modules\\router\\index.js:340:13)\n    at C:\\Users\\techn\\Documents\\PROJECTS\\TERA\\TERANETWORK-SYSTEM-FINAL\\back\\node_modules\\router\\index.js:297:9","method":"POST","url":"/api/v1/admin/users","ip":"::1","userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36"}
+2026-10-02 22:03:12 [[31merror[39m]: HTTP Error: [500] POST /api/v1/admin/users - 62.651 ms 
+2026-10-02 22:03:17 [[31merror[39m]: API Error (5xx) Internal Server Error {"requestId":"d1eed92a-14a4-4742-8d6b-fc6401076990","statusCode":500,"stack":"APIError: Internal Server Error\n    at file:///C:/Users/techn/Documents/PROJECTS/TERA/TERANETWORK-SYSTEM-FINAL/back/server/config/express.js:317:22\n    at Layer.handleError (C:\\Users\\techn\\Documents\\PROJECTS\\TERA\\TERANETWORK-SYSTEM-FINAL\\back\\node_modules\\router\\lib\\layer.js:116:17)\n    at trimPrefix (C:\\Users\\techn\\Documents\\PROJECTS\\TERA\\TERANETWORK-SYSTEM-FINAL\\back\\node_modules\\router\\index.js:340:13)\n    at C:\\Users\\techn\\Documents\\PROJECTS\\TERA\\TERANETWORK-SYSTEM-FINAL\\back\\node_modules\\router\\index.js:297:9\n    at processParams (C:\\Users\\techn\\Documents\\PROJECTS\\TERA\\TERANETWORK-SYSTEM-FINAL\\back\\node_modules\\router\\index.js:582:12)\n    at next (C:\\Users\\techn\\Documents\\PROJECTS\\TERA\\TERANETWORK-SYSTEM-FINAL\\back\\node_modules\\router\\index.js:291:5)\n    at csrfErrorHandler (file:///C:/Users/techn/Documents/PROJECTS/TERA/TERANETWORK-SYSTEM-FINAL/back/server/src/middlewares/csrf.middleware.js:311:3)\n    at Layer.handleError (C:\\Users\\techn\\Documents\\PROJECTS\\TERA\\TERANETWORK-SYSTEM-FINAL\\back\\node_modules\\router\\lib\\layer.js:116:17)\n    at trimPrefix (C:\\Users\\techn\\Documents\\PROJECTS\\TERA\\TERANETWORK-SYSTEM-FINAL\\back\\node_modules\\router\\index.js:340:13)\n    at C:\\Users\\techn\\Documents\\PROJECTS\\TERA\\TERANETWORK-SYSTEM-FINAL\\back\\node_modules\\router\\index.js:297:9","method":"POST","url":"/api/v1/admin/users","ip":"::1","userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36"}
+2026-10-02 22:03:17 [[31merror[39m]: HTTP Error: [500] POST /api/v1/admin/users - 62.670 ms 
+2026-10-02 22:03:29 [[33mwarn[39m]: Rate limit exceeded: auth {"key":"::ffff:100.122.158.28","profile":"auth","retryAfter":813}
+2026-10-02 22:03:29 [[31merror[39m]: HTTP Error: [429] POST /api/v1/admin/auth/login - 2.148 ms 
+2026-10-02 22:03:47 [[33mwarn[39m]: Rate limit exceeded: auth {"key":"::ffff:100.122.158.28","profile":"auth","retryAfter":795}
+2026-10-02 22:03:47 [[31merror[39m]: HTTP Error: [429] POST /api/v1/admin/auth/login - 1.820 ms 
+compressImage
+2026-10-02 22:14:15 [[33mwarn[39m]: Rate limit exceeded: auth {"key":"::ffff:100.122.158.28","profile":"auth","retryAfter":167}
+2026-10-02 22:14:15 [[31merror[39m]: HTTP Error: [429] POST /api/v1/admin/auth/login - 2.251 ms 
+2026-10-02 22:14:21 [[33mwarn[39m]: Rate limit exceeded: auth {"key":"::ffff:100.122.158.28","profile":"auth","retryAfter":161}
+2026-10-02 22:14:21 [[31merror[39m]: HTTP Error: [429] POST /api/v1/admin/auth/login - 1.499 ms 
+2026-10-02 22:15:41 [[31merror[39m]: HTTP Error: [422] POST /api/v1/admin/payments - 15.432 ms 
+2026-10-02 22:26:23 [[32minfo[39m]: SIGINT signal received: initiating graceful shutdown 
+2026-10-02 22:26:23 [[32minfo[39m]: Closing database connection pool... 
+2026-10-02 22:26:24 [[32minfo[39m]: Final pool statistics {"totalConnections":7,"activeConnections":0,"idleConnections":7,"queuedRequests":0}
+2026-10-02 22:26:24 [[32minfo[39m]: HTTP server closed - no longer accepting connections 
+2026-10-02 22:26:24 [[32minfo[39m]: Database connection pool closed successfully 
+2026-10-02 22:26:24 [[32minfo[39m]: ✓ Rate limiter connections closed 
+2026-10-02 22:26:24 [[32minfo[39m]: ✓ Database connections closed 
+2026-10-02 22:26:24 [[32minfo[39m]: Graceful shutdown completed successfully 
+2026-10-02 22:27:11 [[32minfo[39m]: Serving the frontend build from C:\Users\techn\Documents\PROJECTS\TERA\TERANETWORK-SYSTEM-FINAL\front\dist 
+2026-10-02 22:27:11 [[32minfo[39m]: Running startup health checks... 
+2026-10-02 22:27:11 [[32minfo[39m]: Database connection test successful 
+2026-10-02 22:27:11 [[32minfo[39m]: Database connection pool initialized {"host":"localhost","database":"teranetwork","connectionLimit":10,"charset":"utf8mb4","timezone":"+08:00"}
+2026-10-02 22:27:11 [[32minfo[39m]: ✓ Database connectivity verified 
+2026-10-02 22:27:11 [[32minfo[39m]: ✓ JWT keys verified 
+2026-10-02 22:27:11 [[32minfo[39m]: ✓ Required directories verified 
+2026-10-02 22:27:11 [[32minfo[39m]: All startup health checks passed ✓ 
+[33m
+---------------------------
+✓ SERVER READY
+Address: 169.254.83.107
+Port: 8787
+Environment: production
+---------------------------
+[0m
+2026-10-02 22:31:25 [[32minfo[39m]: SIGINT signal received: initiating graceful shutdown 
+2026-10-02 22:31:25 [[32minfo[39m]: Closing database connection pool... 
+2026-10-02 22:31:25 [[32minfo[39m]: Final pool statistics {"totalConnections":3,"activeConnections":0,"idleConnections":3,"queuedRequests":0}
+2026-10-02 22:31:25 [[32minfo[39m]: Database connection pool closed successfully 
+2026-10-02 22:31:25 [[32minfo[39m]: ✓ Rate limiter connections closed 
+2026-10-02 22:31:25 [[32minfo[39m]: ✓ Database connections closed 
+2026-10-02 22:31:25 [[32minfo[39m]: Graceful shutdown completed successfully 
+2026-10-02 22:37:58 [[32minfo[39m]: Serving the frontend build from C:\Users\techn\Documents\PROJECTS\TERA\TERANETWORK-SYSTEM-FINAL\front\dist 
+2026-10-02 22:37:58 [[32minfo[39m]: Running startup health checks... 
+2026-10-02 22:37:58 [[32minfo[39m]: Database connection test successful 
+2026-10-02 22:37:58 [[32minfo[39m]: Database connection pool initialized {"host":"localhost","database":"teranetwork","connectionLimit":10,"charset":"utf8mb4","timezone":"+08:00"}
+2026-10-02 22:37:58 [[32minfo[39m]: ✓ Database connectivity verified 
+2026-10-02 22:37:58 [[32minfo[39m]: ✓ JWT keys verified 
+2026-10-02 22:37:58 [[32minfo[39m]: ✓ Required directories verified 
+2026-10-02 22:37:58 [[32minfo[39m]: All startup health checks passed ✓ 
+[33m
+---------------------------
+✓ SERVER READY
+Address: 192.168.100.146
+Port: 8787
+Environment: production
+---------------------------
+[0m
+2026-10-02 22:38:58 [[31merror[39m]: Query failed {"duration":2,"sql":"SELECT 1 AS health_check","error":"","code":"ECONNREFUSED"}
+2026-10-02 22:38:58 [[31merror[39m]: Database health check failed {"error":"","code":"ECONNREFUSED"}
+2026-10-02 22:39:28 [[31merror[39m]: Query failed {"duration":2,"sql":"SELECT 1 AS health_check","error":"","code":"ECONNREFUSED"}
+2026-10-02 22:39:28 [[31merror[39m]: Database health check failed {"error":"","code":"ECONNREFUSED"}
+2026-10-02 22:39:52 [[32minfo[39m]: SIGINT signal received: initiating graceful shutdown 
+2026-10-02 22:39:52 [[32minfo[39m]: Closing database connection pool... 
+2026-10-02 22:39:52 [[32minfo[39m]: Final pool statistics {"totalConnections":3,"activeConnections":0,"idleConnections":3,"queuedRequests":0}
+2026-10-02 22:39:52 [[32minfo[39m]: HTTP server closed - no longer accepting connections 
+2026-10-02 22:39:52 [[32minfo[39m]: Database connection pool closed successfully 
+2026-10-02 22:39:52 [[32minfo[39m]: ✓ Rate limiter connections closed 
+2026-10-02 22:39:52 [[32minfo[39m]: ✓ Database connections closed 
+2026-10-02 22:39:52 [[32minfo[39m]: Graceful shutdown completed successfully 
+2026-10-02 22:40:29 [[32minfo[39m]: Serving the frontend build from C:\Users\techn\Documents\PROJECTS\TERA\TERANETWORK-SYSTEM-FINAL\front\dist 
+2026-10-02 22:40:29 [[32minfo[39m]: Running startup health checks... 
+2026-10-02 22:40:29 [[32minfo[39m]: Database connection test successful 
+2026-10-02 22:40:29 [[32minfo[39m]: Database connection pool initialized {"host":"localhost","database":"teranetwork","connectionLimit":10,"charset":"utf8mb4","timezone":"+08:00"}
+2026-10-02 22:40:29 [[32minfo[39m]: ✓ Database connectivity verified 
+2026-10-02 22:40:29 [[32minfo[39m]: ✓ JWT keys verified 
+2026-10-02 22:40:29 [[32minfo[39m]: ✓ Required directories verified 
+2026-10-02 22:40:29 [[32minfo[39m]: All startup health checks passed ✓ 
+[33m
+---------------------------
+✓ SERVER READY
+Address: 192.168.100.146
+Port: 8787
+Environment: production
+---------------------------
+[0m
+2026-10-02 22:41:19 [[32minfo[39m]: API Error (4xx) Invalid email or password {"requestId":"6e4f193c-8322-423b-9209-0f47c5ba337c","statusCode":401,"method":"POST","url":"/api/v1/admin/auth/login","ip":"::ffff:100.122.158.28"}
+2026-10-02 22:41:19 [[31merror[39m]: HTTP Error: [401] POST /api/v1/admin/auth/login - 64.901 ms 
+2026-10-02 22:41:25 [[32minfo[39m]: API Error (4xx) Invalid email or password {"requestId":"e15bfe74-01bc-48b3-acfc-7f7fe0abdcde","statusCode":401,"method":"POST","url":"/api/v1/admin/auth/login","ip":"::ffff:100.122.158.28"}
+2026-10-02 22:41:25 [[31merror[39m]: HTTP Error: [401] POST /api/v1/admin/auth/login - 37.371 ms 
+2026-10-02 22:41:36 [[32minfo[39m]: API Error (4xx) Invalid email or password {"requestId":"97d0c0e2-aae7-4d6f-a6a8-f5fcada85e12","statusCode":401,"method":"POST","url":"/api/v1/admin/auth/login","ip":"::ffff:100.122.158.28"}
+2026-10-02 22:41:36 [[31merror[39m]: HTTP Error: [401] POST /api/v1/admin/auth/login - 61.221 ms 
+2026-10-02 22:42:18 [[32minfo[39m]: User logged in successfully {"accountId":"324de890-be68-11f1-8891-088fc3017818"}
+2026-10-02 22:54:07 [[32minfo[39m]: SIGINT signal received: initiating graceful shutdown 
+2026-10-02 22:54:07 [[32minfo[39m]: Closing database connection pool... 
+2026-10-02 22:54:07 [[32minfo[39m]: Final pool statistics {"totalConnections":6,"activeConnections":0,"idleConnections":6,"queuedRequests":0}
+2026-10-02 22:54:07 [[32minfo[39m]: HTTP server closed - no longer accepting connections 
+2026-10-02 22:54:07 [[32minfo[39m]: Database connection pool closed successfully 
+2026-10-02 22:54:07 [[32minfo[39m]: ✓ Rate limiter connections closed 
+2026-10-02 22:54:07 [[32minfo[39m]: ✓ Database connections closed 
+2026-10-02 22:54:07 [[32minfo[39m]: Graceful shutdown completed successfully 
