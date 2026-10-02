@@ -97,6 +97,7 @@ export const processJob = async (db, job, { workerId }) => {
  * @param {Object} db
  * @param {Object} [options]
  * @param {number} [options.pollIntervalMs=3000] - wait when the queue is empty
+ * @param {number} [options.maxErrorBackoffMs=30000] - longest wait between retries while the queue keeps failing
  * @param {number} [options.reclaimEveryMs=300000] - how often to release stale locks
  * @param {string} [options.workerId]
  * @returns {{ stop: () => Promise<void> }}
@@ -104,6 +105,7 @@ export const processJob = async (db, job, { workerId }) => {
 export const startWorker = (db, options = {}) => {
   const {
     pollIntervalMs = 3000,
+    maxErrorBackoffMs = 30 * 1000,
     reclaimEveryMs = 5 * 60 * 1000,
     workerId = `worker-${process.pid}`,
   } = options;
@@ -111,6 +113,7 @@ export const startWorker = (db, options = {}) => {
   let running = true;
   let idle = Promise.resolve();
   let lastReclaim = 0;
+  let consecutiveErrors = 0;
 
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -129,6 +132,11 @@ export const startWorker = (db, options = {}) => {
 
         const job = await claim(db, { workerId });
 
+        if (consecutiveErrors > 0) {
+          logger.info(`[worker] queue reachable again after ${consecutiveErrors} failed attempt(s)`);
+          consecutiveErrors = 0;
+        }
+
         if (!job) {
           await sleep(pollIntervalMs);
           continue;
@@ -139,8 +147,19 @@ export const startWorker = (db, options = {}) => {
         // Reaching here means the queue itself failed — the database is down,
         // say. Keep looping: the alternative is a worker that exits on a blip
         // and stops disconnecting or reconnecting anyone until someone notices.
-        logger.error("[worker] loop error, continuing", { error: error.message });
-        await sleep(pollIntervalMs);
+        // Back off while it stays down (3 s, 6 s, 12 s … up to 30 s) so an outage
+        // doesn't fill the log with a line every 3 seconds.
+        consecutiveErrors += 1;
+        const retryInMs = Math.min(
+          pollIntervalMs * 2 ** (consecutiveErrors - 1),
+          maxErrorBackoffMs
+        );
+        logger.error("[worker] loop error, continuing", {
+          error: error.message,
+          attempt: consecutiveErrors,
+          retryInSeconds: Math.round(retryInMs / 1000),
+        });
+        await sleep(retryInMs);
       }
     }
 

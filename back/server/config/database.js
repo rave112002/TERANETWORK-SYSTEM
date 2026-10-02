@@ -281,8 +281,13 @@ class Database {
    * Rollback an active transaction (manual mode).
    *
    * @param {Connection} conn - The connection being used for the transaction
+   *   (undefined when beginTransaction() itself failed — then there is nothing to undo)
    */
   async rollback(conn) {
+    // The transaction template calls rollback(conn) in its catch, which also
+    // catches a failed beginTransaction() — e.g. MySQL is down — before conn is set.
+    if (!conn) return;
+
     try {
       await conn.rollback();
       logger.debug("Transaction rolled back", { threadId: conn.threadId });

@@ -1,6 +1,6 @@
 # Project status
 
-**Updated:** 2026-09-28 · Keep this page to one screen. Update it whenever something moves.
+**Updated:** 2026-10-03 · Keep this page to one screen. Update it whenever something moves.
 
 ## What the system is
 
@@ -16,19 +16,24 @@ Customer signs up → subscription → ONU provisioned on the OLT
   → 60 days suspended → modem pulled out
 ```
 
-## 🧪 Now: two-PC deployment rehearsal
+## ✅ Two-PC deployment rehearsal passed (2026-10-02)
 
-A full simulated deployment on two computers, following **[deployment-steps.md](deployment-steps.md)**:
+A clean second PC set up as a branch from nothing, following [deployment-steps.md](deployment-steps.md),
+and managed from the SuperAdmin PC over Tailscale (Windows, Node 22, MySQL 8.0.45, NSSM 2.24-101).
+Full results: [rehearsal-status.md](rehearsal-status.md).
 
-| PC | Plays | Runs |
-| --- | --- | --- |
-| **PC 1** (the developer's computer) | The central SuperAdmin PC | `superadmin-server` + SuperAdmin web app, Tailscale |
-| **PC 2** (a second computer) | The client's branch PC | MySQL, the branch server on :8787 serving the built app, the worker, Tailscale |
-
-Set PC 2 up from nothing (Node, MySQL, code, `.env`, keys, `db:setup`, services, firewall), connect
-it from SuperAdmin over Tailscale, then run the full test: billing end to end with real emails,
-GCash Check, reports, audit, restarting PC 2, PC 1 off, MySQL down, backup + restore. Results go
-here when it's done.
+- **Passed:** branch reachable only inside the tailnet · app + worker as Windows services · SuperAdmin
+  shows it Online, creates the Owner, sets settings and company profile · role menus (Billing,
+  Technician) · billing end to end with real invoice and receipt emails · GCash Check (a wrong
+  amount is flagged) · reports + CSV · audit trail, SuperAdmin's actions included · branch PC
+  restarted with nobody logged in · SuperAdmin PC off · MySQL killed, recovers by itself ·
+  password reset from SuperAdmin ends the old session · backup restored into a scratch DB, counts match.
+- **Found and fixed (2026-10-03):** five gaps in [deployment-steps.md](deployment-steps.md) (`npm ci`
+  before `build:superadmin`, NSSM 2.24-101 via winget into System32, logs folder before `nssm set`,
+  MySQL test by `taskkill` and `nssm start` after a manual stop, `mysqldump --result-file=` +
+  `source` restore), plus the site notes. One worker bug: with MySQL down, `db.rollback()` was
+  called on a connection that never opened. It now returns early, and the worker backs off
+  3 s → 30 s while the queue keeps failing instead of logging every 3 s.
 
 ## ✅ Built and working
 
@@ -53,6 +58,7 @@ here when it's done.
 | **OLT: an ONU that comes back under a new ID** | Blacklisting deletes the ONU's binding. On restore the OLT re-binds it at the lowest free ID, which need not be its old one. Suspend, restore and status all work by MAC, so nothing acts on the wrong ONU. But the stored `onuIndex` isn't updated, so the screen shows a stale ID. 1/27 kept its ID on the bench. Small fix (next, item 2). |
 | **OLT: suspending with other ONUs online** | Only one ONU was online on the bench PON. The blacklist is by MAC, so neighbours shouldn't be affected, but it hasn't been seen. |
 | **GCash Check on longer statements** | Checked on one real 1-page statement (7 rows, 2026-09-17): all rows, references, directions and the credit total read correctly. Not yet seen: a multi-page statement. Run `npm run gcash:inspect` on one when available. |
+| **Emails landing in spam** | In the rehearsal the receipt email (Gmail → Gmail) went to spam. Customers may miss invoices. Use the client's Gmail and ask customers to save the address; a domain email with SPF/DKIM later. |
 
 ## ⏳ Waiting on the client
 
@@ -65,11 +71,11 @@ here when it's done.
 1. **Customer import** from the client's subscriber spreadsheet — the biggest go-live gap.
 2. **Follow an ONU's new ID**: when a status read finds the ONU by MAC under a different
    PON/ONU, update `onuIndex` (and log it), so what staff see matches the OLT.
-3. **Automatic backups** (mysqldump + Task Scheduler, per the deployment doc).
-4. **The two-PC deployment rehearsal** above — the full test, on a clean second PC.
-5. **Per installation:** follow [deployment-steps.md](deployment-steps.md) on the client's PC
-   (fresh database, the client's Gmail, real branch name).
-6. `npm run gcash:inspect` on a multi-page statement when one is available.
+3. **Automatic backups** (mysqldump `--result-file` + Task Scheduler, per the deployment doc).
+4. **Per installation:** follow [deployment-steps.md](deployment-steps.md) on the client's PC
+   (fresh database, the client's Gmail, real branch name). Install to `C:\TERANETWORK`; the PC
+   must reach the network before Windows login (Ethernet, or Wi-Fi set to connect automatically).
+5. `npm run gcash:inspect` on a multi-page statement when one is available.
 
 ✅ Done 2026-09-28: **Express serves the React build on :8787** — one process, one address
 (`back`: `npm run serve` builds `front` and starts). Checked in Chrome: pages, login, invoice PDF.
@@ -90,6 +96,7 @@ Secure only when the server is on HTTPS (`certPath` or `COOKIE_SECURE=true`).
 | --- | --- |
 | Decisions (why things are the way they are) | [decisions.md](decisions.md) |
 | Deploying a branch, step by step (and the two-PC rehearsal) | [deployment-steps.md](deployment-steps.md) |
+| Two-PC rehearsal results (2026-10-02) | [rehearsal-status.md](rehearsal-status.md) |
 | How it is deployed (branches, SuperAdmin, Tailscale) | [isp-invoice-generator-deployment-multibranch.md](isp-invoice-generator-deployment-multibranch.md) |
 | Payments, day to day | [payments.md](payments.md) |
 | What to do when something breaks | [runbooks.md](runbooks.md) |

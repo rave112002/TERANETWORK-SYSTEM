@@ -18,7 +18,7 @@ Commit deployed: _<fill in>_
 - Password reset from SuperAdmin signs out the old session.
 - Manual backup and restore into a scratch DB: customer and invoice counts match.
 
-### Fix in deployment-steps.md
+### Fix in deployment-steps.md — ✅ applied 2026-10-03
 - **Part 4.3 / Part 6:** add `npm ci` in `front` on the superadmin PC before `npm run build:superadmin`.
 - **Part 5.3:** install NSSM with `winget install -e --id NSSM.NSSM`, then copy `nssm.exe` into System32 (services run through it, so it must not live in a user profile). Use 2.24-101, not 2.24.
 - **Part 5.3:** create the logs folder before the `nssm set ... AppStdout` lines.
@@ -27,6 +27,7 @@ Commit deployed: _<fill in>_
 
 ### Bugs found
 - **Worker transaction helper:** when getting a DB connection fails, it still calls `rollback()` / `release()` on an undefined connection ("Cannot read properties of undefined"). Guard with `if (conn)`. Consider backoff instead of a 3 s retry while the DB is down.
+  - ✅ Fixed 2026-10-03: `Database.rollback()` returns early without a connection (`back/server/config/database.js`); the worker loop backs off 3 s → 6 s → … → 30 s on consecutive queue errors and logs when the queue is reachable again (`back/server/src/lib/jobs/worker.js`).
 
 ### Notes for the real client site
 - Branch PC must reach the network **before Windows login**. Prefer Ethernet; if Wi-Fi, set the profile to "Connect automatically".

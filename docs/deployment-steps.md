@@ -127,10 +127,21 @@ setup except the code. Anything that goes wrong now is one less thing that goes 
    ```
    If Windows pops up "allow Node.js on networks", choose **Private only** / cancel. The rule above
    is the access you want. Do not forward any router port.
-3. **Run as Windows services**, so staff never start Node by hand. Install
-   [NSSM](https://nssm.cc/download) (put `nssm.exe` in `C:\Windows\System32`), stop the two
-   terminals, then in admin PowerShell:
+3. **Run as Windows services**, so staff never start Node by hand. Install NSSM **2.24-101**
+   (not 2.24) and copy `nssm.exe` into `C:\Windows\System32`. The services run through it, so it
+   must not stay inside a user's profile. In admin PowerShell:
    ```powershell
+   winget install -e --id NSSM.NSSM
+   Get-ChildItem "$env:LOCALAPPDATA\Microsoft\WinGet\Packages" -Recurse -Filter nssm.exe |
+     Where-Object FullName -like "*win64*" | Select-Object -First 1 |
+     Copy-Item -Destination C:\Windows\System32\
+   nssm version                # NSSM 2.24-101-…
+   ```
+   (If `nssm.exe` isn't found there, `where.exe nssm` shows where winget put it.)
+   Stop the two terminals, then in admin PowerShell. **Create the logs folder first:** the
+   `AppStdout` lines point into it.
+   ```powershell
+   mkdir C:\TERANETWORK\logs
    $node = (Get-Command node).Source
    nssm install TeranetworkApp    $node "server\bin\www.js"
    nssm set     TeranetworkApp    AppDirectory C:\TERANETWORK\back
@@ -142,11 +153,19 @@ setup except the code. Anything that goes wrong now is one less thing that goes 
    nssm set     TeranetworkWorker DependOnService MySQL80
    nssm set     TeranetworkWorker AppStdout C:\TERANETWORK\logs\worker.log
    nssm set     TeranetworkWorker AppStderr C:\TERANETWORK\logs\worker.log
-   mkdir C:\TERANETWORK\logs
    nssm start TeranetworkApp; nssm start TeranetworkWorker
    ```
    (`MySQL80` is the default service name; check yours in `services.msc`.) Both services start
-   automatically with Windows. *Not yet tried on this project — note anything that differs.*
+   automatically with Windows (proven in the 2026-10-02 rehearsal).
+
+   > **`DependOnService MySQL80` cuts both ways.** Stopping MySQL by hand (`net stop MySQL80`, or
+   > from `services.msc`) also stops **both** app services, and starting MySQL again does **not**
+   > bring them back. SuperAdmin then shows the branch **Offline**. After any manual MySQL stop:
+   > `net start MySQL80; nssm start TeranetworkApp; nssm start TeranetworkWorker`.
+
+4. **The PC must be on the network before anyone logs in to Windows.** Otherwise Tailscale and
+   SuperAdmin can't reach it after a restart. Use Ethernet. If it has to be Wi-Fi, set that network's
+   profile to **Connect automatically**.
 
 ## Part 6 · PC 1 (SuperAdmin): set up
 
@@ -156,6 +175,7 @@ npm install
 copy .env.example .env      # SUPERADMIN_SECRET = a generated secret (record it); HOST stays 127.0.0.1
 npm run user -- --username <you> --first <First> --last <Last>     # your SuperAdmin login
 cd ..\front
+npm ci                      # the build needs front's own dependencies
 npm run build:superadmin    # must end: check-build: dist-superadmin/ OK (SuperAdmin app)
 cd ..\superadmin-server
 npm start                   # http://127.0.0.1:8788
@@ -212,31 +232,37 @@ Tick each one. Write down anything odd, with the time, for the log check afterwa
 **Surviving the everyday**
 - [ ] **Restart PC 2.** Without logging in to Windows, from PC 1: the app opens and SuperAdmin shows Online again (services + Tailscale came back by themselves).
 - [ ] **Turn off PC 1.** PC 2 keeps working normally (branches don't depend on SuperAdmin).
-- [ ] **Stop MySQL** on PC 2 (`net stop MySQL80`): SuperAdmin shows "Online, but its database is down". Start it again: Online.
+- [ ] **Crash MySQL** on PC 2 (admin PowerShell: `taskkill /F /IM mysqld.exe`): SuperAdmin shows "Online, but its database is down", then Online again once Windows restarts MySQL by itself. Don't test with `net stop MySQL80`. It also stops both app services (see Part 5.3), and SuperAdmin shows Offline.
 - [ ] **Password reset** from SuperAdmin → Users works; the old session is signed out.
 
 **Backup and restore** (automatic backups aren't built yet; do this one by hand)
 - [ ] On PC 2:
   ```powershell
   mkdir C:\TERANETWORK\backups
-  & "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysqldump.exe" -u root -p --routines --single-transaction teranetwork > C:\TERANETWORK\backups\teranetwork-test.sql
+  & "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysqldump.exe" -u root -p --routines --single-transaction --result-file=C:\TERANETWORK\backups\teranetwork-test.sql teranetwork
   ```
-- [ ] Restore it into a scratch database and check the customer count matches:
+  Use `--result-file=`, not `> file.sql`. Windows PowerShell's `>` can write the dump as UTF-16,
+  and `mysql` can't read that back.
+- [ ] Restore it into a scratch database and check the customer and invoice counts match:
   ```powershell
   & "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe" -u root -p -e "CREATE DATABASE restore_test"
-  Get-Content C:\TERANETWORK\backups\teranetwork-test.sql | & "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe" -u root -p restore_test
+  & "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe" -u root -p restore_test -e "source C:/TERANETWORK/backups/teranetwork-test.sql"
   ```
-  Then `DROP DATABASE restore_test;`.
+  Use forward slashes in the `source` path. Then `DROP DATABASE restore_test;`.
 
 **Afterwards**
 - [ ] Read `C:\TERANETWORK\logs\app.log` and `worker.log` for errors you didn't see on screen.
-- [ ] Update [STATUS.md](STATUS.md) with what passed and what didn't.
+- [ ] Update [STATUS.md](STATUS.md) with what passed and what didn't. The 2026-10-02 rehearsal's
+  results are in [rehearsal-status.md](rehearsal-status.md).
 
 ## Part 9 · After the rehearsal, before the real client PC
 
 - The rehearsal data is fake. On the client's PC start from Part 2 with a **fresh** database; don't
   carry the test one over.
-- Use the **client's** Gmail (App Password) and the real `BRANCH_NAME`.
+- Install to `C:\TERANETWORK` (Part 3), never under a user's Documents.
+- Use the **client's** Gmail (App Password) and the real `BRANCH_NAME`. In the rehearsal, receipt
+  emails (Gmail → Gmail) went to spam. Ask customers to save the address. A domain email with
+  SPF/DKIM can come later.
 - Import the client's customers (the import screen is still to be built — see STATUS).
 - Set up **automatic backups** (still to be built — see STATUS) and test a restore on site.
 - Turn on **BitLocker** on the branch PC if available, and keep Windows, MySQL, Node and Tailscale
